@@ -1,26 +1,32 @@
 
-// Mock user data - in a real application, this would come from your backend
-const mockUsers = [
-  { email: "admin@example.com", role: "admin" },
-  { email: "bh@example.com", role: "BH" },
-  { email: "zh@example.com", role: "ZH" },
-  { email: "ch@example.com", role: "CH" },
-];
+import { supabase } from "@/integrations/supabase/client";
 
 // Function to get user role based on email
-export const getUserRole = (email: string): string => {
-  const user = mockUsers.find(user => user.email === email);
-  return user?.role || "BH"; // Default to BH if not found
+export const getUserRole = async (userId: string): Promise<string> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+    
+    if (error) throw error;
+    
+    return data?.role || "BH"; // Default to BH if not found
+  } catch (error) {
+    console.error("Error getting user role:", error);
+    return "BH"; // Default role
+  }
 };
 
-// Mock function to check if a user is authenticated
-export const isAuthenticated = (): boolean => {
-  // In a real application, check localStorage, cookies, or a state management solution
-  return false;
+// Function to check if a user is authenticated
+export const isAuthenticated = async (): Promise<boolean> => {
+  const { data } = await supabase.auth.getSession();
+  return !!data.session;
 };
 
-// Mock function to get the current user
-export const getCurrentUser = () => {
-  // In a real application, retrieve user data from storage or state
-  return null;
+// Function to get the current user
+export const getCurrentUser = async () => {
+  const { data } = await supabase.auth.getUser();
+  return data?.user || null;
 };

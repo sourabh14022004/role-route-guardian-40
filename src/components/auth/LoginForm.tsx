@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -15,8 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
-import { getUserRole } from "@/lib/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -28,10 +26,8 @@ interface LoginFormProps {
 }
 
 const LoginForm = ({ onForgotPassword }: LoginFormProps) => {
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const { signIn, loading } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -42,47 +38,7 @@ const LoginForm = ({ onForgotPassword }: LoginFormProps) => {
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setIsLoading(true);
-    
-    try {
-      // Simulation of login API call
-      // In a real application, you would call your authentication API here
-      console.log("Login attempt with:", values);
-      
-      // For demo purposes, we'll simulate a successful login after a short delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Get the user role from the mock function
-      const userRole = getUserRole(values.email);
-      
-      toast({
-        title: "Login Successful",
-        description: `Welcome back! Redirecting to ${userRole} dashboard...`,
-      });
-      
-      // Redirect based on role
-      switch (userRole) {
-        case "admin":
-          navigate("/admin/dashboard");
-          break;
-        case "BH":
-        case "ZH":
-        case "CH":
-          navigate(`/${userRole.toLowerCase()}/dashboard`);
-          break;
-        default:
-          navigate("/dashboard");
-      }
-    } catch (error) {
-      console.error("Login failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: "Invalid email or password. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await signIn(values.email, values.password);
   };
 
   return (
@@ -144,8 +100,8 @@ const LoginForm = ({ onForgotPassword }: LoginFormProps) => {
           )}
         />
         
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? (
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? (
             <span className="flex items-center gap-2">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
               Logging in...

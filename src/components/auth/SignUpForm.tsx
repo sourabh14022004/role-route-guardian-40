@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -22,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formSchema = z
   .object({
@@ -49,11 +48,9 @@ const formSchema = z
   });
 
 const SignUpForm = () => {
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const { signUp, loading } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -68,43 +65,15 @@ const SignUpForm = () => {
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setIsLoading(true);
-    
-    try {
-      // Simulation of signup API call
-      console.log("Signup with:", values);
-      
-      // For demo purposes, we'll simulate a successful signup after a short delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: "Account created!",
-        description: "Your account has been created successfully.",
-      });
-      
-      // Redirect based on role
-      switch (values.role) {
-        case "admin":
-          navigate("/admin/dashboard");
-          break;
-        case "BH":
-        case "ZH":
-        case "CH":
-          navigate(`/${values.role.toLowerCase()}/dashboard`);
-          break;
-        default:
-          navigate("/dashboard");
-      }
-    } catch (error) {
-      console.error("Signup failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Signup Failed",
-        description: "There was an error creating your account. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await signUp({
+      email: values.email,
+      password: values.password,
+      fullName: values.fullName,
+      eCode: values.eCode,
+      role: values.role,
+      location: values.location,
+      gender: values.gender,
+    });
   };
 
   return (
@@ -285,8 +254,8 @@ const SignUpForm = () => {
           />
         </div>
         
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? (
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? (
             <div className="flex items-center justify-center gap-2">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
               <span>Creating Account...</span>

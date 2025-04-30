@@ -1,23 +1,59 @@
 
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { isAuthenticated, getCurrentUser } from "@/lib/auth";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { user, session, loading } = useAuth();
   
   useEffect(() => {
-    // Check if user is authenticated and has admin role
-    if (!isAuthenticated()) {
+    if (loading) return;
+    
+    // Check if user is authenticated
+    if (!session || !user) {
       navigate("/auth");
       return;
     }
     
-    const user = getCurrentUser();
-    if (!user || user.role !== "admin") {
-      navigate("/auth");
-    }
-  }, [navigate]);
+    // Verify user is an admin
+    const checkAdminRole = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (!data || data.role.toLowerCase() !== 'admin') {
+          toast({
+            variant: "destructive",
+            title: "Access Denied",
+            description: "Admin privileges required."
+          });
+          navigate("/auth");
+        }
+      } catch (error) {
+        console.error("Error verifying admin role:", error);
+        navigate("/auth");
+      }
+    };
+    
+    checkAdminRole();
+  }, [navigate, session, user, loading]);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-8">

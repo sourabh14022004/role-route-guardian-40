@@ -1,26 +1,62 @@
 
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { isAuthenticated, getCurrentUser } from "@/lib/auth";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 const RoleDashboard = () => {
   const { role } = useParams<{ role: string }>();
   const navigate = useNavigate();
+  const { user, session, loading } = useAuth();
   
   useEffect(() => {
-    // Check if user is authenticated and has the right role
-    if (!isAuthenticated()) {
+    if (loading) return;
+    
+    // Check if user is authenticated
+    if (!session || !user) {
       navigate("/auth");
       return;
     }
     
-    const user = getCurrentUser();
-    const validRoles = ["bh", "zh", "ch"];
+    // Verify user role matches the requested dashboard
+    const checkUserRole = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) throw error;
+        
+        const validRoles = ["bh", "zh", "ch", "admin"];
+        
+        if (!data || data.role.toLowerCase() !== role?.toLowerCase() || !validRoles.includes(role?.toLowerCase() || "")) {
+          toast({
+            variant: "destructive",
+            title: "Access Denied",
+            description: "You don't have permission to view this page."
+          });
+          navigate("/auth");
+        }
+      } catch (error) {
+        console.error("Error verifying user role:", error);
+        navigate("/auth");
+      }
+    };
     
-    if (!user || user.role.toLowerCase() !== role || !validRoles.includes(role || "")) {
-      navigate("/auth");
-    }
-  }, [navigate, role]);
+    checkUserRole();
+  }, [navigate, role, session, user, loading]);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
 
   const getRoleName = () => {
     switch(role) {

@@ -1,44 +1,57 @@
 
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { isAuthenticated, getCurrentUser } from "@/lib/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
-// This is a placeholder dashboard component
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user, session, loading } = useAuth();
   
   useEffect(() => {
+    if (loading) return;
+    
     // Check if user is authenticated
-    if (!isAuthenticated()) {
+    if (!session || !user) {
       navigate("/auth");
       return;
     }
     
-    const user = getCurrentUser();
-    if (!user) {
-      navigate("/auth");
-    }
-  }, [navigate]);
+    // Redirect to role-specific dashboard if user gets here directly
+    const redirectToRoleDashboard = async () => {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileData?.role) {
+          navigate(`/${profileData.role.toLowerCase()}/dashboard`);
+        }
+      } catch (error) {
+        console.error("Error redirecting to role dashboard:", error);
+      }
+    };
+    
+    redirectToRoleDashboard();
+  }, [navigate, session, user, loading]);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
         <p className="text-lg text-slate-600">
-          Welcome to your dashboard! This is a placeholder that would show content based on your role.
+          Welcome to your dashboard! Redirecting to your role-specific dashboard...
         </p>
-        
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-md p-6 border border-slate-200">
-              <h3 className="font-medium mb-2">Card {i + 1}</h3>
-              <p className="text-slate-500 text-sm">
-                This is placeholder content for the dashboard. In a real application, 
-                this would show data relevant to your role and responsibilities.
-              </p>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
