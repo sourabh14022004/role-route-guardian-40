@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
@@ -1010,5 +1009,26 @@ export async function generateReportData(month?: string, year?: string) {
       topPerformer: "Error loading data",
       categoryBreakdown: []
     };
+  }
+}
+
+export async function fetchZoneBHRPerformance() {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_zone_bhr_performance');
+      
+    if (error) throw error;
+    
+    // Fix the typing issue - make sure we're returning an array of objects
+    const performanceData = Array.isArray(data) ? data.map(item => ({
+      name: item.name,
+      branches: item.branches,
+      coverage: item.coverage
+    })) : [];
+    
+    return performanceData;
+  } catch (error) {
+    console.error("Error fetching zone BHR performance:", error);
+    return [];
   }
 }

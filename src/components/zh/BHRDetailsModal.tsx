@@ -292,7 +292,8 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                     <TableBody>
                       {recentReports.map(report => (
                         <TableRow key={report.id}>
-                          <TableCell>{report.branches ? report.branches.name : 'Unknown'}</TableCell>
+                          <TableCell>{report.branches && typeof report.branches === 'object' ? 
+                            (report.branches as any).name : 'Unknown'}</TableCell>
                           <TableCell>{formatDate(report.visit_date)}</TableCell>
                           <TableCell>{getStatusBadge(report.status)}</TableCell>
                           <TableCell>
