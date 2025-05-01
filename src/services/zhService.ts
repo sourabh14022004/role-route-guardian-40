@@ -98,29 +98,17 @@ export async function fetchZoneBHRs(userId: string): Promise<BHRUser[]> {
 
 export async function fetchDashboardStats(userId: string) {
   try {
-    // First, get the ZH profile to identify their location
-    const { data: zhProfile, error: zhError } = await supabase
-      .from('profiles')
-      .select('location')
-      .eq('id', userId)
-      .single();
-
-    if (zhError) throw zhError;
-    if (!zhProfile) throw new Error('Zone Head profile not found');
-
-    // Count total branches in the zone
+    // Count total branches without location filter
     const { count: totalBranches, error: branchError } = await supabase
       .from('branches')
-      .select('id', { count: 'exact', head: true })
-      .eq('location', zhProfile.location);
+      .select('id', { count: 'exact', head: true });
 
     if (branchError) throw branchError;
 
-    // Count total BHRs in the zone
+    // Count total BHRs without location filter
     const { count: totalBHRs, error: bhrError } = await supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
-      .eq('location', zhProfile.location)
       .eq('role', 'BH');
 
     if (bhrError) throw bhrError;
@@ -132,9 +120,8 @@ export async function fetchDashboardStats(userId: string) {
         id,
         visit_date,
         status,
-        branches!inner (location)
-      `)
-      .eq('branches.location', zhProfile.location);
+        branches (location)
+      `);
 
     if (visitsError) throw visitsError;
 

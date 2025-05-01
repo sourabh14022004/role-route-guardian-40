@@ -36,8 +36,10 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Search, Plus, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { fetchZoneBranches, fetchZoneBHRs, assignBranchToBHR, unassignBranchFromBHR } from "@/services/zhService";
 import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 type Branch = {
   id: string;
@@ -55,6 +57,11 @@ type BHUser = {
   branches_assigned: number;
 };
 
+type BranchAssignment = {
+  user_id: string;
+  bh_name: string;
+};
+
 const ZHBranchMapping = () => {
   const { user } = useAuth();
   
@@ -62,6 +69,7 @@ const ZHBranchMapping = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [bhUsers, setBHUsers] = useState<BHUser[]>([]);
   const [filteredBranches, setFilteredBranches] = useState<Branch[]>([]);
+  const [branchAssignments, setBranchAssignments] = useState<Record<string, BranchAssignment[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   
   // Filter states
@@ -77,6 +85,7 @@ const ZHBranchMapping = () => {
     branchId: string;
     branchName: string;
     bhUserId: string;
+    bhName: string;
   } | null>(null);
   
   // Fetch data on component mount
@@ -96,6 +105,47 @@ const ZHBranchMapping = () => {
         setBranches(branchesData);
         setFilteredBranches(branchesData);
         setBHUsers(bhUsersData);
+        
+        // Fetch assignments for each branch
+        const assignmentsMap: Record<string, BranchAssignment[]> = {};
+        
+        // Process branch assignments for all branches
+        const { data: allAssignments, error } = await supabase
+          .from('branch_assignments')
+          .select(`
+            branch_id,
+            user_id,
+            profiles:user_id(full_name)
+          `);
+          
+        if (error) {
+          console.error('Error fetching branch assignments:', error);
+          return;
+        }
+        
+        // Group assignments by branch
+        allAssignments?.forEach(assignment => {
+          const branchId = assignment.branch_id;
+          const userId = assignment.user_id;
+          let bhName = 'Unknown';
+          
+          // Extract BH name
+          if (assignment.profiles && typeof assignment.profiles === 'object') {
+            const profile = assignment.profiles as { full_name?: string };
+            bhName = profile.full_name || 'Unknown';
+          }
+          
+          if (!assignmentsMap[branchId]) {
+            assignmentsMap[branchId] = [];
+          }
+          
+          assignmentsMap[branchId].push({
+            user_id: userId,
+            bh_name: bhName
+          });
+        });
+        
+        setBranchAssignments(assignmentsMap);
       } catch (error) {
         console.error("Error loading branch mapping data:", error);
         toast({
@@ -137,11 +187,12 @@ const ZHBranchMapping = () => {
     setDialogOpen(true);
   };
   
-  const handleOpenUnassignDialog = (branchId: string, branchName: string, bhUserId: string) => {
+  const handleOpenUnassignDialog = (branchId: string, branchName: string, bhUserId: string, bhName: string) => {
     setSelectedBranchForUnassign({
       branchId,
       branchName,
-      bhUserId
+      bhUserId,
+      bhName
     });
     setDialogType("unassign");
     setDialogOpen(true);
@@ -152,13 +203,51 @@ const ZHBranchMapping = () => {
       if (dialogType === "assign" && selectedBranch && selectedBHUser) {
         await assignBranchToBHR(selectedBHUser, selectedBranch.id);
         
-        // Refresh data
+        // Reload data
         if (user) {
           const [branchesData, bhUsersData] = await Promise.all([
             fetchZoneBranches(user.id),
             fetchZoneBHRs(user.id)
           ]);
           
+          // Fetch updated assignments
+          const { data: allAssignments, error } = await supabase
+            .from('branch_assignments')
+            .select(`
+              branch_id,
+              user_id,
+              profiles:user_id(full_name)
+            `);
+            
+          if (error) {
+            console.error('Error fetching branch assignments:', error);
+            return;
+          }
+          
+          // Update assignments
+          const assignmentsMap: Record<string, BranchAssignment[]> = {};
+          
+          allAssignments?.forEach(assignment => {
+            const branchId = assignment.branch_id;
+            const userId = assignment.user_id;
+            let bhName = 'Unknown';
+            
+            if (assignment.profiles && typeof assignment.profiles === 'object') {
+              const profile = assignment.profiles as { full_name?: string };
+              bhName = profile.full_name || 'Unknown';
+            }
+            
+            if (!assignmentsMap[branchId]) {
+              assignmentsMap[branchId] = [];
+            }
+            
+            assignmentsMap[branchId].push({
+              user_id: userId,
+              bh_name: bhName
+            });
+          });
+          
+          setBranchAssignments(assignmentsMap);
           setBranches(branchesData);
           setFilteredBranches(branchesData);
           setBHUsers(bhUsersData);
@@ -169,13 +258,51 @@ const ZHBranchMapping = () => {
           selectedBranchForUnassign.branchId
         );
         
-        // Refresh data
+        // Reload data
         if (user) {
           const [branchesData, bhUsersData] = await Promise.all([
             fetchZoneBranches(user.id),
             fetchZoneBHRs(user.id)
           ]);
           
+          // Fetch updated assignments
+          const { data: allAssignments, error } = await supabase
+            .from('branch_assignments')
+            .select(`
+              branch_id,
+              user_id,
+              profiles:user_id(full_name)
+            `);
+            
+          if (error) {
+            console.error('Error fetching branch assignments:', error);
+            return;
+          }
+          
+          // Update assignments
+          const assignmentsMap: Record<string, BranchAssignment[]> = {};
+          
+          allAssignments?.forEach(assignment => {
+            const branchId = assignment.branch_id;
+            const userId = assignment.user_id;
+            let bhName = 'Unknown';
+            
+            if (assignment.profiles && typeof assignment.profiles === 'object') {
+              const profile = assignment.profiles as { full_name?: string };
+              bhName = profile.full_name || 'Unknown';
+            }
+            
+            if (!assignmentsMap[branchId]) {
+              assignmentsMap[branchId] = [];
+            }
+            
+            assignmentsMap[branchId].push({
+              user_id: userId,
+              bh_name: bhName
+            });
+          });
+          
+          setBranchAssignments(assignmentsMap);
           setBranches(branchesData);
           setFilteredBranches(branchesData);
           setBHUsers(bhUsersData);
@@ -211,8 +338,8 @@ const ZHBranchMapping = () => {
         <p className="text-slate-600">Assign branches to Branch Head Representatives (BHRs)</p>
       </div>
       
-      <Card className="mb-6">
-        <CardHeader className="pb-2">
+      <Card className="mb-6 hover:shadow-md transition-shadow">
+        <CardHeader className="pb-2 bg-slate-50 border-b">
           <CardTitle>Branches</CardTitle>
           <CardDescription>Manage branch assignments for your zone</CardDescription>
         </CardHeader>
@@ -227,16 +354,31 @@ const ZHBranchMapping = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <div className="w-full md:w-48">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="platinum">Platinum</SelectItem>
+                  <SelectItem value="diamond">Diamond</SelectItem>
+                  <SelectItem value="gold">Gold</SelectItem>
+                  <SelectItem value="silver">Silver</SelectItem>
+                  <SelectItem value="bronze">Bronze</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           
           <div className="border rounded-md overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">Branch Name</TableHead>
+                  <TableHead className="w-[200px]">Branch Name</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead className="text-center">Assigned BHRs</TableHead>
+                  <TableHead>Assigned BHRs</TableHead>
                   <TableHead className="text-right w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -257,12 +399,36 @@ const ZHBranchMapping = () => {
                           {formatCategoryName(branch.category)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-center">{branch.bh_count}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          {branchAssignments[branch.id] && branchAssignments[branch.id].length > 0 ? (
+                            branchAssignments[branch.id].map((assignment, idx) => (
+                              <Badge key={idx} variant="secondary" className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200">
+                                {assignment.bh_name}
+                                <button 
+                                  className="ml-1 rounded-full hover:bg-slate-300 p-0.5"
+                                  onClick={() => handleOpenUnassignDialog(
+                                    branch.id, 
+                                    branch.name, 
+                                    assignment.user_id,
+                                    assignment.bh_name
+                                  )}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-slate-500 text-sm">No BHRs assigned</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button 
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleOpenAssignDialog(branch)}
+                          className="bg-slate-100 hover:bg-slate-200"
                         >
                           <Plus className="h-3.5 w-3.5 mr-1" />
                           Assign
@@ -288,7 +454,7 @@ const ZHBranchMapping = () => {
       
       {/* Dialogs for assigning/unassigning */}
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md">
           {dialogType === "assign" ? (
             <>
               <AlertDialogHeader>
@@ -313,7 +479,7 @@ const ZHBranchMapping = () => {
               </div>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmDialog} disabled={!selectedBHUser}>
+                <AlertDialogAction onClick={handleConfirmDialog} disabled={!selectedBHUser} className="bg-blue-600 hover:bg-blue-700">
                   Assign
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -323,12 +489,13 @@ const ZHBranchMapping = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Unassign Branch</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to unassign {selectedBranchForUnassign?.branchName} from this BHR?
+                  Are you sure you want to unassign <span className="font-medium">{selectedBranchForUnassign?.branchName}</span> from <span className="font-medium">{selectedBranchForUnassign?.bhName}</span>?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleConfirmDialog} className="bg-red-600 hover:bg-red-700">
+                  <X className="mr-2 h-4 w-4" />
                   Unassign
                 </AlertDialogAction>
               </AlertDialogFooter>

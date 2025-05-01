@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CalendarIcon, Check, X } from "lucide-react";
+import { Search, CalendarIcon, Check, X, Filter } from "lucide-react";
 import { BranchVisitReport, fetchRecentReports, fetchReportById, updateReportStatus } from "@/services/reportService";
 
 const getStatusBadge = (status: string | null) => {
@@ -67,10 +67,10 @@ const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportD
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Branch Visit Report</DialogTitle>
+          <DialogTitle className="text-xl font-bold">Branch Visit Report</DialogTitle>
         </DialogHeader>
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
             <div>
               <h3 className="text-sm font-medium text-gray-500">Branch</h3>
               <p className="text-lg font-medium">{report.branch_name}</p>
@@ -100,20 +100,20 @@ const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportD
           <div className="space-y-4">
             <h3 className="font-medium text-lg border-b pb-2">Visit Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="p-3 bg-slate-50 rounded-md">
                 <h4 className="text-sm font-medium text-gray-500">HR Connect Session</h4>
                 <p className="font-medium">{report.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
               </div>
-              <div>
+              <div className="p-3 bg-slate-50 rounded-md">
                 <h4 className="text-sm font-medium text-gray-500">Manning Percentage</h4>
                 <p className="font-medium">{report.manning_percentage}%</p>
               </div>
-              <div>
+              <div className="p-3 bg-slate-50 rounded-md">
                 <h4 className="text-sm font-medium text-gray-500">Attrition Percentage</h4>
                 <p className="font-medium">{report.attrition_percentage}%</p>
               </div>
               {report.status && (
-                <div>
+                <div className="p-3 bg-slate-50 rounded-md">
                   <h4 className="text-sm font-medium text-gray-500">Status</h4>
                   <div className="mt-1">{getStatusBadge(report.status)}</div>
                 </div>
@@ -124,7 +124,7 @@ const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportD
           {report.feedback && (
             <div>
               <h3 className="font-medium text-lg border-b pb-2">Feedback</h3>
-              <div className="mt-2 p-3 bg-gray-50 rounded-md">
+              <div className="mt-2 p-4 bg-slate-50 rounded-md">
                 <p>{report.feedback}</p>
               </div>
             </div>
@@ -200,7 +200,7 @@ const ZHReviewReports = () => {
         </p>
       </div>
 
-      <Card className="mb-6">
+      <Card className="mb-6 hover:shadow-md transition-shadow">
         <CardContent className="p-5">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
@@ -214,7 +214,8 @@ const ZHReviewReports = () => {
             </div>
             <div className="w-full md:w-48">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="flex items-center">
+                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -230,7 +231,7 @@ const ZHReviewReports = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hover:shadow-md transition-shadow">
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex justify-center py-8">
@@ -247,28 +248,31 @@ const ZHReviewReports = () => {
             </div>
           ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>BHR Name</TableHead>
-                  <TableHead>Visit Date</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="font-medium">Branch</TableHead>
+                  <TableHead className="font-medium">BHR Name</TableHead>
+                  <TableHead className="font-medium">Visit Date</TableHead>
+                  <TableHead className="font-medium">Status</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredReports.map((report) => (
-                  <TableRow key={report.id}>
+                  <TableRow key={report.id} className="hover:bg-slate-50">
                     <TableCell className="font-medium">{report.branch_name}</TableCell>
                     <TableCell>{report.bh_name}</TableCell>
                     <TableCell>{formatDate(report.visit_date)}</TableCell>
                     <TableCell>{getStatusBadge(report.status)}</TableCell>
                     <TableCell className="text-right">
                       <Button 
-                        variant="ghost" 
+                        variant="outline" 
                         size="sm"
                         onClick={() => setSelectedReportId(report.id)}
-                        className="hover:bg-blue-50 hover:text-blue-700"
+                        className={`
+                          bg-slate-100 hover:bg-slate-200 text-slate-700 
+                          ${report.status === "submitted" ? "border-blue-200 hover:border-blue-300" : ""}
+                        `}
                       >
                         {report.status === "submitted" ? "Review" : "View Details"}
                       </Button>
