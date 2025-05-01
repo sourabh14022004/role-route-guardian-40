@@ -73,7 +73,9 @@ const BranchVisitDetailsModal = ({
     }
   };
 
-  const getCategoryName = (category: string) => {
+  const getCategoryName = (category: string | undefined) => {
+    // Add null check to prevent calling charAt on undefined
+    if (!category) return "Unknown";
     return category.charAt(0).toUpperCase() + category.slice(1);
   };
 
@@ -110,18 +112,18 @@ const BranchVisitDetailsModal = ({
         <div className="py-2">
           <div className="flex flex-col md:flex-row gap-4 mb-6 items-start">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold">{visit.branches.name}</h3>
-              <p className="text-sm text-slate-500">{visit.branches.location}</p>
+              <h3 className="text-lg font-semibold">{visit.branches?.name || 'Unknown Branch'}</h3>
+              <p className="text-sm text-slate-500">{visit.branches?.location || 'Unknown Location'}</p>
             </div>
             <div>
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                visit.branch_category === 'platinum' ? 'bg-violet-100 text-violet-700' : 
-                visit.branch_category === 'diamond' ? 'bg-blue-100 text-blue-700' :
-                visit.branch_category === 'gold' ? 'bg-amber-100 text-amber-700' :
-                visit.branch_category === 'silver' ? 'bg-slate-100 text-slate-700' :
+                visit.branches?.category === 'platinum' ? 'bg-violet-100 text-violet-700' : 
+                visit.branches?.category === 'diamond' ? 'bg-blue-100 text-blue-700' :
+                visit.branches?.category === 'gold' ? 'bg-amber-100 text-amber-700' :
+                visit.branches?.category === 'silver' ? 'bg-slate-100 text-slate-700' :
                 'bg-orange-100 text-orange-700'
               }`}>
-                {getCategoryName(visit.branch_category)}
+                {getCategoryName(visit.branches?.category)}
               </div>
             </div>
           </div>

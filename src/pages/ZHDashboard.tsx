@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { BarChart2, Users, ClipboardCheck } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { getActiveBHRsCount, getTotalBranchVisitsInMonth } from "@/services/reportService";
+import { getActiveBHRsCount, getTotalBranchVisitsInMonth, fetchReportById } from "@/services/reportService";
 import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -29,6 +28,7 @@ const ZHDashboard = () => {
   const [recentReports, setRecentReports] = useState<any[]>([]);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [categoryData, setCategoryData] = useState<{name: string; value: number; color: string}[]>([]);
   
   useEffect(() => {
@@ -146,9 +146,29 @@ const ZHDashboard = () => {
     }
   };
   
-  const handleViewReport = (reportId: string) => {
-    setSelectedReportId(reportId);
-    setIsModalOpen(true);
+  const handleViewReport = async (reportId: string) => {
+    try {
+      // Fetch complete report details
+      const report = await fetchReportById(reportId);
+      
+      if (report) {
+        setSelectedVisit(report);
+        setIsModalOpen(true);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load report details.",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching report details:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load report details.",
+      });
+    }
   };
   
   return (
@@ -340,11 +360,11 @@ const ZHDashboard = () => {
       
       {/* Branch Visit Details Modal */}
       <BranchVisitDetailsModal 
-        visit={recentReports.find(r => r.id === selectedReportId)} 
+        visit={selectedVisit} 
         isOpen={isModalOpen} 
         onClose={() => {
           setIsModalOpen(false);
-          setSelectedReportId(null);
+          setSelectedVisit(null);
         }}
       />
     </div>
