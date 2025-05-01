@@ -109,7 +109,8 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
           )
         `)
         .eq('user_id', bhId)
-        .order('visit_date', { ascending: false });
+        .order('visit_date', { ascending: false })
+        .limit(10);
       
       if (error) throw error;
       
@@ -118,6 +119,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
     enabled: !!bhId && open
   });
 
+  // Fixed: Now properly waits for reportDetails data
   const { data: reportDetails, isLoading: reportDetailsLoading } = useQuery({
     queryKey: ['bhr-report-details', selectedReportId],
     queryFn: async () => {
@@ -129,7 +131,10 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
         .eq('id', selectedReportId)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching report details:", error);
+        throw error;
+      }
       return data;
     },
     enabled: !!selectedReportId
