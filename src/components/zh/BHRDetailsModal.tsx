@@ -64,7 +64,20 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
       
       if (error) throw error;
       
-      return (data || []).map(item => item.branches as Branch);
+      // Transform data to ensure it's an array of Branch objects
+      return (data || []).map(item => {
+        // Safely extract branch data
+        if (!item.branches) return null;
+        
+        // Handle the branches object
+        const branch = item.branches as unknown as Branch;
+        return {
+          id: branch.id,
+          name: branch.name,
+          location: branch.location,
+          category: branch.category
+        };
+      }).filter(Boolean) as Branch[];
     },
     enabled: !!bhId && open
   });
@@ -174,7 +187,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
         ) : (
           <>
             <div className="flex flex-col md:flex-row gap-4 md:items-start">
-              <div className="h-16 w-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl font-bold">
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-2xl font-bold shadow-md">
                 {bhrProfile.full_name.charAt(0)}
               </div>
               <div className="flex-1">
@@ -248,7 +261,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {assignedBranches.map((branch: Branch) => (
+                      {assignedBranches.map((branch) => (
                         <TableRow key={branch.id}>
                           <TableCell>{branch.name}</TableCell>
                           <TableCell>{branch.location}</TableCell>
@@ -279,7 +292,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                     <TableBody>
                       {recentReports.map(report => (
                         <TableRow key={report.id}>
-                          <TableCell>{report.branches?.name}</TableCell>
+                          <TableCell>{report.branches ? report.branches.name : 'Unknown'}</TableCell>
                           <TableCell>{formatDate(report.visit_date)}</TableCell>
                           <TableCell>{getStatusBadge(report.status)}</TableCell>
                           <TableCell>
@@ -318,11 +331,11 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm font-medium text-slate-500">Branch</p>
-                          <p className="font-medium">{reportDetails.branches?.name}</p>
+                          <p className="font-medium">{reportDetails.branches ? reportDetails.branches.name : 'Unknown'}</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-slate-500">Location</p>
-                          <p className="font-medium">{reportDetails.branches?.location}</p>
+                          <p className="font-medium">{reportDetails.branches ? reportDetails.branches.location : 'Unknown'}</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-slate-500">Visit Date</p>

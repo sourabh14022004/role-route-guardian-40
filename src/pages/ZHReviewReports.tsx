@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CalendarIcon } from "lucide-react";
+import { Search, CalendarIcon, Check, X } from "lucide-react";
 import { BranchVisitReport, fetchRecentReports, fetchReportById, updateReportStatus } from "@/services/reportService";
 
 const getStatusBadge = (status: string | null) => {
@@ -131,16 +131,20 @@ const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportD
           )}
 
           {report.status === "submitted" && (
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="sticky bottom-0 py-4 bg-white border-t mt-6 flex justify-end gap-3">
               <Button
                 variant="outline"
+                className="bg-white border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700"
                 onClick={() => onStatusUpdate(report.id, "rejected")}
               >
+                <X className="mr-2 h-4 w-4" />
                 Reject Report
               </Button>
               <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => onStatusUpdate(report.id, "approved")}
               >
+                <Check className="mr-2 h-4 w-4" />
                 Approve Report
               </Button>
             </div>
@@ -264,8 +268,9 @@ const ZHReviewReports = () => {
                         variant="ghost" 
                         size="sm"
                         onClick={() => setSelectedReportId(report.id)}
+                        className="hover:bg-blue-50 hover:text-blue-700"
                       >
-                        View Details
+                        {report.status === "submitted" ? "Review" : "View Details"}
                       </Button>
                     </TableCell>
                   </TableRow>

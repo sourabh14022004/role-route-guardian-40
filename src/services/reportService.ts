@@ -44,12 +44,30 @@ export async function fetchRecentReports(limit = 5) {
 
     // Transform the data to match our interface
     const transformedData = (data || []).map(visit => {
+      // Safely extract branch name
+      let branchName = 'Unknown Branch';
+      if (visit.branches && typeof visit.branches === 'object') {
+        const branchObj = visit.branches as { name?: string };
+        if (branchObj && typeof branchObj.name === 'string') {
+          branchName = branchObj.name;
+        }
+      }
+      
+      // Safely extract BH name
+      let bhName = 'Unknown BH';
+      if (visit.profiles && typeof visit.profiles === 'object') {
+        const profileObj = visit.profiles as { full_name?: string };
+        if (profileObj && typeof profileObj.full_name === 'string') {
+          bhName = profileObj.full_name;
+        }
+      }
+      
       return {
         id: visit.id,
         user_id: visit.user_id,
         branch_id: visit.branch_id,
-        branch_name: visit.branches ? visit.branches.name : 'Unknown Branch',
-        bh_name: visit.profiles ? visit.profiles.full_name : 'Unknown BH',
+        branch_name: branchName,
+        bh_name: bhName,
         visit_date: visit.visit_date,
         branch_category: visit.branch_category,
         hr_connect_session: visit.hr_connect_session,
@@ -84,12 +102,29 @@ export async function fetchReportById(reportId: string) {
     
     if (!data) return null;
     
+    // Safely extract properties from joined tables
+    const branchName = data.branches && typeof data.branches === 'object' 
+      ? (data.branches as any).name 
+      : undefined;
+      
+    const branchLocation = data.branches && typeof data.branches === 'object'
+      ? (data.branches as any).location
+      : undefined;
+      
+    const bhName = data.profiles && typeof data.profiles === 'object'
+      ? (data.profiles as any).full_name
+      : undefined;
+      
+    const bhCode = data.profiles && typeof data.profiles === 'object'
+      ? (data.profiles as any).e_code
+      : undefined;
+    
     return {
       ...data,
-      branch_name: data.branches ? data.branches.name : undefined,
-      branch_location: data.branches ? data.branches.location : undefined,
-      bh_name: data.profiles ? data.profiles.full_name : undefined,
-      bh_code: data.profiles ? data.profiles.e_code : undefined
+      branch_name: branchName,
+      branch_location: branchLocation,
+      bh_name: bhName,
+      bh_code: bhCode
     };
   } catch (error: any) {
     console.error("Error fetching report:", error);

@@ -46,12 +46,20 @@ const ReportDetailsModal = ({ visitId, open, onClose }: ReportDetailsModalProps)
       
       if (!data) return null;
       
+      const branchName = data.branches && typeof data.branches === 'object' 
+        ? (data.branches as any).name || 'Unknown Branch'
+        : 'Unknown Branch';
+        
+      const bhName = data.profiles && typeof data.profiles === 'object'
+        ? (data.profiles as any).full_name || 'Unknown BH'
+        : 'Unknown BH';
+      
       return {
         id: data.id,
         branch: {
-          name: data.branches ? data.branches.name : 'Unknown Branch',
+          name: branchName
         },
-        bh_name: data.profiles ? data.profiles.full_name : 'Unknown BH',
+        bh_name: bhName,
         visit_date: data.visit_date ? new Date(data.visit_date).toLocaleDateString('en-IN', {
           day: 'numeric',
           month: 'short',

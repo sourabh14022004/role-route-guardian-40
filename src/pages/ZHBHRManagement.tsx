@@ -29,7 +29,7 @@ interface BHRUser {
 const ZHBHRManagement = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [locationFilter, setLocationFilter] = useState("All Locations");
+  const [locationFilter, setLocationFilter] = useState("");
   const [selectedBHRId, setSelectedBHRId] = useState<string | null>(null);
 
   const { data: bhrs, isLoading } = useQuery({
@@ -119,7 +119,7 @@ const ZHBHRManagement = () => {
           bhr.e_code.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
         
-      const matchesLocation = locationFilter === "All Locations" || bhr.location === locationFilter;
+      const matchesLocation = !locationFilter || locationFilter === "All Locations" || bhr.location === locationFilter;
       
       return matchesSearch && matchesLocation;
     });
@@ -148,29 +148,6 @@ const ZHBHRManagement = () => {
             className="pl-10"
           />
         </div>
-        
-        <Select value={locationFilter} onValueChange={setLocationFilter}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {locations.map(location => (
-              <SelectItem key={location} value={location}>{location}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        <Select defaultValue="All Channels">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All Channels">All Channels</SelectItem>
-            <SelectItem value="Corporate">Corporate Banking</SelectItem>
-            <SelectItem value="SME">SME Banking</SelectItem>
-            <SelectItem value="Retail">Retail Banking</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* BHR Cards */}
@@ -199,10 +176,10 @@ const ZHBHRManagement = () => {
               .join('');
               
             return (
-              <Card key={bhr.id} className="hover:shadow-md transition-shadow">
+              <Card key={bhr.id} className="hover:shadow-md transition-shadow border-t-4 border-t-blue-500">
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
-                    <div className="h-14 w-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold">
+                    <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-xl font-bold shadow-md">
                       {initials}
                     </div>
                     <div className="flex-1">
@@ -219,35 +196,35 @@ const ZHBHRManagement = () => {
                   </div>
                   
                   <div className="mt-6 grid grid-cols-2 gap-4">
-                    <div className="text-center">
+                    <div className="text-center p-3 rounded-lg bg-gradient-to-r from-slate-50 to-blue-50 shadow-sm">
                       <div className="text-slate-500 text-xs mb-1">Branches Mapped</div>
-                      <div className="text-2xl font-bold">{bhr.branches_assigned}</div>
+                      <div className="text-2xl font-bold text-blue-700">{bhr.branches_assigned}</div>
                     </div>
-                    <div className="text-center">
+                    <div className="text-center p-3 rounded-lg bg-gradient-to-r from-slate-50 to-indigo-50 shadow-sm">
                       <div className="text-slate-500 text-xs mb-1">Reports Submitted</div>
-                      <div className="text-2xl font-bold">{bhr.reports_stats?.total || 0}</div>
+                      <div className="text-2xl font-bold text-indigo-700">{bhr.reports_stats?.total || 0}</div>
                     </div>
                   </div>
                   
                   <div className="mt-4 grid grid-cols-3 gap-2">
-                    <div className="text-center bg-green-50 p-2 rounded-md">
-                      <div className="text-xs text-green-700">Approved</div>
-                      <div className="font-bold">{bhr.reports_stats?.approved || 0}</div>
+                    <div className="text-center bg-green-50 p-2 rounded-md shadow-sm border border-green-100">
+                      <div className="text-xs text-green-700 font-medium">Approved</div>
+                      <div className="font-bold text-green-800">{bhr.reports_stats?.approved || 0}</div>
                     </div>
-                    <div className="text-center bg-blue-50 p-2 rounded-md">
-                      <div className="text-xs text-blue-700">Pending</div>
-                      <div className="font-bold">{bhr.reports_stats?.pending || 0}</div>
+                    <div className="text-center bg-blue-50 p-2 rounded-md shadow-sm border border-blue-100">
+                      <div className="text-xs text-blue-700 font-medium">Pending</div>
+                      <div className="font-bold text-blue-800">{bhr.reports_stats?.pending || 0}</div>
                     </div>
-                    <div className="text-center bg-red-50 p-2 rounded-md">
-                      <div className="text-xs text-red-700">Rejected</div>
-                      <div className="font-bold">{bhr.reports_stats?.rejected || 0}</div>
+                    <div className="text-center bg-red-50 p-2 rounded-md shadow-sm border border-red-100">
+                      <div className="text-xs text-red-700 font-medium">Rejected</div>
+                      <div className="font-bold text-red-800">{bhr.reports_stats?.rejected || 0}</div>
                     </div>
                   </div>
                   
                   <div className="mt-4 pt-4 border-t">
                     <Button 
                       variant="link" 
-                      className="w-full text-blue-600 font-medium p-0 h-auto"
+                      className="w-full text-blue-600 font-medium p-0 h-auto hover:text-blue-800 transition-colors"
                       onClick={() => handleBHRClick(bhr.id)}
                     >
                       View Details
