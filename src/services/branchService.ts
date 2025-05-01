@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth } from "date-fns";
 
-// Fix for the category type issue
+// Updated type definition for the category issue
 type BranchWithCategory = {
   branches?: {
     category: string;
@@ -87,7 +87,8 @@ export const getBranchCategoryCoverage = async (userId: string) => {
     // Count by category
     const categoryCounts: Record<string, { total: number, visited: number }> = {};
     
-    assignedBranches?.forEach((assignment: BranchWithCategory) => {
+    // Fix for the type mismatch
+    (assignedBranches || []).forEach((assignment: any) => {
       const category = assignment.branches?.category || "unknown";
       if (!categoryCounts[category]) {
         categoryCounts[category] = { total: 0, visited: 0 };
@@ -222,7 +223,6 @@ export const getActiveBHRCount = async () => {
   }
 };
 
-// Include the previously added functions
 // Fetch user branch visits with branch details
 export const fetchUserBranchVisits = async (userId: string) => {
   try {

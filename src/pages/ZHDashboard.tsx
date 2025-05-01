@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -23,7 +22,7 @@ import {
 } from "lucide-react";
 import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
 
-// Define proper types for the report data
+// Updated type definition to match Supabase's return structure
 type ReportData = {
   id: string;
   visit_date: string;
@@ -67,7 +66,24 @@ const ZHDashboard = () => {
         .limit(5);
         
       if (error) throw error;
-      return (data || []) as ReportData[];
+      
+      // Transform the data to match the ReportData type
+      const transformedData = data?.map(item => ({
+        id: item.id,
+        visit_date: item.visit_date,
+        status: item.status,
+        created_at: item.created_at,
+        profiles: {
+          full_name: item.profiles?.full_name || '',
+          e_code: item.profiles?.e_code || '',
+        },
+        branches: {
+          name: item.branches?.name || '',
+          location: item.branches?.location || '',
+        }
+      }));
+      
+      return (transformedData || []) as ReportData[];
     },
   });
   
