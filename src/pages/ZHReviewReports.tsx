@@ -1,403 +1,296 @@
 
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, isWithinInterval, parse, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "@/components/ui/use-toast";
-import { Loader2, Search, Calendar as CalendarIcon, CheckCircle, XCircle, Eye } from "lucide-react";
-import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
-import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, CalendarIcon, Check, X, Filter } from "lucide-react";
+import { BranchVisitReport, fetchRecentReports, fetchReportById, updateReportStatus } from "@/services/reportService";
+
+const getStatusBadge = (status: string | null) => {
+  switch(status) {
+    case "approved":
+      return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
+    case "submitted":
+      return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>;
+    case "rejected":
+      return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
+    default:
+      return <Badge className="bg-gray-100 text-gray-800">Draft</Badge>;
+  }
+};
+
+interface ReportDetailsModalProps {
+  reportId: string | null;
+  open: boolean;
+  onClose: () => void;
+  onStatusUpdate: (reportId: string, status: "approved" | "rejected") => void;
+}
+
+const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportDetailsModalProps) => {
+  const { data: report, isLoading } = useQuery({
+    queryKey: ['report-details', reportId],
+    queryFn: () => reportId ? fetchReportById(reportId) : null,
+    enabled: !!reportId && open
+  });
+
+  if (isLoading) {
+    return (
+      <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Loading report details...</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center py-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (!report) return null;
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold">Branch Visit Report</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Branch</h3>
+              <p className="text-lg font-medium">{report.branch_name}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Location</h3>
+              <p className="text-lg font-medium">{report.branch_location}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Category</h3>
+              <p className="text-lg font-medium capitalize">{report.branch_category}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Visit Date</h3>
+              <p className="text-lg font-medium">{formatDate(report.visit_date)}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">BHR Name</h3>
+              <p className="text-lg font-medium">{report.bh_name}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Employee Code</h3>
+              <p className="text-lg font-medium">{report.bh_code}</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="font-medium text-lg border-b pb-2">Visit Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-3 bg-slate-50 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500">HR Connect Session</h4>
+                <p className="font-medium">{report.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500">Manning Percentage</h4>
+                <p className="font-medium">{report.manning_percentage}%</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500">Attrition Percentage</h4>
+                <p className="font-medium">{report.attrition_percentage}%</p>
+              </div>
+              {report.status && (
+                <div className="p-3 bg-slate-50 rounded-md">
+                  <h4 className="text-sm font-medium text-gray-500">Status</h4>
+                  <div className="mt-1">{getStatusBadge(report.status)}</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {report.feedback && (
+            <div>
+              <h3 className="font-medium text-lg border-b pb-2">Feedback</h3>
+              <div className="mt-2 p-4 bg-slate-50 rounded-md">
+                <p>{report.feedback}</p>
+              </div>
+            </div>
+          )}
+
+          {report.status === "submitted" && (
+            <div className="sticky bottom-0 py-4 bg-white border-t mt-6 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                className="bg-white border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700"
+                onClick={() => onStatusUpdate(report.id, "rejected")}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Reject Report
+              </Button>
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => onStatusUpdate(report.id, "approved")}
+              >
+                <Check className="mr-2 h-4 w-4" />
+                Approve Report
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const ZHReviewReports = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{
-    from: Date | undefined;
-    to: Date | undefined;
-  }>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+
+  const { data: reports = [], isLoading, refetch } = useQuery({
+    queryKey: ['zh-all-reports'],
+    queryFn: () => fetchRecentReports(100) // Fetch more reports for this page
   });
-  const [selectedReport, setSelectedReport] = useState<any>(null);
-  const [reportDetailsOpen, setReportDetailsOpen] = useState(false);
-  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [reviewStatus, setReviewStatus] = useState<"approved" | "rejected" | null>(null);
-  const [reviewComment, setReviewComment] = useState("");
-  const queryClient = useQueryClient();
-  
-  // Fetch reports
-  const { data: reports, isLoading } = useQuery({
-    queryKey: ["branch-visits"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("branch_visits")
-        .select(`
-          *,
-          branches:branch_id (*),
-          profiles:user_id (
-            full_name,
-            e_code
-          )
-        `)
-        .order("created_at", { ascending: false });
-        
-      if (error) throw error;
-      return data || [];
-    },
-  });
-  
-  // Mutation to update report status
-  const updateReportStatusMutation = useMutation({
-    mutationFn: async ({ reportId, status, comment }: { reportId: string, status: string, comment: string }) => {
-      const { error } = await supabase
-        .from("branch_visits")
-        .update({ 
-          status, 
-          review_comment: comment,
-          reviewed_at: new Date().toISOString() 
-        })
-        .eq("id", reportId);
-        
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["branch-visits"] });
-      toast({
-        title: "Report updated",
-        description: "Report status has been successfully updated",
-      });
-      setReviewDialogOpen(false);
-      setReviewStatus(null);
-      setReviewComment("");
-    },
-    onError: (error) => {
-      console.error("Error updating report:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update report status. Please try again.",
-      });
-    },
-  });
-  
-  // Filter reports based on search, status, and date range
-  const filteredReports = reports?.filter(report => {
-    const searchMatches = !searchQuery || (
-      (report.branches?.name?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (report.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-    
-    const statusMatches = !statusFilter || report.status === statusFilter;
-    
-    let dateMatches = true;
-    if (dateRange.from && dateRange.to) {
-      const visitDate = new Date(report.visit_date);
-      dateMatches = isWithinInterval(visitDate, {
-        start: startOfDay(dateRange.from),
-        end: endOfDay(dateRange.to)
-      });
-    }
-    
-    return searchMatches && statusMatches && dateMatches;
-  }) || [];
-  
-  // Handle view report details
-  const handleViewReport = (report: any) => {
-    setSelectedReport(report);
-    setReportDetailsOpen(true);
+
+  const handleStatusUpdate = async (reportId: string, status: "approved" | "rejected") => {
+    await updateReportStatus(reportId, status);
+    refetch();
+    setSelectedReportId(null);
   };
-  
-  // Handle open review dialog
-  const handleOpenReviewDialog = (report: any) => {
-    setSelectedReport(report);
-    setReviewDialogOpen(true);
-  };
-  
-  // Handle review submission
-  const handleSubmitReview = () => {
-    if (!selectedReport || !reviewStatus) return;
+
+  const filteredReports = reports.filter((report) => {
+    const matchesSearch = 
+      (report.branch_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      report.bh_name?.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    updateReportStatusMutation.mutate({
-      reportId: selectedReport.id,
-      status: reviewStatus,
-      comment: reviewComment
+    const matchesStatus = 
+      statusFilter === "all" || 
+      report.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
     });
   };
-  
-  // Format date
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd MMM yyyy");
-  };
-  
-  // Get status badge
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "submitted":
-        return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>;
-      case "approved":
-        return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
-      case "rejected":
-        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
-      default:
-        return <Badge className="bg-slate-100 text-slate-800">Draft</Badge>;
-    }
-  };
-  
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Review Reports</h1>
-          <p className="text-slate-500">Review and approve branch visit reports</p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Review Branch Visit Reports</h1>
+        <p className="text-slate-600 mt-1">
+          Manage and review branch visit reports submitted by BHRs
+        </p>
       </div>
-      
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-            <Input 
-              placeholder="Search by branch or BHR..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+
+      <Card className="mb-6 hover:shadow-md transition-shadow">
+        <CardContent className="p-5">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+              <Input
+                placeholder="Search by branch name or BHR name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="w-full md:w-48">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="flex items-center">
+                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          
-          <Select value={statusFilter || ""} onValueChange={value => setStatusFilter(value || null)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All Statuses</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="submitted">Submitted</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, "PPP")} - {format(dateRange.to, "PPP")}
-                      </>
-                    ) : (
-                      format(dateRange.from, "PPP")
-                    )
-                  ) : (
-                    <span>Pick a date range</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange.from}
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-      </div>
-      
-      {/* Reports table */}
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : filteredReports.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <p className="text-slate-500">No reports found matching the criteria</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
+        </CardContent>
+      </Card>
+
+      <Card className="hover:shadow-md transition-shadow">
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              <span className="sr-only">Loading...</span>
+            </div>
+          ) : filteredReports.length === 0 ? (
+            <div className="py-12 text-center text-slate-500">
+              <div className="flex justify-center mb-3">
+                <CalendarIcon className="h-12 w-12 text-slate-300" />
+              </div>
+              <h3 className="text-lg font-medium mb-1">No reports found</h3>
+              <p>No branch visit reports match your current filters.</p>
+            </div>
+          ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>BHR</TableHead>
-                  <TableHead>Visit Date</TableHead>
-                  <TableHead>Submitted On</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="font-medium">Branch</TableHead>
+                  <TableHead className="font-medium">BHR Name</TableHead>
+                  <TableHead className="font-medium">Visit Date</TableHead>
+                  <TableHead className="font-medium">Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredReports.map((report) => (
-                  <TableRow key={report.id}>
-                    <TableCell className="font-medium">
-                      {report.branches?.name || "Unknown"}
-                    </TableCell>
-                    <TableCell>
-                      {report.profiles?.full_name || "Unknown"}
-                      <span className="text-xs text-slate-500 block">
-                        {report.profiles?.e_code}
-                      </span>
-                    </TableCell>
+                  <TableRow key={report.id} className="hover:bg-slate-50">
+                    <TableCell className="font-medium">{report.branch_name}</TableCell>
+                    <TableCell>{report.bh_name}</TableCell>
                     <TableCell>{formatDate(report.visit_date)}</TableCell>
-                    <TableCell>{formatDate(report.created_at)}</TableCell>
                     <TableCell>{getStatusBadge(report.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewReport(report)}
-                          className="flex items-center gap-1"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </Button>
-                        
-                        {report.status === "submitted" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenReviewDialog(report)}
-                            className="flex items-center gap-1"
-                          >
-                            Review
-                          </Button>
-                        )}
-                      </div>
+                    <TableCell className="text-right">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setSelectedReportId(report.id)}
+                        className={`
+                          bg-slate-100 hover:bg-slate-200 text-slate-700 
+                          ${report.status === "submitted" ? "border-blue-200 hover:border-blue-300" : ""}
+                        `}
+                      >
+                        {report.status === "submitted" ? "Review" : "View Details"}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        </div>
-      )}
-      
-      {/* Report details modal */}
-      <BranchVisitDetailsModal
-        visit={selectedReport}
-        isOpen={reportDetailsOpen}
-        onClose={() => {
-          setReportDetailsOpen(false);
-          setSelectedReport(null);
-        }}
+          )}
+        </CardContent>
+      </Card>
+
+      <ReportDetailsModal
+        reportId={selectedReportId}
+        open={!!selectedReportId}
+        onClose={() => setSelectedReportId(null)}
+        onStatusUpdate={handleStatusUpdate}
       />
-      
-      {/* Review dialog */}
-      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Review Report</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-slate-500">Branch</p>
-                <p className="font-medium">{selectedReport?.branches?.name}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">BHR</p>
-                <p className="font-medium">{selectedReport?.profiles?.full_name}</p>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-500">Status</p>
-              <div className="flex items-center gap-4">
-                <Button
-                  variant={reviewStatus === "approved" ? "default" : "outline"}
-                  onClick={() => setReviewStatus("approved")}
-                  className="flex items-center gap-2"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  Approve
-                </Button>
-                <Button
-                  variant={reviewStatus === "rejected" ? "default" : "outline"}
-                  onClick={() => setReviewStatus("rejected")}
-                  className="flex items-center gap-2"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Reject
-                </Button>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-500">Comment (optional)</p>
-              <Input
-                placeholder="Add a comment..."
-                value={reviewComment}
-                onChange={(e) => setReviewComment(e.target.value)}
-                className="resize-none"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSubmitReview} 
-              disabled={!reviewStatus || updateReportStatusMutation.isPending}
-            >
-              {updateReportStatusMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit Review"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
