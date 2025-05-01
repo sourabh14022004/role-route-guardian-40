@@ -11,6 +11,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchBHRReportStats } from "@/services/reportService";
 
+interface Branch {
+  id: string;
+  name: string;
+  location: string;
+  category: string;
+}
+
 interface BHRDetailsModalProps {
   bhId: string | null;
   open: boolean;
@@ -57,7 +64,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
       
       if (error) throw error;
       
-      return (data || []).map(item => item.branches);
+      return (data || []).map(item => item.branches as Branch);
     },
     enabled: !!bhId && open
   });
@@ -241,7 +248,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {assignedBranches.map((branch: any) => (
+                      {assignedBranches.map((branch: Branch) => (
                         <TableRow key={branch.id}>
                           <TableCell>{branch.name}</TableCell>
                           <TableCell>{branch.location}</TableCell>

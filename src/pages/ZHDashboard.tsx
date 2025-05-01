@@ -49,9 +49,9 @@ const ReportDetailsModal = ({ visitId, open, onClose }: ReportDetailsModalProps)
       return {
         id: data.id,
         branch: {
-          name: data.branches?.name || 'Unknown Branch',
+          name: data.branches ? data.branches.name : 'Unknown Branch',
         },
-        bh_name: data.profiles?.full_name || 'Unknown BH',
+        bh_name: data.profiles ? data.profiles.full_name : 'Unknown BH',
         visit_date: data.visit_date ? new Date(data.visit_date).toLocaleDateString('en-IN', {
           day: 'numeric',
           month: 'short',
@@ -241,7 +241,7 @@ const ZHDashboard = () => {
             <CardTitle className="text-sm font-medium text-slate-500">Active BHRs</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{statsLoading ? "..." : stats?.activeBHRs}</p>
+            <p className="text-3xl font-bold">{statsLoading ? "..." : stats?.totalBHRs}</p>
           </CardContent>
         </Card>
 

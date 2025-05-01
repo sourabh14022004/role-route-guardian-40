@@ -14,7 +14,7 @@ export interface BranchVisitReport {
   manning_percentage: number | null;
   attrition_percentage: number | null;
   feedback: string | null;
-  status: "draft" | "submitted" | "approved" | null;
+  status: "draft" | "submitted" | "approved" | "rejected" | null;
   created_at: string;
 }
 
@@ -48,8 +48,8 @@ export async function fetchRecentReports(limit = 5) {
         id: visit.id,
         user_id: visit.user_id,
         branch_id: visit.branch_id,
-        branch_name: visit.branches?.name || 'Unknown Branch',
-        bh_name: visit.profiles?.full_name || 'Unknown BH',
+        branch_name: visit.branches ? visit.branches.name : 'Unknown Branch',
+        bh_name: visit.profiles ? visit.profiles.full_name : 'Unknown BH',
         visit_date: visit.visit_date,
         branch_category: visit.branch_category,
         hr_connect_session: visit.hr_connect_session,
@@ -86,10 +86,10 @@ export async function fetchReportById(reportId: string) {
     
     return {
       ...data,
-      branch_name: data.branches?.name,
-      branch_location: data.branches?.location,
-      bh_name: data.profiles?.full_name,
-      bh_code: data.profiles?.e_code
+      branch_name: data.branches ? data.branches.name : undefined,
+      branch_location: data.branches ? data.branches.location : undefined,
+      bh_name: data.profiles ? data.profiles.full_name : undefined,
+      bh_code: data.profiles ? data.profiles.e_code : undefined
     };
   } catch (error: any) {
     console.error("Error fetching report:", error);
