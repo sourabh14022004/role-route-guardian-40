@@ -1,31 +1,8 @@
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { format, isWithinInterval, parse, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
-import { DateRange } from "react-day-picker";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -34,322 +11,393 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
-  Search,
-  Calendar as CalendarIcon,
-  FileCheck,
-  Check,
-  X,
-  Eye,
-  Filter,
-  BarChart,
-  Calendar as CalIcon,
-} from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/use-toast";
+import { Loader2, Search, Calendar as CalendarIcon, CheckCircle, XCircle, Eye } from "lucide-react";
 import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
+import { cn } from "@/lib/utils";
 
 const ZHReviewReports = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const { toast } = useToast();
-  
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
   const [selectedReport, setSelectedReport] = useState<any>(null);
+  const [reportDetailsOpen, setReportDetailsOpen] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<"approved" | "rejected" | null>(null);
+  const [reviewComment, setReviewComment] = useState("");
+  const queryClient = useQueryClient();
   
-  // Date range state with proper typing
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  
-  // Fetch reports with filters
-  const { data: reports, isLoading, refetch } = useQuery({
-    queryKey: ["zh-reports", currentPage, statusFilter, categoryFilter, dateRange, searchQuery],
+  // Fetch reports
+  const { data: reports, isLoading } = useQuery({
+    queryKey: ["branch-visits"],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from("branch_visits")
         .select(`
           *,
-          branches:branch_id(*),
-          profiles:user_id(*)
+          branches:branch_id (*),
+          profiles:user_id (
+            full_name,
+            e_code
+          )
         `)
-        .order('created_at', { ascending: false });
-      
-      // Apply filters
-      if (statusFilter) {
-        query = query.eq('status', statusFilter);
-      }
-      
-      if (categoryFilter) {
-        query = query.eq('branch_category', categoryFilter);
-      }
-      
-      if (dateRange?.from) {
-        const formattedFrom = format(dateRange.from, 'yyyy-MM-dd');
-        query = query.gte('visit_date', formattedFrom);
-      }
-      
-      if (dateRange?.to) {
-        const formattedTo = format(dateRange.to, 'yyyy-MM-dd');
-        query = query.lte('visit_date', formattedTo);
-      }
-      
-      if (searchQuery) {
-        query = query.or(`branches.name.ilike.%${searchQuery}%,profiles.full_name.ilike.%${searchQuery}%`);
-      }
-      
-      const { data, error } = await query;
-      
+        .order("created_at", { ascending: false });
+        
       if (error) throw error;
       return data || [];
     },
   });
   
-  // Handle report actions
-  const handleReportAction = async (reportId: string, status: 'approved' | 'rejected') => {
-    try {
+  // Mutation to update report status
+  const updateReportStatusMutation = useMutation({
+    mutationFn: async ({ reportId, status, comment }: { reportId: string, status: string, comment: string }) => {
       const { error } = await supabase
-        .from('branch_visits')
-        .update({ status })
-        .eq('id', reportId);
-      
+        .from("branch_visits")
+        .update({ 
+          status, 
+          review_comment: comment,
+          reviewed_at: new Date().toISOString() 
+        })
+        .eq("id", reportId);
+        
       if (error) throw error;
-      
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["branch-visits"] });
       toast({
-        title: `Report ${status === 'approved' ? 'approved' : 'rejected'} successfully`,
-        description: `The branch visit report has been ${status}.`,
+        title: "Report updated",
+        description: "Report status has been successfully updated",
       });
-      
-      refetch();
-    } catch (error: any) {
+      setReviewDialogOpen(false);
+      setReviewStatus(null);
+      setReviewComment("");
+    },
+    onError: (error) => {
+      console.error("Error updating report:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: `Failed to update report status: ${error.message}`,
+        description: "Failed to update report status. Please try again.",
+      });
+    },
+  });
+  
+  // Filter reports based on search, status, and date range
+  const filteredReports = reports?.filter(report => {
+    const searchMatches = !searchQuery || (
+      (report.branches?.name?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (report.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+    
+    const statusMatches = !statusFilter || report.status === statusFilter;
+    
+    let dateMatches = true;
+    if (dateRange.from && dateRange.to) {
+      const visitDate = new Date(report.visit_date);
+      dateMatches = isWithinInterval(visitDate, {
+        start: startOfDay(dateRange.from),
+        end: endOfDay(dateRange.to)
       });
     }
-  };
+    
+    return searchMatches && statusMatches && dateMatches;
+  }) || [];
   
+  // Handle view report details
   const handleViewReport = (report: any) => {
     setSelectedReport(report);
-    setIsViewModalOpen(true);
+    setReportDetailsOpen(true);
   };
   
+  // Handle open review dialog
+  const handleOpenReviewDialog = (report: any) => {
+    setSelectedReport(report);
+    setReviewDialogOpen(true);
+  };
+  
+  // Handle review submission
+  const handleSubmitReview = () => {
+    if (!selectedReport || !reviewStatus) return;
+    
+    updateReportStatusMutation.mutate({
+      reportId: selectedReport.id,
+      status: reviewStatus,
+      comment: reviewComment
+    });
+  };
+  
+  // Format date
   const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'MMM dd, yyyy');
-    } catch (error) {
-      return dateString;
+    return format(new Date(dateString), "dd MMM yyyy");
+  };
+  
+  // Get status badge
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "submitted":
+        return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>;
+      case "approved":
+        return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
+      case "rejected":
+        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
+      default:
+        return <Badge className="bg-slate-100 text-slate-800">Draft</Badge>;
     }
   };
-
+  
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Review Branch Visit Reports</h1>
-          <p className="text-slate-500">Approve or reject reports submitted by BHRs</p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <CalIcon className="h-4 w-4" />
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "LLL dd, y")} -{" "}
-                      {format(dateRange.to, "LLL dd, y")}
-                    </>
-                  ) : (
-                    format(dateRange.from, "LLL dd, y")
-                  )
-                ) : (
-                  <span>Date range</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={dateRange?.from}
-                selected={dateRange}
-                onSelect={(range) => setDateRange(range)}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
+          <h1 className="text-2xl font-bold">Review Reports</h1>
+          <p className="text-slate-500">Review and approve branch visit reports</p>
         </div>
       </div>
       
-      <Card className="mb-6">
-        <CardHeader className="p-4">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-              <Input 
-                placeholder="Search branch or BHR..." 
-                className="pl-9" 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
-                  <SelectItem value="platinum">Platinum</SelectItem>
-                  <SelectItem value="diamond">Diamond</SelectItem>
-                  <SelectItem value="gold">Gold</SelectItem>
-                  <SelectItem value="silver">Silver</SelectItem>
-                  <SelectItem value="bronze">Bronze</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+            <Input 
+              placeholder="Search by branch or BHR..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        </CardHeader>
-      </Card>
+          
+          <Select value={statusFilter || ""} onValueChange={value => setStatusFilter(value || null)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="submitted">Submitted</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className="w-full justify-start text-left font-normal"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "PPP")} - {format(dateRange.to, "PPP")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "PPP")
+                    )
+                  ) : (
+                    <span>Pick a date range</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      </div>
       
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Branch</TableHead>
-                <TableHead>BHR</TableHead>
-                <TableHead className="hidden md:table-cell">Visit Date</TableHead>
-                <TableHead className="hidden md:table-cell">Category</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+      {/* Reports table */}
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : filteredReports.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <p className="text-slate-500">No reports found matching the criteria</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <div className="flex justify-center">
-                      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-                    </div>
-                  </TableCell>
+                  <TableHead>Branch</TableHead>
+                  <TableHead>BHR</TableHead>
+                  <TableHead>Visit Date</TableHead>
+                  <TableHead>Submitted On</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ) : reports?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    No reports found matching your criteria
-                  </TableCell>
-                </TableRow>
-              ) : (
-                reports?.map((report) => (
+              </TableHeader>
+              <TableBody>
+                {filteredReports.map((report) => (
                   <TableRow key={report.id}>
-                    <TableCell className="font-medium">{report.branches.name}</TableCell>
-                    <TableCell>{report.profiles.full_name}</TableCell>
-                    <TableCell className="hidden md:table-cell">{formatDate(report.visit_date)}</TableCell>
-                    <TableCell className="hidden md:table-cell capitalize">{report.branch_category}</TableCell>
-                    <TableCell>
-                      <div className={cn(
-                        "px-2 py-1 text-xs rounded-full w-fit flex items-center",
-                        report.status === "approved" ? "bg-green-100 text-green-800" :
-                        report.status === "rejected" ? "bg-red-100 text-red-800" :
-                        "bg-blue-100 text-blue-800"
-                      )}>
-                        {report.status === "approved" && <Check className="mr-1 h-3 w-3" />}
-                        {report.status === "rejected" && <X className="mr-1 h-3 w-3" />}
-                        {report.status === "submitted" && <FileCheck className="mr-1 h-3 w-3" />}
-                        {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-                      </div>
+                    <TableCell className="font-medium">
+                      {report.branches?.name || "Unknown"}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                    <TableCell>
+                      {report.profiles?.full_name || "Unknown"}
+                      <span className="text-xs text-slate-500 block">
+                        {report.profiles?.e_code}
+                      </span>
+                    </TableCell>
+                    <TableCell>{formatDate(report.visit_date)}</TableCell>
+                    <TableCell>{formatDate(report.created_at)}</TableCell>
+                    <TableCell>{getStatusBadge(report.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleViewReport(report)}
-                          className="h-8 w-8 p-0"
+                          className="flex items-center gap-1"
                         >
-                          <span className="sr-only">View</span>
                           <Eye className="h-4 w-4" />
+                          View
                         </Button>
                         
                         {report.status === "submitted" && (
-                          <>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleReportAction(report.id, 'approved')}
-                              className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                            >
-                              <span className="sr-only">Approve</span>
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleReportAction(report.id, 'rejected')}
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                            >
-                              <span className="sr-only">Reject</span>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenReviewDialog(report)}
+                            className="flex items-center gap-1"
+                          >
+                            Review
+                          </Button>
                         )}
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-        <CardFooter className="flex items-center justify-between p-4">
-          <div className="text-sm text-slate-500">
-            Showing {Math.min(reports?.length || 0, 10)} of {reports?.length || 0} reports
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+      
+      {/* Report details modal */}
+      <BranchVisitDetailsModal
+        visit={selectedReport}
+        isOpen={reportDetailsOpen}
+        onClose={() => {
+          setReportDetailsOpen(false);
+          setSelectedReport(null);
+        }}
+      />
+      
+      {/* Review dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Review Report</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Branch</p>
+                <p className="font-medium">{selectedReport?.branches?.name}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">BHR</p>
+                <p className="font-medium">{selectedReport?.profiles?.full_name}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-500">Status</p>
+              <div className="flex items-center gap-4">
+                <Button
+                  variant={reviewStatus === "approved" ? "default" : "outline"}
+                  onClick={() => setReviewStatus("approved")}
+                  className="flex items-center gap-2"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Approve
+                </Button>
+                <Button
+                  variant={reviewStatus === "rejected" ? "default" : "outline"}
+                  onClick={() => setReviewStatus("rejected")}
+                  className="flex items-center gap-2"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Reject
+                </Button>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-500">Comment (optional)</p>
+              <Input
+                placeholder="Add a comment..."
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                className="resize-none"
+              />
+            </div>
           </div>
           
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious href="#" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} />
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext href="#" onClick={() => setCurrentPage(prev => prev + 1)} />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </CardFooter>
-      </Card>
-      
-      <BranchVisitDetailsModal 
-        visit={selectedReport} 
-        isOpen={isViewModalOpen}
-        onClose={() => setIsViewModalOpen(false)}
-      />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitReview} 
+              disabled={!reviewStatus || updateReportStatusMutation.isPending}
+            >
+              {updateReportStatusMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Review"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
