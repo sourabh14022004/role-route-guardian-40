@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,21 +39,21 @@ const ZHDashboard = () => {
         setActiveBHRs(activeBHRsCount);
         
         // Get total BHRs under this ZH
-        const { data: bhData, error: bhError } = await supabase
+        const { count: bhCount, error: bhError } = await supabase
           .from("profiles")
           .select("count", { count: 'exact', head: true })
           .eq("role", "BH");
         
         if (bhError) throw bhError;
-        setTotalBHRs(bhData || 0);
+        setTotalBHRs(bhCount || 0);
         
         // Get total branches count
-        const { data: branchData, error: branchError } = await supabase
+        const { count: branchCount, error: branchError } = await supabase
           .from("branches")
           .select("count", { count: 'exact', head: true });
         
         if (branchError) throw branchError;
-        setTotalBranches(branchData || 0);
+        setTotalBranches(branchCount || 0);
         
         // Get monthly visit coverage
         const monthlyVisitsCount = await getTotalBranchVisitsInMonth();

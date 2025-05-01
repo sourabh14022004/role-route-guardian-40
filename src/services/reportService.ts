@@ -1,6 +1,23 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+export interface BranchVisitReport {
+  id: string;
+  user_id: string;
+  branch_id: string;
+  visit_date: string;
+  status: string;
+  feedback?: string;
+  hr_connect_session?: boolean;
+  manning_percentage?: number;
+  attrition_percentage?: number;
+  branch_name?: string;
+  branch_location?: string;
+  branch_category?: string;
+  bh_name?: string;
+  bh_code?: string;
+}
+
 export const fetchBHRReportStats = async (bhId: string) => {
   try {
     const { data, error } = await supabase
@@ -77,5 +94,113 @@ export const getTotalBranchVisitsInMonth = async (): Promise<number> => {
   } catch (error) {
     console.error("Error fetching monthly branch visits count:", error);
     return 0;
+  }
+};
+
+// Add the missing functions needed by ZHReviewReports
+export const fetchRecentReports = async (limit = 5): Promise<BranchVisitReport[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        visit_date,
+        status,
+        user_id,
+        branch_id,
+        hr_connect_session,
+        manning_percentage,
+        attrition_percentage,
+        feedback,
+        profiles:user_id (full_name, e_code),
+        branches:branch_id (name, location, category)
+      `)
+      .order('visit_date', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
+    
+    // Transform data to match BranchVisitReport interface
+    return (data || []).map(report => ({
+      id: report.id,
+      user_id: report.user_id,
+      branch_id: report.branch_id,
+      visit_date: report.visit_date,
+      status: report.status,
+      feedback: report.feedback,
+      hr_connect_session: report.hr_connect_session,
+      manning_percentage: report.manning_percentage,
+      attrition_percentage: report.attrition_percentage,
+      branch_name: report.branches?.name,
+      branch_location: report.branches?.location,
+      branch_category: report.branches?.category,
+      bh_name: report.profiles?.full_name,
+      bh_code: report.profiles?.e_code
+    }));
+  } catch (error) {
+    console.error("Error fetching recent reports:", error);
+    return [];
+  }
+};
+
+export const fetchReportById = async (reportId: string): Promise<BranchVisitReport | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        visit_date,
+        status,
+        user_id,
+        branch_id,
+        hr_connect_session,
+        manning_percentage,
+        attrition_percentage,
+        feedback,
+        profiles:user_id (full_name, e_code),
+        branches:branch_id (name, location, category)
+      `)
+      .eq('id', reportId)
+      .single();
+    
+    if (error) throw error;
+    
+    if (!data) return null;
+    
+    return {
+      id: data.id,
+      user_id: data.user_id,
+      branch_id: data.branch_id,
+      visit_date: data.visit_date,
+      status: data.status,
+      feedback: data.feedback,
+      hr_connect_session: data.hr_connect_session,
+      manning_percentage: data.manning_percentage,
+      attrition_percentage: data.attrition_percentage,
+      branch_name: data.branches?.name,
+      branch_location: data.branches?.location,
+      branch_category: data.branches?.category,
+      bh_name: data.profiles?.full_name,
+      bh_code: data.profiles?.e_code
+    };
+  } catch (error) {
+    console.error("Error fetching report by ID:", error);
+    return null;
+  }
+};
+
+export const updateReportStatus = async (reportId: string, status: "approved" | "rejected"): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('branch_visits')
+      .update({ status })
+      .eq('id', reportId);
+    
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating report status:", error);
+    return false;
   }
 };

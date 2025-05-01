@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Eye, MapPin } from "lucide-react";
+import { Search, Filter, Eye, MapPin, User } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import BHRDetailsModal from "@/components/zh/BHRDetailsModal";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -65,7 +65,7 @@ const ZHBHRManagement = () => {
       return await fetchBHRReportStats(bhId);
     } catch (error) {
       console.error("Error fetching BHR stats:", error);
-      return { total: 0, approved: 0, pending: 0, rejected: 0, draft: 0 };
+      return { total: 0, approved: 0, pending: 0, rejected: 0 };
     }
   };
 
@@ -186,7 +186,7 @@ const BHRCard = ({ bhr, onViewDetails }: BHRCardProps) => {
             <div className="bg-slate-50 p-3 rounded-lg">
               <p className="text-sm text-slate-600 mb-1">Reports Submitted</p>
               <p className="text-3xl font-bold text-blue-700">
-                {isLoading ? "..." : (stats?.total || 0) - (stats?.draft || 0)}
+                {isLoading ? "..." : stats?.total || 0}
               </p>
             </div>
           </div>

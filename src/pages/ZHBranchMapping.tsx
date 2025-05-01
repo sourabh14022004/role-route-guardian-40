@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -195,6 +196,62 @@ const ZHBranchMapping = () => {
     });
     setDialogType("unassign");
     setDialogOpen(true);
+  };
+  
+  const handleUnassignBHR = async (branchId: string, branchName: string, bhUserId: string, bhName: string) => {
+    try {
+      await unassignBranchFromBHR(bhUserId, branchId);
+      
+      // Update the assignments in state
+      setBranchAssignments(prev => {
+        const updated = { ...prev };
+        if (updated[branchId]) {
+          updated[branchId] = updated[branchId].filter(
+            assignment => assignment.user_id !== bhUserId
+          );
+        }
+        return updated;
+      });
+      
+      // Update branch count in branches list
+      setBranches(prev => 
+        prev.map(branch => 
+          branch.id === branchId 
+            ? { ...branch, bh_count: Math.max((branch.bh_count || 1) - 1, 0) }
+            : branch
+        )
+      );
+      
+      // Also update filtered branches
+      setFilteredBranches(prev => 
+        prev.map(branch => 
+          branch.id === branchId 
+            ? { ...branch, bh_count: Math.max((branch.bh_count || 1) - 1, 0) }
+            : branch
+        )
+      );
+      
+      // Update BH user's assigned branches count
+      setBHUsers(prev => 
+        prev.map(user => 
+          user.id === bhUserId 
+            ? { ...user, branches_assigned: Math.max((user.branches_assigned || 1) - 1, 0) }
+            : user
+        )
+      );
+      
+      toast({
+        title: "BHR Unassigned",
+        description: `${bhName} has been unassigned from ${branchName}.`,
+      });
+    } catch (error) {
+      console.error("Error unassigning BHR from branch:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to unassign BHR from branch.",
+      });
+    }
   };
   
   const handleConfirmDialog = async () => {
