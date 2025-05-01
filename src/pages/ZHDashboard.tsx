@@ -1,38 +1,277 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
+
+interface BranchVisit {
+  id: string;
+  branch: {
+    name: string;
+  };
+  bh_name: string;
+  visit_date: string;
+  report_details: {
+    feedback: string;
+    manning_percentage: number;
+    attrition_percentage: number;
+    hr_connect_session: boolean;
+  };
+}
+
+interface ReportDetailsModalProps {
+  visit: BranchVisit | null;
+  open: boolean;
+  onClose: () => void;
+}
+
+const ReportDetailsModal = ({ visit, open, onClose }: ReportDetailsModalProps) => {
+  if (!visit) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Visit Report Details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Branch</p>
+              <p className="text-lg font-medium">{visit.branch.name}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">Visited By</p>
+              <p className="text-lg font-medium">{visit.bh_name}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">Visit Date</p>
+              <p className="text-lg font-medium">{visit.visit_date}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">HR Connect Session</p>
+              <p className="text-lg font-medium">{visit.report_details.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">Manning Percentage</p>
+              <p className="text-lg font-medium">{visit.report_details.manning_percentage}%</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">Attrition Percentage</p>
+              <p className="text-lg font-medium">{visit.report_details.attrition_percentage}%</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-500">Feedback</p>
+            <p className="text-base mt-1">{visit.report_details.feedback}</p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const ZHDashboard = () => {
   const { user } = useAuth();
+  const [selectedVisit, setSelectedVisit] = useState<BranchVisit | null>(null);
 
-  // Sample data for the dashboard
-  const bhrData = [
-    { id: "BHR01", name: "Amit Singh", completed: 8, total: 10, progress: 80 },
-    { id: "BHR02", name: "Priya Sharma", completed: 7, total: 8, progress: 87 },
-    { id: "BHR03", name: "Raj Patel", completed: 5, total: 6, progress: 83 },
-    { id: "BHR04", name: "Neha Gupta", completed: 9, total: 12, progress: 75 },
-    { id: "BHR05", name: "Karan Shah", completed: 4, total: 9, progress: 44 },
-  ];
+  // Fetch BHR data from Supabase
+  const { data: bhrData, isLoading: bhrLoading } = useQuery({
+    queryKey: ['zh-bhrs'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, e_code')
+          .eq('role', 'BH');
+        
+        if (error) throw error;
+        return data || [];
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to load BHRs: ${error.message}`,
+        });
+        return [];
+      }
+    }
+  });
 
-  const branchCategories = [
-    { category: "Platinum", count: 7 },
-    { category: "Diamond", count: 10 },
-    { category: "Gold", count: 14 },
-    { category: "Silver", count: 12 },
-    { category: "Bronze", count: 5 },
-  ];
+  // Fetch branch visit reports from Supabase
+  const { data: visitReports, isLoading: visitsLoading } = useQuery({
+    queryKey: ['zh-visits'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('branch_visits')
+          .select(`
+            id,
+            visit_date,
+            branches:branch_id(name),
+            profiles:user_id(full_name),
+            feedback,
+            hr_connect_session,
+            manning_percentage,
+            attrition_percentage
+          `)
+          .order('visit_date', { ascending: false })
+          .limit(5);
+        
+        if (error) throw error;
 
-  const unmappedBranches = [
-    { id: "072", name: "Branch 072 - Kurla", category: "Silver" },
-    { id: "114", name: "Branch 114 - Thane", category: "Gold" },
-    { id: "093", name: "Branch 093 - Powai", category: "Bronze" },
-  ];
+        // Transform the data to match our interface
+        const transformedData = (data || []).map(visit => ({
+          id: visit.id,
+          branch: {
+            name: visit.branches?.name || 'Unknown Branch',
+          },
+          bh_name: visit.profiles?.full_name || 'Unknown BH',
+          visit_date: new Date(visit.visit_date).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          }),
+          report_details: {
+            feedback: visit.feedback || 'No feedback provided',
+            manning_percentage: visit.manning_percentage || 0,
+            attrition_percentage: visit.attrition_percentage || 0,
+            hr_connect_session: visit.hr_connect_session || false,
+          }
+        }));
+        
+        return transformedData;
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to load visit reports: ${error.message}`,
+        });
+        return [];
+      }
+    }
+  });
+
+  // Fetch branch and BHR stats from Supabase
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['zh-stats'],
+    queryFn: async () => {
+      try {
+        // Get total branches
+        const { data: branches, error: branchesError } = await supabase
+          .from('branches')
+          .select('id', { count: 'exact' });
+        
+        if (branchesError) throw branchesError;
+        
+        // Get total BHRs
+        const { data: bhrs, error: bhrsError } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact' })
+          .eq('role', 'BH');
+        
+        if (bhrsError) throw bhrsError;
+        
+        // Get active BHRs (those with at least one branch visit in the last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const { data: activeBhrs, error: activeBhrsError } = await supabase
+          .from('branch_visits')
+          .select('user_id')
+          .gte('visit_date', thirtyDaysAgo.toISOString())
+          .eq('status', 'submitted');
+        
+        if (activeBhrsError) throw activeBhrsError;
+        
+        // Count unique active BHRs
+        const uniqueActiveBhrs = new Set(activeBhrs?.map(bhr => bhr.user_id));
+        
+        // Get unmapped branches (branches with no assignment)
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from('branch_assignments')
+          .select('branch_id');
+        
+        if (assignmentsError) throw assignmentsError;
+        
+        const assignedBranchIds = assignments?.map(a => a.branch_id) || [];
+        const { data: unmappedBranches, error: unmappedError } = await supabase
+          .from('branches')
+          .select('id')
+          .not('id', 'in', `(${assignedBranchIds.length > 0 ? assignedBranchIds.join(',') : '0'})`);
+        
+        if (unmappedError) throw unmappedError;
+        
+        return {
+          totalBranches: branches?.length || 0,
+          totalBHRs: bhrs?.length || 0,
+          activeBHRs: uniqueActiveBhrs.size,
+          unmappedBranches: unmappedBranches?.length || 0
+        };
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to load statistics: ${error.message}`,
+        });
+        return {
+          totalBranches: 0,
+          totalBHRs: 0,
+          activeBHRs: 0,
+          unmappedBranches: 0
+        };
+      }
+    }
+  });
+
+  const getBHRReportCount = async () => {
+    try {
+      // Get report counts per BHR
+      const { data, error } = await supabase
+        .from('branch_visits')
+        .select(`
+          user_id,
+          profiles:user_id(full_name)
+        `)
+        .eq('status', 'submitted');
+      
+      if (error) throw error;
+      
+      // Count reports by BHR
+      const bhrCounts: Record<string, { name: string, reports: number }> = {};
+      data?.forEach(visit => {
+        const userId = visit.user_id;
+        const name = visit.profiles?.full_name || 'Unknown';
+        
+        if (!bhrCounts[userId]) {
+          bhrCounts[userId] = { name, reports: 0 };
+        }
+        bhrCounts[userId].reports++;
+      });
+      
+      return Object.values(bhrCounts);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to load BHR report counts: ${error.message}`,
+      });
+      return [];
+    }
+  };
+
+  // Fetch BHR report counts
+  const { data: bhrReportCounts, isLoading: bhrCountsLoading } = useQuery({
+    queryKey: ['bhr-report-counts'],
+    queryFn: getBHRReportCount
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -49,7 +288,7 @@ const ZHDashboard = () => {
             <CardTitle className="text-sm font-medium text-slate-500">Total BHRs</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">12</p>
+            <p className="text-3xl font-bold">{statsLoading ? "..." : stats?.totalBHRs}</p>
           </CardContent>
         </Card>
 
@@ -58,7 +297,7 @@ const ZHDashboard = () => {
             <CardTitle className="text-sm font-medium text-slate-500">Active BHRs</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">10</p>
+            <p className="text-3xl font-bold">{statsLoading ? "..." : stats?.activeBHRs}</p>
           </CardContent>
         </Card>
 
@@ -67,7 +306,7 @@ const ZHDashboard = () => {
             <CardTitle className="text-sm font-medium text-slate-500">Total Branches</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">48</p>
+            <p className="text-3xl font-bold">{statsLoading ? "..." : stats?.totalBranches}</p>
           </CardContent>
         </Card>
 
@@ -76,15 +315,15 @@ const ZHDashboard = () => {
             <CardTitle className="text-sm font-medium text-slate-500">Unmapped Branches</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">3</p>
+            <p className="text-3xl font-bold">{statsLoading ? "..." : stats?.unmappedBranches}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Left Column - Recent Branch Visit Reports */}
+        <div className="lg:col-span-2">
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -92,105 +331,86 @@ const ZHDashboard = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Branch</TableHead>
-                    <TableHead>BH Assigned</TableHead>
-                    <TableHead>Last Report</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[
-                    { branch: "Andheri", bh: "Amit Singh", date: "15 Apr 2025", status: "Approved" },
-                    { branch: "Juhu", bh: "Priya Sharma", date: "12 Apr 2025", status: "Pending" },
-                    { branch: "Bandra", bh: "Raj Patel", date: "10 Apr 2025", status: "Approved" },
-                    { branch: "Worli", bh: "Neha Gupta", date: "8 Apr 2025", status: "Approved" },
-                    { branch: "Dadar", bh: "Karan Shah", date: "5 Apr 2025", status: "Pending" },
-                  ].map((report, i) => (
-                    <TableRow key={i}>
-                      <TableCell>{report.branch}</TableCell>
-                      <TableCell>{report.bh}</TableCell>
-                      <TableCell>{report.date}</TableCell>
-                      <TableCell>
-                        <Badge variant={report.status === "Approved" ? "default" : "outline"}>
-                          {report.status}
-                        </Badge>
-                      </TableCell>
+              {visitsLoading ? (
+                <p className="text-center py-4 text-slate-500">Loading reports...</p>
+              ) : visitReports?.length === 0 ? (
+                <p className="text-center py-4 text-slate-500">No reports found</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Branch</TableHead>
+                      <TableHead>BH Assigned</TableHead>
+                      <TableHead>Last Report</TableHead>
+                      <TableHead>Action</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>BHR Performance Overview</CardTitle>
-                <Badge variant="outline">Current Month</Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {bhrData.map((bhr) => (
-                  <div key={bhr.id} className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm font-medium">{bhr.id} - {bhr.name}</p>
-                      <p className="text-sm text-slate-500">{bhr.completed}/{bhr.total} branches</p>
-                    </div>
-                    <Progress value={bhr.progress} className="h-2" />
-                  </div>
-                ))}
-                <div className="pt-2">
-                  <Button variant="outline" size="sm" className="w-full">
-                    View All BHRs
-                  </Button>
-                </div>
-              </div>
+                  </TableHeader>
+                  <TableBody>
+                    {visitReports?.map((visit, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{visit.branch.name}</TableCell>
+                        <TableCell>{visit.bh_name}</TableCell>
+                        <TableCell>{visit.visit_date}</TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setSelectedVisit(visit)}
+                            className="flex items-center gap-1"
+                          >
+                            View Report
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-6">
+        {/* Right Column - BHR Performance Overview */}
+        <div>
           <Card>
             <CardHeader>
-              <CardTitle>Branch Category Distribution</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>BHR Report Submissions</CardTitle>
+                <Badge variant="outline">Overall</Badge>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {branchCategories.map((cat) => (
-                  <div key={cat.category} className="flex justify-between items-center">
-                    <p className="text-sm font-medium">{cat.category}</p>
-                    <p className="text-sm text-slate-500">{cat.count} branches</p>
+              {bhrCountsLoading ? (
+                <p className="text-center py-4 text-slate-500">Loading BHR data...</p>
+              ) : bhrReportCounts?.length === 0 ? (
+                <p className="text-center py-4 text-slate-500">No BHR data found</p>
+              ) : (
+                <div className="space-y-4">
+                  {bhrReportCounts?.map((bhr, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <p className="text-sm font-medium">{bhr.name}</p>
+                      <Badge variant="secondary">{bhr.reports} reports</Badge>
+                    </div>
+                  ))}
+                  <div className="pt-2">
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = "/zh/bhr-management"}>
+                      View All BHRs
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Unmapped Branches</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {unmappedBranches.map((branch) => (
-                  <div key={branch.id} className="p-2 border rounded-md">
-                    <p className="font-medium">{branch.name}</p>
-                    <p className="text-xs text-slate-500">Category: {branch.category}</p>
-                  </div>
-                ))}
-                <Button variant="secondary" size="sm" className="w-full mt-3">
-                  Assign Branches
-                </Button>
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Report Details Modal */}
+      <ReportDetailsModal 
+        visit={selectedVisit} 
+        open={!!selectedVisit} 
+        onClose={() => setSelectedVisit(null)}
+      />
     </div>
   );
 };
