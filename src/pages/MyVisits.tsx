@@ -1,12 +1,11 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Select,
@@ -15,51 +14,54 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { FilePlus, Search, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const MyVisits = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [branchCategory, setBranchCategory] = useState("");
   const [visits, setVisits] = useState<any[]>([]);
+  const isMobile = useIsMobile();
   
   return (
-    <div className="container py-6">
-      <div className="flex flex-col md:flex-row items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold mb-4 md:mb-0">My Branch Visits</h1>
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">My Branch Visits</h1>
+          <p className="text-slate-600">View and manage your branch visit records</p>
+        </div>
+        
         <Button 
           onClick={() => navigate("/bh/new-visit")}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
         >
-          <Plus className="h-4 w-4" />
+          <FilePlus className="h-4 w-4" />
           New Visit
         </Button>
       </div>
       
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>View and manage your branch visit records</CardTitle>
-          <CardDescription>
-            You can search for specific branches or filter by different attributes
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <Input
-              placeholder="Search branches or locations..."
-              className="md:max-w-xs"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        <CardHeader className="p-4 md:p-6 pt-4 pb-0 md:pt-6 md:pb-2">
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <div className="relative w-full md:max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 h-4 w-4" />
+              <Input
+                placeholder="Search branches or locations..."
+                className="pl-9 w-full"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
             
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Filters</span>
+            <div className="flex items-center gap-3 w-full md:w-auto self-end">
+              <span className="text-sm font-medium whitespace-nowrap">Filters</span>
               <Select
                 value={branchCategory}
                 onValueChange={setBranchCategory}
               >
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full md:w-[180px] border-slate-200">
                   <SelectValue placeholder="Branch category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -73,19 +75,36 @@ const MyVisits = () => {
               </Select>
             </div>
           </div>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-2 md:pt-4">
+          {/* Mobile filter button */}
+          {isMobile && (
+            <div className="flex justify-end mb-4">
+              <Button variant="outline" size="sm" className="text-xs flex gap-1.5 items-center">
+                <Filter className="h-3 w-3" />
+                More filters
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
       
       {visits.length === 0 ? (
-        <div className="bg-muted/50 rounded-lg p-8 text-center">
+        <div className="bg-white rounded-lg border p-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+            <Search className="h-8 w-8 text-slate-400" />
+          </div>
           <h3 className="text-xl font-medium mb-2">No visits found matching your filters</h3>
-          <p className="text-muted-foreground mb-6">
+          <p className="text-slate-500 mb-6">
             Try changing your search criteria or create a new branch visit record.
           </p>
-          <Button variant="outline" onClick={() => {
-            setSearchQuery("");
-            setBranchCategory("");
-          }}>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setSearchQuery("");
+              setBranchCategory("");
+            }}
+          >
             Reset Filters
           </Button>
         </div>

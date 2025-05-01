@@ -15,7 +15,6 @@ import BHDashboardLayout from "./components/bh/BHDashboardLayout";
 import BHDashboard from "./pages/BHDashboard";
 import NewVisit from "./pages/NewVisit";
 import MyVisits from "./pages/MyVisits";
-import BHCalendar from "./pages/BHCalendar";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +30,6 @@ const AppRoutes = () => (
       <Route path="dashboard" element={<BHDashboard />} />
       <Route path="new-visit" element={<NewVisit />} />
       <Route path="my-visits" element={<MyVisits />} />
-      <Route path="calendar" element={<BHCalendar />} />
     </Route>
     
     <Route path="/:role/dashboard" element={<RoleDashboard />} />
