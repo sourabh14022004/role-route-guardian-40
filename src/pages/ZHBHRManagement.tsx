@@ -27,7 +27,6 @@ interface BHRUser {
   e_code: string;
   location: string;
   branches_assigned: number;
-  // The email field is removed as it's not in the BHRUser type in zhService.ts
 }
 
 const ZHBHRManagement = () => {
@@ -119,7 +118,7 @@ const ZHBHRManagement = () => {
         </CardContent>
       </Card>
       
-      <Card className="hover:shadow-md transition-shadow">
+      <Card className="hover:shadow-md transition-shadow bg-gradient-to-br from-card to-secondary/80 backdrop-blur-sm">
         <CardHeader className="bg-slate-50 border-b">
           <CardTitle>Branch Head Representatives</CardTitle>
         </CardHeader>

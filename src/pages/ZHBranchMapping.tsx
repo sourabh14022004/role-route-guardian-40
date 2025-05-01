@@ -74,7 +74,7 @@ const ZHBranchMapping = () => {
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   
   // Action states
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
@@ -360,7 +360,7 @@ const ZHBranchMapping = () => {
                   <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="platinum">Platinum</SelectItem>
                   <SelectItem value="diamond">Diamond</SelectItem>
                   <SelectItem value="gold">Gold</SelectItem>
