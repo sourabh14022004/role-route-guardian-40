@@ -4,22 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchZoneBHRs } from "@/services/zhService";
 import { fetchBHRReportStats } from "@/services/reportService";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Eye, User } from "lucide-react";
+import { Search, Filter, Eye, MapPin } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import BHRDetailsModal from "@/components/zh/BHRDetailsModal";
-import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface BHRUser {
   id: string;
@@ -118,77 +110,30 @@ const ZHBHRManagement = () => {
         </CardContent>
       </Card>
       
-      <Card className="hover:shadow-md transition-shadow bg-gradient-to-br from-card to-secondary/80 backdrop-blur-sm">
-        <CardHeader className="bg-slate-50 border-b">
-          <CardTitle>Branch Head Representatives</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {usersLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-              <span className="sr-only">Loading...</span>
-            </div>
-          ) : filteredBHRs.length === 0 ? (
-            <div className="py-12 text-center text-slate-500">
-              <div className="flex justify-center mb-3">
-                <User className="h-12 w-12 text-slate-300" />
-              </div>
-              <h3 className="text-lg font-medium mb-1">No BHRs found</h3>
-              <p>No Branch Head Representatives match your current filters.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-medium">Name</TableHead>
-                  <TableHead className="font-medium">Employee Code</TableHead>
-                  <TableHead className="font-medium">Location</TableHead>
-                  <TableHead className="font-medium">Assigned Branches</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBHRs.map((bhr) => (
-                  <TableRow key={bhr.id} className="hover:bg-slate-50">
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-medium text-sm">
-                          {bhr.full_name?.charAt(0) || 'B'}
-                        </div>
-                        {bhr.full_name}
-                      </div>
-                    </TableCell>
-                    <TableCell>{bhr.e_code || 'N/A'}</TableCell>
-                    <TableCell>{bhr.location || 'Not assigned'}</TableCell>
-                    <TableCell>
-                      {bhr.branches_assigned > 0 ? (
-                        <Badge className="bg-blue-100 text-blue-800">
-                          {bhr.branches_assigned} branch{bhr.branches_assigned !== 1 ? 'es' : ''}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-slate-500">
-                          No branches
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setSelectedBHId(bhr.id)}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {usersLoading ? (
+        <div className="flex justify-center py-8">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <span className="sr-only">Loading...</span>
+        </div>
+      ) : filteredBHRs.length === 0 ? (
+        <div className="py-12 text-center text-slate-500 bg-white rounded-lg shadow-sm">
+          <div className="flex justify-center mb-3">
+            <User className="h-12 w-12 text-slate-300" />
+          </div>
+          <h3 className="text-lg font-medium mb-1">No BHRs found</h3>
+          <p>No Branch Head Representatives match your current filters.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredBHRs.map((bhr) => (
+            <BHRCard
+              key={bhr.id}
+              bhr={bhr}
+              onViewDetails={() => setSelectedBHId(bhr.id)}
+            />
+          ))}
+        </div>
+      )}
       
       {/* BHR Details Modal */}
       <BHRDetailsModal
@@ -197,6 +142,85 @@ const ZHBHRManagement = () => {
         onClose={() => setSelectedBHId(null)}
       />
     </div>
+  );
+};
+
+// BHR Card Component
+interface BHRCardProps {
+  bhr: BHRUser;
+  onViewDetails: () => void;
+}
+
+const BHRCard = ({ bhr, onViewDetails }: BHRCardProps) => {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['bhr-stats', bhr.id],
+    queryFn: async () => await fetchBHRReportStats(bhr.id),
+  });
+
+  return (
+    <Card className="overflow-hidden hover:shadow-md transition-shadow border border-slate-200 rounded-xl">
+      <CardContent className="p-0">
+        <div className="p-6 pb-4">
+          <div className="flex items-center gap-4 mb-4">
+            <Avatar className="h-16 w-16 bg-blue-600/80 text-white text-xl">
+              <AvatarFallback>
+                {bhr.full_name?.charAt(0) || 'B'}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="text-xl font-semibold">{bhr.full_name}</h3>
+              <p className="text-slate-500">{bhr.e_code || 'No Employee Code'}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center text-slate-600 mb-5">
+            <MapPin className="h-4 w-4 mr-2" />
+            <span>{bhr.location || 'No location assigned'}</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-slate-50 p-3 rounded-lg">
+              <p className="text-sm text-slate-600 mb-1">Branches Mapped</p>
+              <p className="text-3xl font-bold text-blue-700">{bhr.branches_assigned}</p>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg">
+              <p className="text-sm text-slate-600 mb-1">Reports Submitted</p>
+              <p className="text-3xl font-bold text-blue-700">
+                {isLoading ? "..." : (stats?.total || 0) - (stats?.draft || 0)}
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-green-50 p-2 rounded-lg text-center">
+              <p className="text-sm font-medium text-green-700">Approved</p>
+              <p className="text-xl font-bold text-green-700">
+                {isLoading ? "..." : stats?.approved || 0}
+              </p>
+            </div>
+            <div className="bg-blue-50 p-2 rounded-lg text-center">
+              <p className="text-sm font-medium text-blue-700">Pending</p>
+              <p className="text-xl font-bold text-blue-700">
+                {isLoading ? "..." : stats?.pending || 0}
+              </p>
+            </div>
+            <div className="bg-red-50 p-2 rounded-lg text-center">
+              <p className="text-sm font-medium text-red-700">Rejected</p>
+              <p className="text-xl font-bold text-red-700">
+                {isLoading ? "..." : stats?.rejected || 0}
+              </p>
+            </div>
+          </div>
+          
+          <div className="border-t pt-4 flex justify-center">
+            <Button variant="outline" onClick={onViewDetails} className="w-full">
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
