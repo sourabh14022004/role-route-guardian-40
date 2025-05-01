@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowRight, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchDashboardStats } from "@/services/zhService";
@@ -111,7 +111,6 @@ const ReportDetailsModal = ({ visitId, open, onClose }: ReportDetailsModalProps)
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Loading report details...</DialogTitle>
-            <DialogDescription>Please wait while we fetch the report.</DialogDescription>
           </DialogHeader>
           <div className="flex justify-center py-6">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
@@ -121,26 +120,13 @@ const ReportDetailsModal = ({ visitId, open, onClose }: ReportDetailsModalProps)
     );
   }
 
-  if (!visit) {
-    return (
-      <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Report Not Found</DialogTitle>
-            <DialogDescription>We couldn't find the requested report.</DialogDescription>
-          </DialogHeader>
-          <Button onClick={onClose}>Close</Button>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  if (!visit) return null;
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Branch Visit Report</DialogTitle>
-          <DialogDescription>Details of the branch visit on {visit.visit_date}</DialogDescription>
         </DialogHeader>
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">

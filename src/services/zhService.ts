@@ -3,79 +3,39 @@ import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
 
 type Branch = Database['public']['Tables']['branches']['Row'];
-type BranchWithAssignments = Branch & { bh_count: number; bh_assignments?: Array<{ user_id: string, bh_name: string }> };
+type BranchWithAssignments = Branch & { bh_count: number };
 type BHRUser = Database['public']['Tables']['profiles']['Row'] & { branches_assigned: number };
 
 export async function fetchZoneBranches(userId: string): Promise<BranchWithAssignments[]> {
   try {
-    // Get all branches without location filter - fixed the query to properly handle relationships
+    // Get all branches without location filter
     const { data: branches, error: branchError } = await supabase
       .from('branches')
-      .select('*');
+      .select(`
+        *,
+        branch_assignments (
+          user_id
+        )
+      `);
 
     if (branchError) throw branchError;
 
-    // Get branch assignments separately - this resolves the relationship error
-    const { data: branchAssignments, error: assignmentsError } = await supabase
-      .from('branch_assignments')
-      .select('branch_id, user_id');
-
-    if (assignmentsError) throw assignmentsError;
-
-    // Get all branch assignments with BH names
-    const { data: allAssignments, error: profilesError } = await supabase
-      .from('branch_assignments')
-      .select(`
-        branch_id,
-        user_id,
-        profiles:profiles!user_id(full_name)
-      `);
-      
-    if (profilesError) throw profilesError;
-
-    // Group assignments by branch id
-    const assignmentsByBranch: Record<string, Array<{user_id: string, bh_name: string}>> = {};
-
-    allAssignments?.forEach(assignment => {
-      const branchId = assignment.branch_id;
-      const userId = assignment.user_id;
-      let bhName = 'Unknown';
-      
-      // Extract BH name
-      if (assignment.profiles && typeof assignment.profiles === 'object') {
-        const profile = assignment.profiles as { full_name?: string };
-        bhName = profile.full_name || 'Unknown';
-      }
-
-      if (!assignmentsByBranch[branchId]) {
-        assignmentsByBranch[branchId] = [];
-      }
-
-      assignmentsByBranch[branchId].push({
-        user_id: userId,
-        bh_name: bhName
-      });
-    });
-    
-    // Count assignments per branch from the branchAssignments data
-    const assignmentCountByBranch: Record<string, Set<string>> = {};
-    
-    branchAssignments?.forEach(assignment => {
-      if (!assignmentCountByBranch[assignment.branch_id]) {
-        assignmentCountByBranch[assignment.branch_id] = new Set();
-      }
-      assignmentCountByBranch[assignment.branch_id].add(assignment.user_id);
-    });
-    
-    // Process the data to count BHs per branch and add assignments data
+    // Process the data to count BHs per branch
     const processedBranches = branches.map(branch => {
-      // Count unique BHs for this branch using our separate assignments data
-      const uniqueBhsSet = assignmentCountByBranch[branch.id] || new Set();
-      
+      // Count unique BHs for this branch
+      const uniqueBhs = new Set();
+      if (branch.branch_assignments) {
+        // Handle array of branch_assignments
+        if (Array.isArray(branch.branch_assignments)) {
+          branch.branch_assignments.forEach((assignment: any) => {
+            uniqueBhs.add(assignment.user_id);
+          });
+        }
+      }
+
       return {
         ...branch,
-        bh_count: uniqueBhsSet.size,
-        bh_assignments: assignmentsByBranch[branch.id] || []
+        bh_count: uniqueBhs.size
       };
     });
 
