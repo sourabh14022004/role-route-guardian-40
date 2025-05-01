@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,6 +35,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchAssignedBranchesWithDetails, createBranchVisit } from "@/services/branchService";
+import { toast } from "@/components/ui/use-toast";
+import { Database } from "@/integrations/supabase/types";
+
+type Branch = Database["public"]["Tables"]["branches"]["Row"];
 
 const formSchema = z.object({
   branchId: z.string({
@@ -68,6 +75,10 @@ const formSchema = z.object({
 const NewVisit = () => {
   const [formStep, setFormStep] = useState(0);
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [loading, setLoading] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -89,32 +100,194 @@ const NewVisit = () => {
   
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log(values);
+  useEffect(() => {
+    const loadBranches = async () => {
+      if (!user) return;
+      
+      try {
+        const assignedBranches = await fetchAssignedBranchesWithDetails(user.id);
+        setBranches(assignedBranches);
+        
+        // Set default branch category based on first branch if available
+        if (assignedBranches.length > 0 && form.getValues('branchId')) {
+          const selectedBranch = assignedBranches.find(branch => branch.id === form.getValues('branchId'));
+          if (selectedBranch) {
+            form.setValue('branchCategory', selectedBranch.category);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading branches:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load assigned branches.",
+        });
+      }
+    };
+    
+    loadBranches();
+  }, [user]);
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "You must be logged in to submit a visit form.",
+      });
+      return;
+    }
+    
+    setLoading(true);
     setSaveStatus("saving");
     
-    // Here you would save to Supabase
-    setTimeout(() => {
-      setSaveStatus("saved");
-      // Reset after a short delay
-      setTimeout(() => {
-        setSaveStatus("idle");
-      }, 2000);
-    }, 1000);
+    try {
+      // Format the date to YYYY-MM-DD for Supabase
+      const formattedDate = format(values.visitDate, 'yyyy-MM-dd');
+      
+      const visitData = {
+        user_id: user.id,
+        branch_id: values.branchId,
+        visit_date: formattedDate,
+        branch_category: values.branchCategory as any,
+        hr_connect_session: values.hrConnectSession,
+        total_employees_invited: values.totalEmployeesInvited,
+        total_participants: values.totalParticipants,
+        manning_percentage: values.manningPercentage,
+        attrition_percentage: values.attritionPercentage,
+        non_vendor_percentage: values.nonVendorPercentage,
+        er_percentage: values.erPercentage,
+        cwt_cases: values.cwtCases,
+        performance_level: values.performanceLevel,
+        new_employees_total: values.newEmployeesTotal,
+        new_employees_covered: values.newEmployeesCovered,
+        star_employees_total: values.starEmployeesTotal,
+        star_employees_covered: values.starEmployeesCovered,
+        culture_branch: values.cultureBranch,
+        line_manager_behavior: values.lineManagerBehavior,
+        branch_hygiene: values.branchHygiene,
+        overall_discipline: values.overallDiscipline,
+        feedback: values.feedback,
+        status: "submitted" as const
+      };
+      
+      const result = await createBranchVisit(visitData);
+      
+      if (result) {
+        setSaveStatus("saved");
+        toast({
+          title: "Success",
+          description: "Branch visit has been submitted successfully.",
+        });
+        
+        // Navigate back to visits page after a short delay
+        setTimeout(() => {
+          navigate("/bh/my-visits");
+        }, 1500);
+      }
+    } catch (error: any) {
+      console.error("Error submitting visit:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to submit branch visit.",
+      });
+      setSaveStatus("idle");
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const saveDraft = () => {
-    const values = form.getValues();
-    console.log("Saving draft:", values);
-    setSaveStatus("saving");
+  const saveDraft = async () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "You must be logged in to save a draft visit.",
+      });
+      return;
+    }
     
-    // Save draft logic
-    setTimeout(() => {
-      setSaveStatus("saved");
-      setTimeout(() => {
+    try {
+      setSaveStatus("saving");
+      setLoading(true);
+      
+      const values = form.getValues();
+      
+      // Make sure required fields are set
+      if (!values.branchId) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Please select a branch before saving.",
+        });
         setSaveStatus("idle");
-      }, 2000);
-    }, 1000);
+        setLoading(false);
+        return;
+      }
+      
+      // Format the date to YYYY-MM-DD for Supabase
+      const formattedDate = format(values.visitDate, 'yyyy-MM-dd');
+      
+      const draftData = {
+        user_id: user.id,
+        branch_id: values.branchId,
+        visit_date: formattedDate,
+        branch_category: values.branchCategory as any,
+        hr_connect_session: values.hrConnectSession,
+        total_employees_invited: values.totalEmployeesInvited,
+        total_participants: values.totalParticipants,
+        manning_percentage: values.manningPercentage,
+        attrition_percentage: values.attritionPercentage,
+        non_vendor_percentage: values.nonVendorPercentage,
+        er_percentage: values.erPercentage,
+        cwt_cases: values.cwtCases,
+        performance_level: values.performanceLevel,
+        new_employees_total: values.newEmployeesTotal,
+        new_employees_covered: values.newEmployeesCovered,
+        star_employees_total: values.starEmployeesTotal,
+        star_employees_covered: values.starEmployeesCovered,
+        culture_branch: values.cultureBranch,
+        line_manager_behavior: values.lineManagerBehavior,
+        branch_hygiene: values.branchHygiene,
+        overall_discipline: values.overallDiscipline,
+        feedback: values.feedback,
+        status: "draft" as const
+      };
+      
+      const result = await createBranchVisit(draftData);
+      
+      if (result) {
+        setSaveStatus("saved");
+        toast({
+          title: "Success",
+          description: "Draft has been saved successfully.",
+        });
+        
+        // Navigate back to visits page after a short delay
+        setTimeout(() => {
+          navigate("/bh/my-visits");
+        }, 1500);
+      }
+    } catch (error: any) {
+      console.error("Error saving draft:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to save draft.",
+      });
+      setSaveStatus("idle");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle branch selection and update category
+  const handleBranchChange = (branchId: string) => {
+    const selectedBranch = branches.find(branch => branch.id === branchId);
+    if (selectedBranch) {
+      form.setValue('branchCategory', selectedBranch.category);
+    }
   };
 
   const calculateCoverage = () => {
@@ -156,16 +329,24 @@ const NewVisit = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Branch</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          handleBranchChange(value);
+                        }}
+                        defaultValue={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a branch" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="branch1">Branch 1</SelectItem>
-                          <SelectItem value="branch2">Branch 2</SelectItem>
-                          <SelectItem value="branch3">Branch 3</SelectItem>
+                          {branches.map(branch => (
+                            <SelectItem key={branch.id} value={branch.id}>
+                              {branch.name} ({branch.location})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -219,7 +400,7 @@ const NewVisit = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Branch Category</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select branch category" />
@@ -451,7 +632,7 @@ const NewVisit = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Performance</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select performance level" />
@@ -570,35 +751,34 @@ const NewVisit = () => {
                 </div>
               </div>
               
-              {/* Qualitative Assessment - Updated UI */}
+              {/* Branch Ambiance Assessment */}
               <div className="space-y-6">
-                <h2 className="text-xl font-semibold">Qualitative Assessment</h2>
+                <h2 className="text-xl font-semibold">Branch Ambiance Assessment</h2>
                 
                 <FormField
                   control={form.control}
                   name="cultureBranch"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Culture of Branch</FormLabel>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                    <FormItem>
+                      <FormLabel>Branch Culture</FormLabel>
+                      <div className="flex flex-wrap gap-2">
                         {qualitativeOptions.map((option) => (
-                          <Button
-                            key={option.value}
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              "h-auto flex flex-col items-center p-3 gap-1",
-                              option.color,
-                              field.value === option.value && "border-2"
-                            )}
-                            onClick={() => field.onChange(option.value)}
-                          >
-                            <option.icon className={cn(
-                              "h-5 w-5",
-                              field.value === option.value ? "opacity-100" : "opacity-60"
-                            )} />
-                            <span>{option.label}</span>
-                          </Button>
+                          <FormControl key={option.value}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "flex flex-col h-auto items-center gap-1 p-3",
+                                option.color,
+                                field.value === option.value && "border-2"
+                              )}
+                              onClick={() => field.onChange(option.value)}
+                            >
+                              <option.icon className="h-5 w-5" />
+                              <span className="text-xs font-medium">{option.label}</span>
+                            </Button>
+                          </FormControl>
                         ))}
                       </div>
                       <FormMessage />
@@ -610,27 +790,26 @@ const NewVisit = () => {
                   control={form.control}
                   name="lineManagerBehavior"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
+                    <FormItem>
                       <FormLabel>Line Manager Behavior</FormLabel>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                      <div className="flex flex-wrap gap-2">
                         {qualitativeOptions.map((option) => (
-                          <Button
-                            key={option.value}
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              "h-auto flex flex-col items-center p-3 gap-1",
-                              option.color,
-                              field.value === option.value && "border-2"
-                            )}
-                            onClick={() => field.onChange(option.value)}
-                          >
-                            <option.icon className={cn(
-                              "h-5 w-5",
-                              field.value === option.value ? "opacity-100" : "opacity-60"
-                            )} />
-                            <span>{option.label}</span>
-                          </Button>
+                          <FormControl key={option.value}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "flex flex-col h-auto items-center gap-1 p-3",
+                                option.color,
+                                field.value === option.value && "border-2"
+                              )}
+                              onClick={() => field.onChange(option.value)}
+                            >
+                              <option.icon className="h-5 w-5" />
+                              <span className="text-xs font-medium">{option.label}</span>
+                            </Button>
+                          </FormControl>
                         ))}
                       </div>
                       <FormMessage />
@@ -642,27 +821,26 @@ const NewVisit = () => {
                   control={form.control}
                   name="branchHygiene"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
+                    <FormItem>
                       <FormLabel>Branch Hygiene</FormLabel>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                      <div className="flex flex-wrap gap-2">
                         {qualitativeOptions.map((option) => (
-                          <Button
-                            key={option.value}
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              "h-auto flex flex-col items-center p-3 gap-1",
-                              option.color,
-                              field.value === option.value && "border-2"
-                            )}
-                            onClick={() => field.onChange(option.value)}
-                          >
-                            <option.icon className={cn(
-                              "h-5 w-5",
-                              field.value === option.value ? "opacity-100" : "opacity-60"
-                            )} />
-                            <span>{option.label}</span>
-                          </Button>
+                          <FormControl key={option.value}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "flex flex-col h-auto items-center gap-1 p-3",
+                                option.color,
+                                field.value === option.value && "border-2"
+                              )}
+                              onClick={() => field.onChange(option.value)}
+                            >
+                              <option.icon className="h-5 w-5" />
+                              <span className="text-xs font-medium">{option.label}</span>
+                            </Button>
+                          </FormControl>
                         ))}
                       </div>
                       <FormMessage />
@@ -674,116 +852,93 @@ const NewVisit = () => {
                   control={form.control}
                   name="overallDiscipline"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
+                    <FormItem>
                       <FormLabel>Overall Discipline</FormLabel>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                      <div className="flex flex-wrap gap-2">
                         {qualitativeOptions.map((option) => (
-                          <Button
-                            key={option.value}
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              "h-auto flex flex-col items-center p-3 gap-1",
-                              option.color,
-                              field.value === option.value && "border-2"
-                            )}
-                            onClick={() => field.onChange(option.value)}
-                          >
-                            <option.icon className={cn(
-                              "h-5 w-5",
-                              field.value === option.value ? "opacity-100" : "opacity-60"
-                            )} />
-                            <span>{option.label}</span>
-                          </Button>
+                          <FormControl key={option.value}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "flex flex-col h-auto items-center gap-1 p-3",
+                                option.color,
+                                field.value === option.value && "border-2"
+                              )}
+                              onClick={() => field.onChange(option.value)}
+                            >
+                              <option.icon className="h-5 w-5" />
+                              <span className="text-xs font-medium">{option.label}</span>
+                            </Button>
+                          </FormControl>
                         ))}
                       </div>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-              
-              {/* Employee Feedback */}
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Employee Feedback & Observations</h2>
                 
                 <FormField
                   control={form.control}
                   name="feedback"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Please provide a detailed summary of employee feedback and your observations in 100-200 words.</FormLabel>
+                      <FormLabel>Additional Feedback</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Summarize the feedback received from employees and your observations..."
-                          className="min-h-32"
+                          placeholder="Any additional comments or observations (optional)"
+                          className="resize-none"
                           {...field}
+                          value={field.value || ""}
                         />
                       </FormControl>
-                      <div className="text-xs text-muted-foreground text-right">
-                        {field.value ? field.value.split(/\s+/).filter(Boolean).length : 0}/200 words
-                      </div>
+                      <FormDescription>
+                        Maximum 200 words
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
               
-              {/* Form buttons with fixed layout */}
-              <div className={cn(
-                "flex justify-end gap-3 pt-4",
-                isMobile ? "flex-col" : "flex-row items-center"
-              )}>
-                <div className={cn(
-                  "flex",
-                  isMobile ? "w-full" : "gap-3",
-                  isMobile ? "flex-col gap-3" : "flex-row"
-                )}>
-                  <Button 
-                    variant="outline" 
-                    type="button"
-                    className={cn(isMobile && "w-full")}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={saveDraft}
-                    disabled={saveStatus !== "idle"}
-                    className={cn(
-                      isMobile && "w-full",
-                      "bg-blue-50"
-                    )}
-                  >
-                    {saveStatus === "saving" ? (
-                      <>Saving...</>
-                    ) : saveStatus === "saved" ? (
-                      <>
-                        <Check className="mr-2 h-4 w-4" />
-                        Saved!
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Draft
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button 
-                    type="submit"
-                    className={cn(
-                      isMobile && "w-full",
-                      "bg-blue-700 hover:bg-blue-800"
-                    )}
-                  >
-                    <Send className="mr-2 h-4 w-4" />
-                    Submit Form
-                  </Button>
-                </div>
+              <div className="flex items-center justify-between gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={saveDraft}
+                  disabled={loading}
+                >
+                  {saveStatus === "saving" ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save as Draft
+                    </>
+                  )}
+                </Button>
+                
+                <Button 
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700" 
+                  disabled={loading}
+                >
+                  {saveStatus === "saving" ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent mr-2" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Submit Visit
+                    </>
+                  )}
+                </Button>
               </div>
             </form>
           </Form>

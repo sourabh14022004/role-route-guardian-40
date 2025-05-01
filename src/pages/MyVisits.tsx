@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,9 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FilePlus, Search, Filter, Calendar as CalendarIcon } from "lucide-react";
+import { FilePlus, Search, Filter, Calendar as CalendarIcon, Eye, Clock, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { format, parseISO } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,21 +27,143 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { fetchUserBranchVisits } from "@/services/branchService";
+import { toast } from "@/components/ui/use-toast";
+import { Database } from "@/integrations/supabase/types";
+
+type BranchVisitWithBranch = Database["public"]["Tables"]["branch_visits"]["Row"] & {
+  branches: {
+    name: string;
+    location: string;
+    category: string;
+  }
+};
 
 const MyVisits = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [branchCategory, setBranchCategory] = useState("");
   const [month, setMonth] = useState("");
   const [status, setStatus] = useState("");
-  const [visits, setVisits] = useState<any[]>([]);
+  const [visits, setVisits] = useState<BranchVisitWithBranch[]>([]);
+  const [filteredVisits, setFilteredVisits] = useState<BranchVisitWithBranch[]>([]);
+  const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
+  
+  useEffect(() => {
+    const fetchVisits = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        const visitsData = await fetchUserBranchVisits(user.id);
+        setVisits(visitsData as BranchVisitWithBranch[]);
+        setFilteredVisits(visitsData as BranchVisitWithBranch[]);
+      } catch (error) {
+        console.error("Error fetching visits:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load your branch visits.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchVisits();
+  }, [user]);
+  
+  useEffect(() => {
+    // Apply filters when filter values change
+    filterVisits();
+  }, [searchQuery, branchCategory, month, status, visits]);
+  
+  const filterVisits = () => {
+    let filtered = [...visits];
+    
+    // Text search
+    if (searchQuery) {
+      const search = searchQuery.toLowerCase();
+      filtered = filtered.filter(visit => 
+        visit.branches.name.toLowerCase().includes(search) || 
+        visit.branches.location.toLowerCase().includes(search)
+      );
+    }
+    
+    // Category filter
+    if (branchCategory && branchCategory !== "all") {
+      filtered = filtered.filter(visit => visit.branch_category === branchCategory);
+    }
+    
+    // Month filter
+    if (month && month !== "all") {
+      const monthIndex = [
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december"
+      ].indexOf(month.toLowerCase());
+      
+      if (monthIndex !== -1) {
+        filtered = filtered.filter(visit => {
+          const date = parseISO(visit.visit_date);
+          return date.getMonth() === monthIndex;
+        });
+      }
+    }
+    
+    // Status filter
+    if (status && status !== "all") {
+      filtered = filtered.filter(visit => visit.status === status);
+    }
+    
+    setFilteredVisits(filtered);
+  };
   
   const resetFilters = () => {
     setSearchQuery("");
     setBranchCategory("");
     setMonth("");
     setStatus("");
+  };
+  
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    try {
+      return format(parseISO(dateString), 'MMM dd, yyyy');
+    } catch (error) {
+      return dateString;
+    }
+  };
+  
+  // Get status badge properties
+  const getStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'draft':
+        return { 
+          label: 'Draft', 
+          className: 'bg-slate-200 text-slate-800 hover:bg-slate-200',
+          icon: <Clock className="h-3 w-3 mr-1" />
+        };
+      case 'submitted':
+        return { 
+          label: 'Submitted', 
+          className: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+          icon: <Eye className="h-3 w-3 mr-1" />
+        };
+      case 'approved':
+        return { 
+          label: 'Approved', 
+          className: 'bg-green-100 text-green-800 hover:bg-green-100',
+          icon: <CheckCircle className="h-3 w-3 mr-1" />
+        };
+      default:
+        return { 
+          label: 'Unknown', 
+          className: 'bg-gray-200 text-gray-800 hover:bg-gray-200',
+          icon: null
+        };
+    }
   };
   
   return (
@@ -125,9 +250,9 @@ const MyVisits = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="submitted">Submitted</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
                     </SelectContent>
                   </Select>
                 </>
@@ -204,9 +329,9 @@ const MyVisits = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Statuses</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
                           <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="submitted">Submitted</SelectItem>
+                          <SelectItem value="approved">Approved</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -225,10 +350,17 @@ const MyVisits = () => {
               </DropdownMenu>
             </div>
           )}
+          
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            </div>
+          ) : null}
+          
         </CardContent>
       </Card>
       
-      {visits.length === 0 ? (
+      {!loading && filteredVisits.length === 0 ? (
         <div className="bg-white rounded-lg border p-8 text-center">
           <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
             <Search className="h-8 w-8 text-slate-400" />
@@ -237,16 +369,85 @@ const MyVisits = () => {
           <p className="text-slate-500 mb-6">
             Try changing your search criteria or create a new branch visit record.
           </p>
-          <Button 
-            variant="outline" 
-            onClick={resetFilters}
-          >
-            Reset Filters
-          </Button>
+          <div className="flex flex-wrap gap-4 justify-center">
+            <Button 
+              variant="outline" 
+              onClick={resetFilters}
+            >
+              Reset Filters
+            </Button>
+            <Button
+              onClick={() => navigate("/bh/new-visit")}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <FilePlus className="mr-2 h-4 w-4" />
+              Create New Visit
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Visit cards would go here */}
+          {filteredVisits.map((visit) => {
+            const statusBadge = getStatusBadge(visit.status);
+            const categoryName = visit.branch_category.charAt(0).toUpperCase() + visit.branch_category.slice(1);
+            
+            return (
+              <Card key={visit.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <div className={`h-2 w-full ${visit.branch_category === 'platinum' ? 'bg-violet-500' : 
+                                             visit.branch_category === 'diamond' ? 'bg-blue-500' :
+                                             visit.branch_category === 'gold' ? 'bg-amber-500' :
+                                             visit.branch_category === 'silver' ? 'bg-slate-400' :
+                                             'bg-orange-700'}`}></div>
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-semibold text-lg mb-1">{visit.branches.name}</h3>
+                      <p className="text-sm text-slate-500">{visit.branches.location}</p>
+                    </div>
+                    <Badge className={statusBadge.className}>
+                      <span className="flex items-center">
+                        {statusBadge.icon}
+                        {statusBadge.label}
+                      </span>
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4">
+                    <div>
+                      <p className="text-xs text-slate-500">Visit Date</p>
+                      <p className="text-sm font-medium">{formatDate(visit.visit_date)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Category</p>
+                      <p className="text-sm font-medium">{categoryName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">HR Connect</p>
+                      <p className="text-sm font-medium">{visit.hr_connect_session ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Coverage</p>
+                      <p className="text-sm font-medium">
+                        {visit.total_employees_invited && visit.total_participants ? 
+                          Math.round((visit.total_participants / visit.total_employees_invited) * 100) + '%' : 
+                          '0%'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full text-sm"
+                    onClick={() => {/* View visit details */}}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Details
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -6,41 +7,172 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       profiles: {
         Row: {
-          created_at: string
-          e_code: string
-          full_name: string
-          gender: string
           id: string
+          full_name: string
+          e_code: string
+          role: "BH" | "ZH" | "CH" | "admin"
           location: string
-          role: string
+          gender: "male" | "female" | "other"
+          created_at: string
           updated_at: string
         }
         Insert: {
-          created_at?: string
-          e_code: string
-          full_name: string
-          gender: string
           id: string
+          full_name: string
+          e_code: string
+          role: "BH" | "ZH" | "CH" | "admin"
           location: string
-          role: string
+          gender: "male" | "female" | "other"
+          created_at?: string
           updated_at?: string
         }
         Update: {
-          created_at?: string
-          e_code?: string
-          full_name?: string
-          gender?: string
           id?: string
+          full_name?: string
+          e_code?: string
+          role?: "BH" | "ZH" | "CH" | "admin"
           location?: string
-          role?: string
+          gender?: "male" | "female" | "other"
+          created_at?: string
           updated_at?: string
         }
-        Relationships: []
+      }
+      branches: {
+        Row: {
+          id: string
+          name: string
+          location: string
+          category: "platinum" | "diamond" | "gold" | "silver" | "bronze"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          location: string
+          category: "platinum" | "diamond" | "gold" | "silver" | "bronze"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          location?: string
+          category?: "platinum" | "diamond" | "gold" | "silver" | "bronze"
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      branch_assignments: {
+        Row: {
+          id: string
+          user_id: string
+          branch_id: string
+          assigned_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          branch_id: string
+          assigned_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          branch_id?: string
+          assigned_at?: string
+        }
+      }
+      branch_visits: {
+        Row: {
+          id: string
+          user_id: string
+          branch_id: string
+          visit_date: string
+          branch_category: "platinum" | "diamond" | "gold" | "silver" | "bronze"
+          hr_connect_session: boolean | null
+          total_employees_invited: number | null
+          total_participants: number | null
+          manning_percentage: number | null
+          attrition_percentage: number | null
+          non_vendor_percentage: number | null
+          er_percentage: number | null
+          cwt_cases: number | null
+          performance_level: string | null
+          new_employees_total: number | null
+          new_employees_covered: number | null
+          star_employees_total: number | null
+          star_employees_covered: number | null
+          culture_branch: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          line_manager_behavior: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          branch_hygiene: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          overall_discipline: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          feedback: string | null
+          status: "draft" | "submitted" | "approved" | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          branch_id: string
+          visit_date: string
+          branch_category: "platinum" | "diamond" | "gold" | "silver" | "bronze"
+          hr_connect_session?: boolean | null
+          total_employees_invited?: number | null
+          total_participants?: number | null
+          manning_percentage?: number | null
+          attrition_percentage?: number | null
+          non_vendor_percentage?: number | null
+          er_percentage?: number | null
+          cwt_cases?: number | null
+          performance_level?: string | null
+          new_employees_total?: number | null
+          new_employees_covered?: number | null
+          star_employees_total?: number | null
+          star_employees_covered?: number | null
+          culture_branch?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          line_manager_behavior?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          branch_hygiene?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          overall_discipline?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          feedback?: string | null
+          status?: "draft" | "submitted" | "approved" | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          branch_id?: string
+          visit_date?: string
+          branch_category?: "platinum" | "diamond" | "gold" | "silver" | "bronze"
+          hr_connect_session?: boolean | null
+          total_employees_invited?: number | null
+          total_participants?: number | null
+          manning_percentage?: number | null
+          attrition_percentage?: number | null
+          non_vendor_percentage?: number | null
+          er_percentage?: number | null
+          cwt_cases?: number | null
+          performance_level?: string | null
+          new_employees_total?: number | null
+          new_employees_covered?: number | null
+          star_employees_total?: number | null
+          star_employees_covered?: number | null
+          culture_branch?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          line_manager_behavior?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          branch_hygiene?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          overall_discipline?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          feedback?: string | null
+          status?: "draft" | "submitted" | "approved" | null
+          created_at?: string
+          updated_at?: string
+        }
       }
     }
     Views: {
