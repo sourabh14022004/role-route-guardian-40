@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface BranchVisitReport {
@@ -175,7 +174,6 @@ export const fetchReportById = async (reportId: string): Promise<BranchVisitRepo
     if (!data) return null;
     
     // Correctly handle nested objects from Supabase join
-    // Use proper type assertions for the nested objects
     const branches = data.branches as any; // Using any temporarily for type safety
     const profiles = data.profiles as any; // Using any temporarily for type safety
     
@@ -189,11 +187,11 @@ export const fetchReportById = async (reportId: string): Promise<BranchVisitRepo
       hr_connect_session: data.hr_connect_session,
       manning_percentage: data.manning_percentage,
       attrition_percentage: data.attrition_percentage,
-      branch_name: branches?.name,
-      branch_location: branches?.location,
-      branch_category: branches?.category,
-      bh_name: profiles?.full_name,
-      bh_code: profiles?.e_code
+      branch_name: branches?.name || 'Unknown Branch',
+      branch_location: branches?.location || 'Unknown Location',
+      branch_category: branches?.category || 'unknown',
+      bh_name: profiles?.full_name || 'Unknown BHR',
+      bh_code: profiles?.e_code || ''
     };
   } catch (error) {
     console.error("Error fetching report by ID:", error);

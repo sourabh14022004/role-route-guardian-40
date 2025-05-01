@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,13 +11,13 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart2, Users, ClipboardCheck } from "lucide-react";
+import { BarChart2, Users, ClipboardCheck, PieChart as PieChartIcon } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getActiveBHRsCount, getTotalBranchVisitsInMonth, fetchReportById } from "@/services/reportService";
 import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartContainer } from "@/components/ui/chart";
 
 const ZHDashboard = () => {
   const { user } = useAuth();
@@ -58,22 +59,31 @@ const ZHDashboard = () => {
         if (branchError) throw branchError;
         setTotalBranches(branchCount || 0);
         
-        // Get branch category stats for pie chart
-        const { data: categoryStats, error: categoryError } = await supabase
+        // Get branch visits with their category information for real-time pie chart
+        const { data: visits, error: visitsError } = await supabase
           .from("branch_visits")
           .select(`
-            branches:branch_id (category)
+            branch_id,
+            branches:branch_id (
+              name,
+              category
+            )
           `)
+          .in('status', ['submitted', 'approved'])
           .gte('visit_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
         
-        if (categoryError) throw categoryError;
+        if (visitsError) throw visitsError;
         
-        // Process category data for pie chart
+        // Process category data for pie chart based on actual visit data
         const categories: Record<string, number> = {};
-        categoryStats?.forEach((item) => {
-          const category = (item.branches as any)?.category || 'unknown';
-          categories[category] = (categories[category] || 0) + 1;
-        });
+        
+        if (visits && visits.length > 0) {
+          visits.forEach((visit) => {
+            const branchData = visit.branches as any;
+            const category = branchData?.category ? branchData.category.toLowerCase() : 'unknown';
+            categories[category] = (categories[category] || 0) + 1;
+          });
+        }
         
         const colors = {
           'platinum': '#9333ea', // purple
@@ -92,7 +102,7 @@ const ZHDashboard = () => {
         
         setCategoryData(categoryChartData);
         
-        // Get recent reports
+        // Get recent reports with full details
         const { data: reports, error: reportsError } = await supabase
           .from("branch_visits")
           .select(`
@@ -102,7 +112,7 @@ const ZHDashboard = () => {
             user_id,
             branch_id,
             profiles:user_id (full_name, e_code),
-            branches:branch_id (name, location)
+            branches:branch_id (name, location, category)
           `)
           .order("visit_date", { ascending: false })
           .limit(5);
@@ -148,7 +158,7 @@ const ZHDashboard = () => {
   
   const handleViewReport = async (reportId: string) => {
     try {
-      // Fetch complete report details
+      // Fetch complete report details with proper data
       const report = await fetchReportById(reportId);
       
       if (report) {
@@ -172,73 +182,93 @@ const ZHDashboard = () => {
   };
   
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">ZH Dashboard</h1>
-      <p className="text-lg text-slate-600 mb-8">
-        Monitor branch coverage and BHR performance.
-      </p>
+    <div className="p-5 md:p-8 max-w-7xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-800 mb-2">Zone HR Dashboard</h1>
+        <p className="text-lg text-slate-600">
+          Monitor branch performance and BHR activity across your zone.
+        </p>
+      </div>
       
       {isLoading ? (
         <div className="flex justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <Card>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card className="bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center">
-                  <Users className="h-8 w-8 text-blue-500 mb-2" />
-                  <div className="text-3xl font-bold">{activeBHRs}</div>
-                  <p className="text-sm text-slate-500">Active BHRs this month</p>
+                  <div className="p-3 rounded-full bg-blue-100 text-blue-600 mb-3">
+                    <Users className="h-8 w-8" />
+                  </div>
+                  <div className="text-3xl font-bold text-slate-800">{activeBHRs}</div>
+                  <p className="text-sm text-slate-600 mt-1">Active BHRs this month</p>
                 </div>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="bg-gradient-to-br from-amber-50 to-white shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center">
-                  <BarChart2 className="h-8 w-8 text-amber-500 mb-2" />
-                  <div className="text-3xl font-bold">{totalBranches}</div>
-                  <p className="text-sm text-slate-500">Total Branches</p>
+                  <div className="p-3 rounded-full bg-amber-100 text-amber-600 mb-3">
+                    <BarChart2 className="h-8 w-8" />
+                  </div>
+                  <div className="text-3xl font-bold text-slate-800">{totalBranches}</div>
+                  <p className="text-sm text-slate-600 mt-1">Total Branches</p>
                 </div>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center">
-                  <ClipboardCheck className="h-8 w-8 text-emerald-500 mb-2" />
-                  <div className="text-3xl font-bold">{recentReports.length}</div>
-                  <p className="text-sm text-slate-500">Recent Reports</p>
+                  <div className="p-3 rounded-full bg-emerald-100 text-emerald-600 mb-3">
+                    <ClipboardCheck className="h-8 w-8" />
+                  </div>
+                  <div className="text-3xl font-bold text-slate-800">{recentReports.length}</div>
+                  <p className="text-sm text-slate-600 mt-1">Recent Reports</p>
                 </div>
               </CardContent>
             </Card>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>BHR Performance</CardTitle>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="border-b pb-3">
+                <CardTitle className="text-lg font-medium">BHR Performance</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Active vs Total BHRs</p>
-                    <p className="text-sm text-slate-500">{activeBHRs} / {totalBHRs}</p>
+              <CardContent className="pt-6">
+                <div className="space-y-5">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-slate-700">Active vs Total BHRs</p>
+                      <p className="text-sm text-slate-600 font-medium">{activeBHRs} / {totalBHRs}</p>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-500 rounded-full" 
+                        style={{ 
+                          width: totalBHRs > 0 ? `${(activeBHRs / totalBHRs) * 100}%` : '0%'
+                        }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {totalBHRs > 0 ? Math.round((activeBHRs / totalBHRs) * 100) : 0}% active participation
+                    </p>
                   </div>
-                  <Progress value={(activeBHRs / totalBHRs) * 100} className="h-2" />
                 </div>
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Branch Category Distribution</CardTitle>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="border-b pb-3">
+                <CardTitle className="text-lg font-medium">Visit Distribution by Branch Category</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 {categoryData.length > 0 ? (
-                  <div className="h-[200px] w-full">
+                  <div className="h-[220px] w-full">
                     <ChartContainer 
                       config={{
                         platinum: { color: '#9333ea' },
@@ -270,69 +300,87 @@ const ZHDashboard = () => {
                               if (active && payload && payload.length) {
                                 const data = payload[0].payload;
                                 return (
-                                  <div className="bg-white p-2 border rounded shadow-md">
-                                    <p className="font-medium">{data.name}: {data.value} reports</p>
+                                  <div className="bg-white p-3 border rounded shadow-md">
+                                    <p className="font-medium">{data.name}: {data.value} visits</p>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      {((data.value / categoryData.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1)}% of total visits
+                                    </p>
                                   </div>
                                 );
                               }
                               return null;
                             }}
                           />
-                          <Legend />
+                          <Legend 
+                            layout="horizontal"
+                            verticalAlign="bottom"
+                            align="center"
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </ChartContainer>
                   </div>
                 ) : (
-                  <div className="h-[200px] flex items-center justify-center">
-                    <p className="text-slate-500">No category data available</p>
+                  <div className="h-[220px] flex items-center justify-center">
+                    <div className="text-center">
+                      <PieChartIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                      <p className="text-slate-500">No visit data available</p>
+                      <p className="text-xs text-slate-400 mt-1">Reports will appear as they're submitted</p>
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Branch Visit Reports</CardTitle>
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="text-lg font-medium">Recent Branch Visit Reports</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-5">
               {recentReports.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">No reports found</div>
+                <div className="text-center py-8">
+                  <ClipboardCheck className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                  <p className="text-slate-600">No reports found</p>
+                  <p className="text-xs text-slate-500 mt-1">Reports will appear here as they are submitted</p>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left border-b">
-                        <th className="pb-3 font-medium">BHR</th>
-                        <th className="pb-3 font-medium">Branch</th>
-                        <th className="pb-3 font-medium">Visit Date</th>
-                        <th className="pb-3 font-medium">Status</th>
-                        <th className="pb-3 font-medium">Action</th>
+                        <th className="pb-3 font-medium text-slate-700">BHR</th>
+                        <th className="pb-3 font-medium text-slate-700">Branch</th>
+                        <th className="pb-3 font-medium text-slate-700">Visit Date</th>
+                        <th className="pb-3 font-medium text-slate-700">Status</th>
+                        <th className="pb-3 font-medium text-slate-700">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {recentReports.map((report) => (
-                        <tr key={report.id} className="border-b last:border-0">
+                        <tr key={report.id} className="border-b last:border-0 hover:bg-slate-50">
                           <td className="py-3">
-                            {report.profiles?.full_name || "Unknown"}<br />
-                            <span className="text-xs text-slate-500">{report.profiles?.e_code}</span>
+                            <div className="font-medium text-slate-800">{report.profiles?.full_name || "Unknown"}</div>
+                            <div className="text-xs text-slate-500">{report.profiles?.e_code}</div>
                           </td>
                           <td className="py-3">
-                            {report.branches?.name || "Unknown"}<br />
-                            <span className="text-xs text-slate-500">{report.branches?.location}</span>
+                            <div className="font-medium text-slate-800">{report.branches?.name || "Unknown"}</div>
+                            <div className="text-xs text-slate-500">{report.branches?.location}</div>
                           </td>
-                          <td className="py-3">{formatDate(report.visit_date)}</td>
                           <td className="py-3">
-                            <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusClass(report.status)}`}>
+                            <div className="font-medium text-slate-700">{formatDate(report.visit_date)}</div>
+                          </td>
+                          <td className="py-3">
+                            <span className={`inline-block px-2 py-1 text-xs rounded-full font-medium ${getStatusClass(report.status)}`}>
                               {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
                             </span>
                           </td>
                           <td className="py-3">
                             <Button 
-                              variant="ghost" 
+                              variant="outline" 
                               size="sm" 
                               onClick={() => handleViewReport(report.id)}
+                              className="hover:bg-slate-100"
                             >
                               View
                             </Button>
@@ -344,11 +392,11 @@ const ZHDashboard = () => {
                 </div>
               )}
             </CardContent>
-            <CardFooter>
+            <CardFooter className="border-t pt-4">
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="ml-auto"
+                className="ml-auto hover:bg-slate-100"
                 onClick={() => navigate("/zh/review-reports")}
               >
                 View All Reports
