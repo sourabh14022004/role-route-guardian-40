@@ -1014,13 +1014,13 @@ export async function generateReportData(month?: string, year?: string) {
 
 export async function fetchZoneBHRPerformance() {
   try {
-    const { data, error } = await supabase
+    const { data: responseData, error } = await supabase
       .rpc('get_zone_bhr_performance');
       
     if (error) throw error;
     
     // Fix the typing issue - make sure we're returning an array of objects
-    const performanceData = Array.isArray(data) ? data.map(item => ({
+    const performanceData = Array.isArray(responseData) ? responseData.map(item => ({
       name: item.name,
       branches: item.branches,
       coverage: item.coverage

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
@@ -9,26 +8,15 @@ type BHRUser = Database['public']['Tables']['profiles']['Row'] & { branches_assi
 
 export async function fetchZoneBranches(userId: string): Promise<BranchWithAssignments[]> {
   try {
-    // First, get the ZH profile to identify their location
-    const { data: zhProfile, error: zhError } = await supabase
-      .from('profiles')
-      .select('location')
-      .eq('id', userId)
-      .single();
-
-    if (zhError) throw zhError;
-    if (!zhProfile) throw new Error('Zone Head profile not found');
-
-    // Get all branches in this zone/location
+    // Get all branches without location filter
     const { data: branches, error: branchError } = await supabase
       .from('branches')
       .select(`
         *,
-        branch_assignments!inner (
+        branch_assignments (
           user_id
         )
-      `)
-      .eq('location', zhProfile.location);
+      `);
 
     if (branchError) throw branchError;
 
@@ -60,21 +48,10 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
 
 export async function fetchZoneBHRs(userId: string): Promise<BHRUser[]> {
     try {
-      // First, get the ZH profile to identify their location
-      const { data: zhProfile, error: zhError } = await supabase
-        .from('profiles')
-        .select('location')
-        .eq('id', userId)
-        .single();
-  
-      if (zhError) throw zhError;
-      if (!zhProfile) throw new Error('Zone Head profile not found');
-  
-      // Get all BH users in this zone/location
+      // Get all BH users without location filter
       const { data: bhUsers, error: bhError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('location', zhProfile.location)
         .eq('role', 'BH');
   
       if (bhError) throw bhError;
@@ -260,5 +237,26 @@ export async function unassignBranchFromBHR(bhUserId: string, branchId: string) 
       description: error.message || "An unexpected error occurred."
     });
     throw error;
+  }
+}
+
+export async function fetchZoneBHRPerformance() {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_zone_bhr_performance');
+      
+    if (error) throw error;
+    
+    // Fix the typing issue - make sure we're returning an array of objects
+    const performanceData = Array.isArray(data) ? data.map(item => ({
+      name: item.name,
+      branches: item.branches,
+      coverage: item.coverage
+    })) : [];
+    
+    return performanceData;
+  } catch (error) {
+    console.error("Error fetching zone BHR performance:", error);
+    return [];
   }
 }

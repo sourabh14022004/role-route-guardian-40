@@ -36,21 +36,11 @@ const ZHBHRManagement = () => {
     queryKey: ['zh-bhrs-management'],
     queryFn: async () => {
       try {
-        // First, get the ZH profile to identify their location
-        const { data: zhProfile, error: zhError } = await supabase
-          .from('profiles')
-          .select('location')
-          .eq('id', user?.id || '')
-          .single();
-        
-        if (zhError) throw zhError;
-        
-        // Get all BH users in this zone/location
+        // Get all BH users without location filter
         const { data: bhUsers, error: bhError } = await supabase
           .from('profiles')
           .select('id, full_name, e_code, location')
-          .eq('role', 'BH')
-          .eq('location', zhProfile?.location || '');
+          .eq('role', 'BH');
         
         if (bhError) throw bhError;
         
@@ -60,7 +50,7 @@ const ZHBHRManagement = () => {
         const { data: assignments, error: assignmentError } = await supabase
           .from('branch_assignments')
           .select('user_id, branch_id')
-          .in('user_id', bhrIds);
+          .in('user_id', bhrIds.length > 0 ? bhrIds : ['no-bhrs']);
           
         if (assignmentError) throw assignmentError;
         
@@ -109,7 +99,7 @@ const ZHBHRManagement = () => {
     return ["All Locations", ...new Set(bhrs.map(bhr => bhr.location))];
   }, [bhrs]);
 
-  // Filter BHRs based on search and location
+  // Filter BHRs based on search only (removed location filter)
   const filteredBHRs = React.useMemo(() => {
     if (!bhrs) return [];
     
@@ -118,12 +108,10 @@ const ZHBHRManagement = () => {
         ? bhr.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
           bhr.e_code.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
-        
-      const matchesLocation = !locationFilter || locationFilter === "All Locations" || bhr.location === locationFilter;
       
-      return matchesSearch && matchesLocation;
+      return matchesSearch;
     });
-  }, [bhrs, searchQuery, locationFilter]);
+  }, [bhrs, searchQuery]);
 
   const handleBHRClick = (bhrId: string) => {
     setSelectedBHRId(bhrId);
@@ -176,17 +164,19 @@ const ZHBHRManagement = () => {
               .join('');
               
             return (
-              <Card key={bhr.id} className="hover:shadow-md transition-shadow border-t-4 border-t-blue-500">
+              <Card key={bhr.id} className="hover:shadow-md transition-shadow border-t-4 border-t-blue-500 overflow-hidden">
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
-                    <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-xl font-bold shadow-md">
+                    <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xl font-bold shadow-lg">
                       {initials}
                     </div>
                     <div className="flex-1">
                       <div className="flex justify-between items-start">
                         <h3 className="font-semibold text-lg">{bhr.full_name}</h3>
                       </div>
-                      <div className="text-sm text-slate-500">{bhr.e_code}</div>
+                      <div className="text-sm text-slate-500 flex items-center gap-1">
+                        <Badge variant="outline" className="bg-slate-50">{bhr.e_code}</Badge>
+                      </div>
                     </div>
                   </div>
                   
@@ -196,12 +186,12 @@ const ZHBHRManagement = () => {
                   </div>
                   
                   <div className="mt-6 grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 rounded-lg bg-gradient-to-r from-slate-50 to-blue-50 shadow-sm">
-                      <div className="text-slate-500 text-xs mb-1">Branches Mapped</div>
+                    <div className="text-center p-3 rounded-lg bg-gradient-to-r from-slate-50 to-blue-50 shadow-sm border border-blue-100">
+                      <div className="text-slate-500 text-xs mb-1 font-medium">Branches Mapped</div>
                       <div className="text-2xl font-bold text-blue-700">{bhr.branches_assigned}</div>
                     </div>
-                    <div className="text-center p-3 rounded-lg bg-gradient-to-r from-slate-50 to-indigo-50 shadow-sm">
-                      <div className="text-slate-500 text-xs mb-1">Reports Submitted</div>
+                    <div className="text-center p-3 rounded-lg bg-gradient-to-r from-slate-50 to-indigo-50 shadow-sm border border-indigo-100">
+                      <div className="text-slate-500 text-xs mb-1 font-medium">Reports Submitted</div>
                       <div className="text-2xl font-bold text-indigo-700">{bhr.reports_stats?.total || 0}</div>
                     </div>
                   </div>
