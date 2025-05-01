@@ -142,18 +142,22 @@ const ZHDashboard = () => {
         // Transform the data to match our interface - with safety checks
         const transformedData = (data || []).map(visit => {
           // Extract branch name safely
-          const branchName = visit.branches ? 
-            // Check if branches is an object with a name property
-            (typeof visit.branches === 'object' && visit.branches !== null && 'name' in visit.branches) ? 
-              visit.branches.name : 'Unknown Branch' 
-            : 'Unknown Branch';
+          let branchName = 'Unknown Branch';
+          if (visit.branches && typeof visit.branches === 'object' && visit.branches !== null) {
+            const branchObj = visit.branches as { name?: string };
+            if (branchObj && typeof branchObj.name === 'string') {
+              branchName = branchObj.name;
+            }
+          }
           
           // Extract BH name safely
-          const bhName = visit.profiles ? 
-            // Check if profiles is an object with a full_name property
-            (typeof visit.profiles === 'object' && visit.profiles !== null && 'full_name' in visit.profiles) ? 
-              visit.profiles.full_name : 'Unknown BH' 
-            : 'Unknown BH';
+          let bhName = 'Unknown BH';
+          if (visit.profiles && typeof visit.profiles === 'object' && visit.profiles !== null) {
+            const profileObj = visit.profiles as { full_name?: string };
+            if (profileObj && typeof profileObj.full_name === 'string') {
+              bhName = profileObj.full_name;
+            }
+          }
             
           return {
             id: visit.id,
@@ -172,7 +176,7 @@ const ZHDashboard = () => {
               attrition_percentage: Number(visit.attrition_percentage || 0),
               hr_connect_session: Boolean(visit.hr_connect_session || false),
             }
-          };
+          } as BranchVisit;
         });
         
         return transformedData;
@@ -269,11 +273,13 @@ const ZHDashboard = () => {
           const userId = visit.user_id;
           
           // Extract BH name safely
-          const name = visit.profiles ? 
-            // Check if profiles is an object with a full_name property
-            (typeof visit.profiles === 'object' && visit.profiles !== null && 'full_name' in visit.profiles) ? 
-              visit.profiles.full_name : 'Unknown' 
-            : 'Unknown';
+          let name = 'Unknown';
+          if (visit.profiles && typeof visit.profiles === 'object' && visit.profiles !== null) {
+            const profileObj = visit.profiles as { full_name?: string };
+            if (profileObj && typeof profileObj.full_name === 'string') {
+              name = profileObj.full_name;
+            }
+          }
           
           if (!bhrCounts[userId]) {
             bhrCounts[userId] = { id: userId, name, reports: 0 };

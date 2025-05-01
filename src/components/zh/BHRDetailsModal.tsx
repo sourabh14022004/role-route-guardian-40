@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -97,12 +98,14 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
         if (error) throw error;
         
         return (data || []).map(visit => {
-          // Correctly access the nested branch name
-          const branchName = visit.branches ? 
-            // Handle the case when branches is an object with a name property
-            (typeof visit.branches === 'object' && visit.branches !== null && 'name' in visit.branches) ? 
-              visit.branches.name : 'Unknown Branch' 
-            : 'Unknown Branch';
+          // Safely extract the branch name
+          let branchName = 'Unknown Branch';
+          if (visit.branches && typeof visit.branches === 'object' && visit.branches !== null) {
+            const branchObj = visit.branches as { name?: string };
+            if (branchObj && typeof branchObj.name === 'string') {
+              branchName = branchObj.name;
+            }
+          }
             
           return {
             id: visit.id,
