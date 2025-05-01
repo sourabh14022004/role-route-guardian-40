@@ -14,16 +14,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FilePlus, Search, Filter } from "lucide-react";
+import { FilePlus, Search, Filter, Calendar as CalendarIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const MyVisits = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [branchCategory, setBranchCategory] = useState("");
+  const [month, setMonth] = useState("");
+  const [status, setStatus] = useState("");
   const [visits, setVisits] = useState<any[]>([]);
   const isMobile = useIsMobile();
+  
+  const resetFilters = () => {
+    setSearchQuery("");
+    setBranchCategory("");
+    setMonth("");
+    setStatus("");
+  };
   
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
@@ -56,34 +72,157 @@ const MyVisits = () => {
             </div>
             
             <div className="flex items-center gap-3 w-full md:w-auto self-end">
-              <span className="text-sm font-medium whitespace-nowrap">Filters</span>
-              <Select
-                value={branchCategory}
-                onValueChange={setBranchCategory}
-              >
-                <SelectTrigger className="w-full md:w-[180px] border-slate-200">
-                  <SelectValue placeholder="Branch category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="platinum">Platinum</SelectItem>
-                  <SelectItem value="diamond">Diamond</SelectItem>
-                  <SelectItem value="gold">Gold</SelectItem>
-                  <SelectItem value="silver">Silver</SelectItem>
-                  <SelectItem value="bronze">Bronze</SelectItem>
-                </SelectContent>
-              </Select>
+              {!isMobile ? (
+                <>
+                  <span className="text-sm font-medium whitespace-nowrap">Filters</span>
+                  <Select
+                    value={month}
+                    onValueChange={setMonth}
+                  >
+                    <SelectTrigger className="border-slate-200 w-[150px]">
+                      <SelectValue placeholder="All Months" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Months</SelectItem>
+                      <SelectItem value="january">January</SelectItem>
+                      <SelectItem value="february">February</SelectItem>
+                      <SelectItem value="march">March</SelectItem>
+                      <SelectItem value="april">April</SelectItem>
+                      <SelectItem value="may">May</SelectItem>
+                      <SelectItem value="june">June</SelectItem>
+                      <SelectItem value="july">July</SelectItem>
+                      <SelectItem value="august">August</SelectItem>
+                      <SelectItem value="september">September</SelectItem>
+                      <SelectItem value="october">October</SelectItem>
+                      <SelectItem value="november">November</SelectItem>
+                      <SelectItem value="december">December</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select
+                    value={branchCategory}
+                    onValueChange={setBranchCategory}
+                  >
+                    <SelectTrigger className="border-slate-200 w-[150px]">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="platinum">Platinum</SelectItem>
+                      <SelectItem value="diamond">Diamond</SelectItem>
+                      <SelectItem value="gold">Gold</SelectItem>
+                      <SelectItem value="silver">Silver</SelectItem>
+                      <SelectItem value="bronze">Bronze</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select
+                    value={status}
+                    onValueChange={setStatus}
+                  >
+                    <SelectTrigger className="border-slate-200 w-[150px]">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              ) : null}
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-2 md:pt-4">
-          {/* Mobile filter button */}
+          {/* Mobile filter dropdown */}
           {isMobile && (
             <div className="flex justify-end mb-4">
-              <Button variant="outline" size="sm" className="text-xs flex gap-1.5 items-center">
-                <Filter className="h-3 w-3" />
-                More filters
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-xs flex gap-1.5 items-center">
+                    <Filter className="h-3 w-3" />
+                    Filters
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                  <DropdownMenuGroup>
+                    <div className="p-2">
+                      <p className="text-xs font-medium mb-2">Month</p>
+                      <Select
+                        value={month}
+                        onValueChange={setMonth}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="All Months" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Months</SelectItem>
+                          <SelectItem value="january">January</SelectItem>
+                          <SelectItem value="february">February</SelectItem>
+                          <SelectItem value="march">March</SelectItem>
+                          <SelectItem value="april">April</SelectItem>
+                          <SelectItem value="may">May</SelectItem>
+                          <SelectItem value="june">June</SelectItem>
+                          <SelectItem value="july">July</SelectItem>
+                          <SelectItem value="august">August</SelectItem>
+                          <SelectItem value="september">September</SelectItem>
+                          <SelectItem value="october">October</SelectItem>
+                          <SelectItem value="november">November</SelectItem>
+                          <SelectItem value="december">December</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="p-2">
+                      <p className="text-xs font-medium mb-2">Branch Category</p>
+                      <Select
+                        value={branchCategory}
+                        onValueChange={setBranchCategory}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="All Categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Categories</SelectItem>
+                          <SelectItem value="platinum">Platinum</SelectItem>
+                          <SelectItem value="diamond">Diamond</SelectItem>
+                          <SelectItem value="gold">Gold</SelectItem>
+                          <SelectItem value="silver">Silver</SelectItem>
+                          <SelectItem value="bronze">Bronze</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="p-2">
+                      <p className="text-xs font-medium mb-2">Status</p>
+                      <Select
+                        value={status}
+                        onValueChange={setStatus}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="All Statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="p-2 pt-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={resetFilters}
+                      >
+                        Reset Filters
+                      </Button>
+                    </div>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </CardContent>
@@ -100,10 +239,7 @@ const MyVisits = () => {
           </p>
           <Button 
             variant="outline" 
-            onClick={() => {
-              setSearchQuery("");
-              setBranchCategory("");
-            }}
+            onClick={resetFilters}
           >
             Reset Filters
           </Button>

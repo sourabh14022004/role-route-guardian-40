@@ -66,12 +66,9 @@ const BHDashboardLayout = () => {
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64">
                 <div className="flex flex-col h-full">
-                  {/* Mobile menu header */}
-                  <div className="flex items-center justify-between h-14 px-4 border-b">
-                    <h2 className="text-lg font-semibold">HDFC App</h2>
-                    <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
-                      <X className="h-5 w-5" />
-                    </Button>
+                  {/* Mobile menu header - reduced height, removed duplicate close button */}
+                  <div className="h-14 px-4 border-b flex items-center">
+                    <h2 className="text-lg font-semibold flex-1">HDFC App</h2>
                   </div>
                   
                   {/* Mobile menu items */}
@@ -82,7 +79,7 @@ const BHDashboardLayout = () => {
                           key={item.path}
                           to={item.path}
                           className={({ isActive }) => cn(
-                            "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                            "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                             isActive 
                               ? "bg-blue-50 text-blue-700" 
                               : "text-gray-700 hover:bg-gray-100"

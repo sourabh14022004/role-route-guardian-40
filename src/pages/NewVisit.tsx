@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Save, Send, X, Check, Frown, Meh, Smile, Star, ThumbsDown, ThumbsUp } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -32,8 +32,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const formSchema = z.object({
   branchId: z.string({
@@ -48,7 +48,6 @@ const formSchema = z.object({
   totalParticipants: z.number().min(0).default(0),
   manningPercentage: z.number().min(0).max(100).default(0),
   attritionPercentage: z.number().min(0).max(100).default(0),
-  sourceMix: z.string().optional(),
   nonVendorPercentage: z.number().min(0).max(100).default(0),
   erPercentage: z.number().min(0).max(100).default(0),
   cwtCases: z.number().min(0).default(0),
@@ -68,10 +67,12 @@ const formSchema = z.object({
 
 const NewVisit = () => {
   const [formStep, setFormStep] = useState(0);
+  const isMobile = useIsMobile();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      visitDate: new Date(), // Set default date to today
       totalEmployeesInvited: 0,
       totalParticipants: 0,
       manningPercentage: 0,
@@ -125,19 +126,18 @@ const NewVisit = () => {
     return 0;
   };
 
+  // Configuration for the qualitative assessment buttons
+  const qualitativeOptions = [
+    { value: 'very_poor', label: 'Very Poor', color: 'border-red-300 data-[state=checked]:bg-red-100 data-[state=checked]:text-red-700', icon: ThumbsDown },
+    { value: 'poor', label: 'Poor', color: 'border-orange-300 data-[state=checked]:bg-orange-100 data-[state=checked]:text-orange-700', icon: Frown },
+    { value: 'neutral', label: 'Neutral', color: 'border-blue-300 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-700', icon: Meh },
+    { value: 'good', label: 'Good', color: 'border-green-300 data-[state=checked]:bg-green-50 data-[state=checked]:text-green-700', icon: Smile },
+    { value: 'excellent', label: 'Excellent', color: 'border-emerald-300 data-[state=checked]:bg-emerald-50 data-[state=checked]:text-emerald-700', icon: Star },
+  ];
+
   return (
     <div className="container py-6">
       <h1 className="text-2xl font-bold mb-6">New Branch Visit Form</h1>
-      
-      <div className="flex justify-end space-x-2 mb-6">
-        <Button
-          variant="outline"
-          onClick={saveDraft}
-          disabled={saveStatus !== "idle"}
-        >
-          {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : "Save Draft"}
-        </Button>
-      </div>
       
       <Card>
         <CardHeader>
@@ -204,6 +204,7 @@ const NewVisit = () => {
                             selected={field.value}
                             onSelect={field.onChange}
                             initialFocus
+                            className="p-3 pointer-events-auto"
                           />
                         </PopoverContent>
                       </Popover>
@@ -370,20 +371,6 @@ const NewVisit = () => {
                     )}
                   />
                 </div>
-                
-                <FormField
-                  control={form.control}
-                  name="sourceMix"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Source Mix</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="e.g. 60% Direct, 30% Referral, 10% Agency" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
@@ -583,7 +570,7 @@ const NewVisit = () => {
                 </div>
               </div>
               
-              {/* Qualitative Assessment */}
+              {/* Qualitative Assessment - Updated UI */}
               <div className="space-y-6">
                 <h2 className="text-xl font-semibold">Qualitative Assessment</h2>
                 
@@ -591,46 +578,29 @@ const NewVisit = () => {
                   control={form.control}
                   name="cultureBranch"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="space-y-3">
                       <FormLabel>Culture of Branch</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col sm:flex-row gap-4"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="very_poor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Very Poor</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="poor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Poor</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="neutral" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Neutral</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="good" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Good</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="excellent" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Excellent</FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                        {qualitativeOptions.map((option) => (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              "h-auto flex flex-col items-center p-3 gap-1",
+                              option.color,
+                              field.value === option.value && "border-2"
+                            )}
+                            onClick={() => field.onChange(option.value)}
+                          >
+                            <option.icon className={cn(
+                              "h-5 w-5",
+                              field.value === option.value ? "opacity-100" : "opacity-60"
+                            )} />
+                            <span>{option.label}</span>
+                          </Button>
+                        ))}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -640,46 +610,29 @@ const NewVisit = () => {
                   control={form.control}
                   name="lineManagerBehavior"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="space-y-3">
                       <FormLabel>Line Manager Behavior</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col sm:flex-row gap-4"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="very_poor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Very Poor</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="poor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Poor</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="neutral" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Neutral</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="good" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Good</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="excellent" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Excellent</FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                        {qualitativeOptions.map((option) => (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              "h-auto flex flex-col items-center p-3 gap-1",
+                              option.color,
+                              field.value === option.value && "border-2"
+                            )}
+                            onClick={() => field.onChange(option.value)}
+                          >
+                            <option.icon className={cn(
+                              "h-5 w-5",
+                              field.value === option.value ? "opacity-100" : "opacity-60"
+                            )} />
+                            <span>{option.label}</span>
+                          </Button>
+                        ))}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -689,46 +642,29 @@ const NewVisit = () => {
                   control={form.control}
                   name="branchHygiene"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="space-y-3">
                       <FormLabel>Branch Hygiene</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col sm:flex-row gap-4"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="very_poor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Very Poor</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="poor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Poor</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="neutral" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Neutral</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="good" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Good</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="excellent" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Excellent</FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                        {qualitativeOptions.map((option) => (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              "h-auto flex flex-col items-center p-3 gap-1",
+                              option.color,
+                              field.value === option.value && "border-2"
+                            )}
+                            onClick={() => field.onChange(option.value)}
+                          >
+                            <option.icon className={cn(
+                              "h-5 w-5",
+                              field.value === option.value ? "opacity-100" : "opacity-60"
+                            )} />
+                            <span>{option.label}</span>
+                          </Button>
+                        ))}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -738,46 +674,29 @@ const NewVisit = () => {
                   control={form.control}
                   name="overallDiscipline"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="space-y-3">
                       <FormLabel>Overall Discipline</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col sm:flex-row gap-4"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="very_poor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Very Poor</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="poor" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Poor</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="neutral" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Neutral</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="good" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Good</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="excellent" />
-                            </FormControl>
-                            <FormLabel className="font-normal">Excellent</FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                        {qualitativeOptions.map((option) => (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              "h-auto flex flex-col items-center p-3 gap-1",
+                              option.color,
+                              field.value === option.value && "border-2"
+                            )}
+                            onClick={() => field.onChange(option.value)}
+                          >
+                            <option.icon className={cn(
+                              "h-5 w-5",
+                              field.value === option.value ? "opacity-100" : "opacity-60"
+                            )} />
+                            <span>{option.label}</span>
+                          </Button>
+                        ))}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -810,16 +729,60 @@ const NewVisit = () => {
                 />
               </div>
               
-              <div className="flex justify-between pt-4">
-                <Button variant="outline" type="button">
-                  Cancel
-                </Button>
-                
-                <div className="space-x-2">
-                  <Button variant="outline" type="button" onClick={saveDraft}>
-                    Save Draft
+              {/* Form buttons with fixed layout */}
+              <div className={cn(
+                "flex justify-end gap-3 pt-4",
+                isMobile ? "flex-col" : "flex-row items-center"
+              )}>
+                <div className={cn(
+                  "flex",
+                  isMobile ? "w-full" : "gap-3",
+                  isMobile ? "flex-col gap-3" : "flex-row"
+                )}>
+                  <Button 
+                    variant="outline" 
+                    type="button"
+                    className={cn(isMobile && "w-full")}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Cancel
                   </Button>
-                  <Button type="submit">Submit Form</Button>
+                  
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={saveDraft}
+                    disabled={saveStatus !== "idle"}
+                    className={cn(
+                      isMobile && "w-full",
+                      "bg-blue-50"
+                    )}
+                  >
+                    {saveStatus === "saving" ? (
+                      <>Saving...</>
+                    ) : saveStatus === "saved" ? (
+                      <>
+                        <Check className="mr-2 h-4 w-4" />
+                        Saved!
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Draft
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    type="submit"
+                    className={cn(
+                      isMobile && "w-full",
+                      "bg-blue-700 hover:bg-blue-800"
+                    )}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Submit Form
+                  </Button>
                 </div>
               </div>
             </form>
