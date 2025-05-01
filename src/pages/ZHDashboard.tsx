@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -78,6 +78,16 @@ const ReportDetailsModal = ({ visit, open, onClose }: ReportDetailsModalProps) =
   );
 };
 
+// ErrorFallback component for empty states
+const ErrorFallback = ({ message }: { message: string }) => {
+  return (
+    <div className="flex flex-col items-center justify-center py-6 text-center">
+      <AlertCircle className="h-10 w-10 text-slate-300 mb-2" />
+      <p className="text-slate-500 text-sm">{message}</p>
+    </div>
+  );
+};
+
 const ZHDashboard = () => {
   const { user } = useAuth();
   const [selectedVisit, setSelectedVisit] = useState<BranchVisit | null>(null);
@@ -127,28 +137,29 @@ const ZHDashboard = () => {
         
         if (error) throw error;
 
-        // Transform the data to match our interface
+        // Transform the data to match our interface - with safety checks
         const transformedData = (data || []).map(visit => ({
           id: visit.id,
           branch: {
-            name: visit.branches?.name || 'Unknown Branch',
+            name: visit.branches ? String(visit.branches.name || 'Unknown Branch') : 'Unknown Branch',
           },
-          bh_name: visit.profiles?.full_name || 'Unknown BH',
-          visit_date: new Date(visit.visit_date).toLocaleDateString('en-IN', {
+          bh_name: visit.profiles ? String(visit.profiles.full_name || 'Unknown BH') : 'Unknown BH',
+          visit_date: visit.visit_date ? new Date(visit.visit_date).toLocaleDateString('en-IN', {
             day: 'numeric',
             month: 'short',
             year: 'numeric'
-          }),
+          }) : 'Unknown Date',
           report_details: {
             feedback: visit.feedback || 'No feedback provided',
-            manning_percentage: visit.manning_percentage || 0,
-            attrition_percentage: visit.attrition_percentage || 0,
-            hr_connect_session: visit.hr_connect_session || false,
+            manning_percentage: Number(visit.manning_percentage || 0),
+            attrition_percentage: Number(visit.attrition_percentage || 0),
+            hr_connect_session: Boolean(visit.hr_connect_session || false),
           }
         }));
         
         return transformedData;
       } catch (error: any) {
+        console.error("Error fetching visit reports:", error);
         toast({
           variant: "destructive",
           title: "Error",
@@ -191,31 +202,16 @@ const ZHDashboard = () => {
         
         if (activeBhrsError) throw activeBhrsError;
         
-        // Count unique active BHRs
-        const uniqueActiveBhrs = new Set(activeBhrs?.map(bhr => bhr.user_id));
-        
-        // Get unmapped branches (branches with no assignment)
-        const { data: assignments, error: assignmentsError } = await supabase
-          .from('branch_assignments')
-          .select('branch_id');
-        
-        if (assignmentsError) throw assignmentsError;
-        
-        const assignedBranchIds = assignments?.map(a => a.branch_id) || [];
-        const { data: unmappedBranches, error: unmappedError } = await supabase
-          .from('branches')
-          .select('id')
-          .not('id', 'in', `(${assignedBranchIds.length > 0 ? assignedBranchIds.join(',') : '0'})`);
-        
-        if (unmappedError) throw unmappedError;
+        // Count unique active BHRs - safely handle null data
+        const uniqueActiveBhrs = new Set((activeBhrs || []).map(bhr => bhr.user_id));
         
         return {
-          totalBranches: branches?.length || 0,
-          totalBHRs: bhrs?.length || 0,
+          totalBranches: (branches || []).length,
+          totalBHRs: (bhrs || []).length,
           activeBHRs: uniqueActiveBhrs.size,
-          unmappedBranches: unmappedBranches?.length || 0
         };
       } catch (error: any) {
+        console.error("Error fetching stats:", error);
         toast({
           variant: "destructive",
           title: "Error",
@@ -225,52 +221,54 @@ const ZHDashboard = () => {
           totalBranches: 0,
           totalBHRs: 0,
           activeBHRs: 0,
-          unmappedBranches: 0
         };
       }
     }
   });
 
-  const getBHRReportCount = async () => {
-    try {
-      // Get report counts per BHR
-      const { data, error } = await supabase
-        .from('branch_visits')
-        .select(`
-          user_id,
-          profiles:user_id(full_name)
-        `)
-        .eq('status', 'submitted');
-      
-      if (error) throw error;
-      
-      // Count reports by BHR
-      const bhrCounts: Record<string, { name: string, reports: number }> = {};
-      data?.forEach(visit => {
-        const userId = visit.user_id;
-        const name = visit.profiles?.full_name || 'Unknown';
-        
-        if (!bhrCounts[userId]) {
-          bhrCounts[userId] = { name, reports: 0 };
-        }
-        bhrCounts[userId].reports++;
-      });
-      
-      return Object.values(bhrCounts);
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to load BHR report counts: ${error.message}`,
-      });
-      return [];
-    }
-  };
-
   // Fetch BHR report counts
   const { data: bhrReportCounts, isLoading: bhrCountsLoading } = useQuery({
     queryKey: ['bhr-report-counts'],
-    queryFn: getBHRReportCount
+    queryFn: async () => {
+      try {
+        // Get report counts per BHR
+        const { data, error } = await supabase
+          .from('branch_visits')
+          .select(`
+            user_id,
+            profiles:user_id(full_name)
+          `)
+          .eq('status', 'submitted');
+        
+        if (error) throw error;
+        
+        // Count reports by BHR - with safety checks
+        const bhrCounts: Record<string, { name: string, reports: number }> = {};
+        
+        (data || []).forEach(visit => {
+          if (!visit.user_id) return;
+          
+          const userId = visit.user_id;
+          const name = visit.profiles && typeof visit.profiles === 'object' ? 
+            String(visit.profiles.full_name || 'Unknown') : 'Unknown';
+          
+          if (!bhrCounts[userId]) {
+            bhrCounts[userId] = { name, reports: 0 };
+          }
+          bhrCounts[userId].reports++;
+        });
+        
+        return Object.values(bhrCounts);
+      } catch (error: any) {
+        console.error("Error loading BHR report counts:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to load BHR report counts: ${error.message}`,
+        });
+        return [];
+      }
+    }
   });
 
   return (
@@ -282,7 +280,7 @@ const ZHDashboard = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500">Total BHRs</CardTitle>
@@ -309,15 +307,6 @@ const ZHDashboard = () => {
             <p className="text-3xl font-bold">{statsLoading ? "..." : stats?.totalBranches}</p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Unmapped Branches</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{statsLoading ? "..." : stats?.unmappedBranches}</p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Main Content */}
@@ -333,8 +322,8 @@ const ZHDashboard = () => {
             <CardContent>
               {visitsLoading ? (
                 <p className="text-center py-4 text-slate-500">Loading reports...</p>
-              ) : visitReports?.length === 0 ? (
-                <p className="text-center py-4 text-slate-500">No reports found</p>
+              ) : !visitReports || visitReports.length === 0 ? (
+                <ErrorFallback message="No reports found" />
               ) : (
                 <Table>
                   <TableHeader>
@@ -346,7 +335,7 @@ const ZHDashboard = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visitReports?.map((visit, i) => (
+                    {visitReports.map((visit, i) => (
                       <TableRow key={i}>
                         <TableCell>{visit.branch.name}</TableCell>
                         <TableCell>{visit.bh_name}</TableCell>
@@ -383,11 +372,11 @@ const ZHDashboard = () => {
             <CardContent>
               {bhrCountsLoading ? (
                 <p className="text-center py-4 text-slate-500">Loading BHR data...</p>
-              ) : bhrReportCounts?.length === 0 ? (
-                <p className="text-center py-4 text-slate-500">No BHR data found</p>
+              ) : !bhrReportCounts || bhrReportCounts.length === 0 ? (
+                <ErrorFallback message="No BHR data found" />
               ) : (
                 <div className="space-y-4">
-                  {bhrReportCounts?.map((bhr, index) => (
+                  {bhrReportCounts.map((bhr, index) => (
                     <div key={index} className="flex justify-between items-center">
                       <p className="text-sm font-medium">{bhr.name}</p>
                       <Badge variant="secondary">{bhr.reports} reports</Badge>
