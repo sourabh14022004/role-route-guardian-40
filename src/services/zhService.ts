@@ -24,9 +24,7 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
       .from('branches')
       .select(`
         *,
-        branch_assignments!inner (
-          user_id
-        )
+        branch_assignments(user_id)
       `)
       .eq('location', zhProfile.location);
 
@@ -73,33 +71,42 @@ export async function fetchZoneBHRs(userId: string): Promise<BHRUser[]> {
     // Get all BH users in this zone/location
     const { data: bhUsers, error: bhError } = await supabase
       .from('profiles')
-      .select(`
-        *,
-        branch_assignments!inner (
-          branch_id
-        )
-      `)
+      .select('*')
       .eq('location', zhProfile.location)
       .eq('role', 'BH');
 
     if (bhError) throw bhError;
-
+    
+    // Get branch assignments for these users in a separate query
+    const bhUserIds = bhUsers.map(user => user.id);
+    
+    // Only proceed if we have users
+    if (bhUserIds.length === 0) {
+      return [] as BHRUser[];
+    }
+    
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('branch_assignments')
+      .select('user_id, branch_id')
+      .in('user_id', bhUserIds);
+      
+    if (assignmentsError) throw assignmentsError;
+    
+    // Group assignments by user
+    const assignmentsByUser: Record<string, string[]> = {};
+    assignments?.forEach(assignment => {
+      if (!assignmentsByUser[assignment.user_id]) {
+        assignmentsByUser[assignment.user_id] = [];
+      }
+      assignmentsByUser[assignment.user_id].push(assignment.branch_id);
+    });
+    
     // Process the data to count branches per BH
     const processedBHRs = bhUsers.map(user => {
-      // Count unique branches for this BH
-      const uniqueBranches = new Set();
-      if (user.branch_assignments) {
-        // Handle array of branch_assignments
-        if (Array.isArray(user.branch_assignments)) {
-          user.branch_assignments.forEach((assignment: any) => {
-            uniqueBranches.add(assignment.branch_id);
-          });
-        }
-      }
-
+      const branchIds = assignmentsByUser[user.id] || [];
       return {
         ...user,
-        branches_assigned: uniqueBranches.size
+        branches_assigned: branchIds.length
       };
     });
 
