@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { LayoutDashboard, Plus, List, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client"; // Added import for supabase
 
 const BHDashboardLayout = () => {
   const [expanded, setExpanded] = useState(false);
