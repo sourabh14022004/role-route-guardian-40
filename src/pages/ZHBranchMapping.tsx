@@ -37,9 +37,14 @@ import {
 } from "@/components/ui/select";
 import { Search, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { fetchZoneBranches, fetchZoneBHRs, assignBranchToBHR, unassignBranchFromBHR } from "@/services/zhService";
+import { 
+  fetchZoneBranches, 
+  fetchZoneBHRs, 
+  assignBranchToBHR, 
+  unassignBranchFromBHR, 
+  fetchBranchAssignments 
+} from "@/services/zhService";
 import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 type Branch = {
   id: string;
@@ -58,6 +63,7 @@ type BHUser = {
 };
 
 type BranchAssignment = {
+  id: string;
   user_id: string;
   bh_name: string;
 };
@@ -86,6 +92,7 @@ const ZHBranchMapping = () => {
     branchName: string;
     bhUserId: string;
     bhName: string;
+    assignmentId: string;
   } | null>(null);
   
   // Fetch data on component mount
@@ -97,51 +104,30 @@ const ZHBranchMapping = () => {
         setIsLoading(true);
         
         // Fetch branches and BH users in parallel
-        const [branchesData, bhUsersData] = await Promise.all([
+        const [branchesData, bhUsersData, allAssignmentsData] = await Promise.all([
           fetchZoneBranches(user.id),
-          fetchZoneBHRs(user.id)
+          fetchZoneBHRs(user.id),
+          fetchBranchAssignments()
         ]);
         
         setBranches(branchesData);
         setFilteredBranches(branchesData);
         setBHUsers(bhUsersData);
         
-        // Fetch assignments for each branch
+        // Group assignments by branch ID
         const assignmentsMap: Record<string, BranchAssignment[]> = {};
         
-        // Process branch assignments for all branches
-        const { data: allAssignments, error } = await supabase
-          .from('branch_assignments')
-          .select(`
-            branch_id,
-            user_id,
-            profiles:user_id(full_name)
-          `);
-          
-        if (error) {
-          console.error('Error fetching branch assignments:', error);
-          return;
-        }
-        
-        // Group assignments by branch
-        allAssignments?.forEach(assignment => {
+        allAssignmentsData.forEach(assignment => {
           const branchId = assignment.branch_id;
-          const userId = assignment.user_id;
-          let bhName = 'Unknown';
-          
-          // Extract BH name
-          if (assignment.profiles && typeof assignment.profiles === 'object') {
-            const profile = assignment.profiles as { full_name?: string };
-            bhName = profile.full_name || 'Unknown';
-          }
           
           if (!assignmentsMap[branchId]) {
             assignmentsMap[branchId] = [];
           }
           
           assignmentsMap[branchId].push({
-            user_id: userId,
-            bh_name: bhName
+            id: assignment.id,
+            user_id: assignment.user_id,
+            bh_name: assignment.bh_name
           });
         });
         
@@ -187,18 +173,23 @@ const ZHBranchMapping = () => {
     setDialogOpen(true);
   };
   
-  const handleOpenUnassignDialog = (branchId: string, branchName: string, bhUserId: string, bhName: string) => {
+  const handleOpenUnassignDialog = (branchId: string, branchName: string, bhUserId: string, bhName: string, assignmentId: string) => {
     setSelectedBranchForUnassign({
       branchId,
       branchName,
       bhUserId,
-      bhName
+      bhName,
+      assignmentId
     });
     setDialogType("unassign");
     setDialogOpen(true);
   };
   
-  const handleUnassignBHR = async (branchId: string, branchName: string, bhUserId: string, bhName: string) => {
+  const handleUnassignBHR = async () => {
+    if (!selectedBranchForUnassign) return;
+    
+    const { branchId, bhUserId, branchName, bhName } = selectedBranchForUnassign;
+    
     try {
       await unassignBranchFromBHR(bhUserId, branchId);
       
@@ -215,15 +206,6 @@ const ZHBranchMapping = () => {
       
       // Update branch count in branches list
       setBranches(prev => 
-        prev.map(branch => 
-          branch.id === branchId 
-            ? { ...branch, bh_count: Math.max((branch.bh_count || 1) - 1, 0) }
-            : branch
-        )
-      );
-      
-      // Also update filtered branches
-      setFilteredBranches(prev => 
         prev.map(branch => 
           branch.id === branchId 
             ? { ...branch, bh_count: Math.max((branch.bh_count || 1) - 1, 0) }
@@ -259,65 +241,54 @@ const ZHBranchMapping = () => {
       if (dialogType === "assign" && selectedBranch && selectedBHUser) {
         const result = await assignBranchToBHR(selectedBHUser, selectedBranch.id);
         
-        // Find the BHR name from the result or from the BHUsers list
-        const bhUser = bhUsers.find(user => user.id === selectedBHUser);
-        const bhName = result?.bh_name || bhUser?.full_name || 'Unknown';
-        
-        // Update the assignments in state
-        setBranchAssignments(prev => {
-          const updated = { ...prev };
-          if (!updated[selectedBranch.id]) {
-            updated[selectedBranch.id] = [];
-          }
+        if (result) {
+          // Find the BHR name from the result or from the BHUsers list
+          const bhUser = bhUsers.find(user => user.id === selectedBHUser);
+          const bhName = result.bh_name || bhUser?.full_name || 'Unknown';
           
-          // Only add if it doesn't already exist
-          const exists = updated[selectedBranch.id].some(
-            assignment => assignment.user_id === selectedBHUser
+          // Update the assignments in state
+          setBranchAssignments(prev => {
+            const updated = { ...prev };
+            if (!updated[selectedBranch.id]) {
+              updated[selectedBranch.id] = [];
+            }
+            
+            // Only add if it doesn't already exist
+            const exists = updated[selectedBranch.id].some(
+              assignment => assignment.user_id === selectedBHUser
+            );
+            
+            if (!exists) {
+              updated[selectedBranch.id].push({
+                id: result.id || 'temp-' + Date.now(),
+                user_id: selectedBHUser,
+                bh_name: bhName
+              });
+            }
+            
+            return updated;
+          });
+          
+          // Update branch count in branches list
+          setBranches(prev => 
+            prev.map(branch => 
+              branch.id === selectedBranch.id 
+                ? { ...branch, bh_count: (branch.bh_count || 0) + 1 }
+                : branch
+            )
           );
           
-          if (!exists) {
-            updated[selectedBranch.id].push({
-              user_id: selectedBHUser,
-              bh_name: bhName
-            });
-          }
-          
-          return updated;
-        });
-        
-        // Update branch count in branches list
-        setBranches(prev => 
-          prev.map(branch => 
-            branch.id === selectedBranch.id 
-              ? { ...branch, bh_count: (branch.bh_count || 0) + 1 }
-              : branch
-          )
-        );
-        
-        // Also update filtered branches
-        setFilteredBranches(prev => 
-          prev.map(branch => 
-            branch.id === selectedBranch.id 
-              ? { ...branch, bh_count: (branch.bh_count || 0) + 1 }
-              : branch
-          )
-        );
-        
-        // Update BH user's assigned branches count
-        setBHUsers(prev => 
-          prev.map(user => 
-            user.id === selectedBHUser 
-              ? { ...user, branches_assigned: (user.branches_assigned || 0) + 1 }
-              : user
-          )
-        );
+          // Update BH user's assigned branches count
+          setBHUsers(prev => 
+            prev.map(user => 
+              user.id === selectedBHUser 
+                ? { ...user, branches_assigned: (user.branches_assigned || 0) + 1 }
+                : user
+            )
+          );
+        }
       } else if (dialogType === "unassign" && selectedBranchForUnassign) {
-        await handleUnassignBHR(
-          selectedBranchForUnassign.branchId,
-          selectedBranchForUnassign.branchName,
-          selectedBranchForUnassign.bhUserId,
-          selectedBranchForUnassign.bhName
-        );
+        await handleUnassignBHR();
       }
     } catch (error) {
       console.error("Error during branch assignment operation:", error);
@@ -422,8 +393,10 @@ const ZHBranchMapping = () => {
                                     branch.id, 
                                     branch.name, 
                                     assignment.user_id,
-                                    assignment.bh_name
+                                    assignment.bh_name,
+                                    assignment.id
                                   )}
+                                  aria-label={`Remove ${assignment.bh_name} from ${branch.name}`}
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -450,7 +423,7 @@ const ZHBranchMapping = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                      {searchQuery || categoryFilter ? 
+                      {searchQuery || categoryFilter !== "all" ? 
                         "No branches match your search criteria" : 
                         "No branches available in your zone"
                       }

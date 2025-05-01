@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
@@ -164,54 +163,77 @@ export async function fetchDashboardStats(userId: string) {
 
 export async function assignBranchToBHR(bhUserId: string, branchId: string) {
   try {
+    // First check if this assignment already exists to prevent duplicate entries
+    const { data: existingAssignment, error: checkError } = await supabase
+      .from('branch_assignments')
+      .select('id')
+      .eq('user_id', bhUserId)
+      .eq('branch_id', branchId)
+      .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      // PGRST116 means no rows returned, which is what we want
+      throw checkError;
+    }
+    
+    if (existingAssignment) {
+      // Assignment already exists
+      toast({
+        variant: "destructive",
+        title: "Assignment already exists",
+        description: "This branch is already assigned to this BHR."
+      });
+      
+      return null;
+    }
+    
+    // If we get here, the assignment doesn't exist, so create it
     const { data, error } = await supabase
       .from('branch_assignments')
       .insert({
         user_id: bhUserId,
         branch_id: branchId
       })
-      .select(`
-        user_id,
-        branch_id,
-        profiles:user_id(full_name)
-      `)
-      .single();
+      .select();
     
     if (error) throw error;
+    
+    // Fetch the BHR's name in a separate query
+    const { data: bhrData, error: bhrError } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', bhUserId)
+      .single();
+    
+    if (bhrError) throw bhrError;
     
     toast({
       title: "Branch assigned successfully",
       description: "The branch has been assigned to the BHR."
     });
     
-    // Transform the data to include the BH name
-    let bhName = 'Unknown';
-    if (data.profiles && typeof data.profiles === 'object') {
-      const profile = data.profiles as { full_name?: string };
-      bhName = profile.full_name || 'Unknown';
-    }
-    
     return {
-      ...data,
-      bh_name: bhName
+      ...data[0],
+      bh_name: bhrData?.full_name || 'Unknown',
+      user_id: bhUserId
     };
   } catch (error: any) {
     console.error("Error assigning branch to BHR:", error);
     
-    // Check if error is a unique constraint violation (already assigned)
+    // Provide a more specific error message
+    let errorMessage = "An unexpected error occurred.";
+    
     if (error.code === '23505') {
-      toast({
-        variant: "destructive",
-        title: "Assignment already exists",
-        description: "This branch is already assigned to this BHR."
-      });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Failed to assign branch",
-        description: error.message || "An unexpected error occurred."
-      });
+      errorMessage = "This branch is already assigned to this BHR.";
+    } else if (error.message) {
+      errorMessage = error.message;
     }
+    
+    toast({
+      variant: "destructive",
+      title: "Failed to assign branch",
+      description: errorMessage
+    });
     
     throw error;
   }
@@ -261,6 +283,45 @@ export async function fetchZoneBHRPerformance() {
     return performanceData;
   } catch (error) {
     console.error("Error fetching zone BHR performance:", error);
+    return [];
+  }
+}
+
+// Add a new function to fetch all branch assignments with BHR names
+export async function fetchBranchAssignments() {
+  try {
+    const { data, error } = await supabase
+      .from('branch_assignments')
+      .select(`
+        id,
+        branch_id,
+        user_id,
+        profiles:user_id (
+          full_name
+        )
+      `);
+      
+    if (error) throw error;
+    
+    // Transform the data to include the BH name directly
+    return data.map(assignment => {
+      let bhName = 'Unknown';
+      
+      // Extract BH name
+      if (assignment.profiles && typeof assignment.profiles === 'object') {
+        const profile = assignment.profiles as { full_name?: string };
+        bhName = profile.full_name || 'Unknown';
+      }
+      
+      return {
+        id: assignment.id,
+        branch_id: assignment.branch_id,
+        user_id: assignment.user_id,
+        bh_name: bhName
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching branch assignments:", error);
     return [];
   }
 }
