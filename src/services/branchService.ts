@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
@@ -314,6 +315,7 @@ export const getBranchCategoryCoverage = async (userId: string): Promise<Array<{
     // Count assigned branches by category
     const assignedByCategory: Record<string, string[]> = {};
     assignedBranches.forEach(item => {
+      if (!item.branches) return;
       const category = item.branches.category;
       if (!assignedByCategory[category]) {
         assignedByCategory[category] = [];
@@ -332,6 +334,7 @@ export const getBranchCategoryCoverage = async (userId: string): Promise<Array<{
     // Count unique visited branches by category
     const visitedByCategory: Record<string, Set<string>> = {};
     visits.forEach(visit => {
+      if (!visit.branches) return;
       const category = visit.branches.category;
       if (!visitedByCategory[category]) {
         visitedByCategory[category] = new Set();
