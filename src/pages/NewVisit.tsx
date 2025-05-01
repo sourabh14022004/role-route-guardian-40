@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -310,7 +311,7 @@ const NewVisit = () => {
   ];
 
   return (
-    <div className="container py-6">
+    <div className="container max-w-5xl py-6">
       <h1 className="text-2xl font-bold mb-6">New Branch Visit Form</h1>
       
       <Card>
@@ -359,70 +360,72 @@ const NewVisit = () => {
                   )}
                 />
                 
-                <FormField
-                  control={form.control}
-                  name="visitDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Visit Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="visitDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Visit Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="branchCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Branch Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select branch category" />
+                            </SelectTrigger>
                           </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                            className="p-3 pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="branchCategory"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Branch Category</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select branch category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="platinum">Platinum</SelectItem>
-                          <SelectItem value="diamond">Diamond</SelectItem>
-                          <SelectItem value="gold">Gold</SelectItem>
-                          <SelectItem value="silver">Silver</SelectItem>
-                          <SelectItem value="bronze">Bronze</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                          <SelectContent>
+                            <SelectItem value="platinum">Platinum</SelectItem>
+                            <SelectItem value="diamond">Diamond</SelectItem>
+                            <SelectItem value="gold">Gold</SelectItem>
+                            <SelectItem value="silver">Silver</SelectItem>
+                            <SelectItem value="bronze">Bronze</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
               
               {/* HR Connect Session */}
@@ -506,7 +509,7 @@ const NewVisit = () => {
               <div className="space-y-6">
                 <h2 className="text-xl font-semibold">Branch Metrics</h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="manningPercentage"
@@ -558,7 +561,7 @@ const NewVisit = () => {
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                   <FormField
                     control={form.control}
                     name="nonVendorPercentage"
@@ -663,7 +666,7 @@ const NewVisit = () => {
                 
                 <div>
                   <h3 className="text-base font-medium mb-3">New Employees (0-6 months)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <FormField
                       control={form.control}
                       name="newEmployeesTotal"
@@ -710,7 +713,7 @@ const NewVisit = () => {
                 
                 <div>
                   <h3 className="text-base font-medium mb-3">STAR Employees</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <FormField
                       control={form.control}
                       name="starEmployeesTotal"
@@ -756,144 +759,149 @@ const NewVisit = () => {
                 </div>
               </div>
               
-              {/* Branch Ambiance Assessment */}
+              {/* Qualitative Assessment */}
               <div className="space-y-6">
-                <h2 className="text-xl font-semibold">Branch Ambiance Assessment</h2>
+                <h2 className="text-xl font-semibold">Qualitative Assessment</h2>
                 
-                <FormField
-                  control={form.control}
-                  name="cultureBranch"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Branch Culture</FormLabel>
-                      <div className="flex flex-wrap gap-2">
-                        {qualitativeOptions.map((option) => (
-                          <FormControl key={option.value}>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className={cn(
-                                "flex flex-col h-auto items-center gap-1 p-3",
-                                option.color,
-                                field.value === option.value && "border-2"
-                              )}
-                              onClick={() => field.onChange(option.value)}
-                            >
-                              <option.icon className="h-5 w-5" />
-                              <span className="text-xs font-medium">{option.label}</span>
-                            </Button>
-                          </FormControl>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="lineManagerBehavior"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Line Manager Behavior</FormLabel>
-                      <div className="flex flex-wrap gap-2">
-                        {qualitativeOptions.map((option) => (
-                          <FormControl key={option.value}>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className={cn(
-                                "flex flex-col h-auto items-center gap-1 p-3",
-                                option.color,
-                                field.value === option.value && "border-2"
-                              )}
-                              onClick={() => field.onChange(option.value)}
-                            >
-                              <option.icon className="h-5 w-5" />
-                              <span className="text-xs font-medium">{option.label}</span>
-                            </Button>
-                          </FormControl>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="branchHygiene"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Branch Hygiene</FormLabel>
-                      <div className="flex flex-wrap gap-2">
-                        {qualitativeOptions.map((option) => (
-                          <FormControl key={option.value}>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className={cn(
-                                "flex flex-col h-auto items-center gap-1 p-3",
-                                option.color,
-                                field.value === option.value && "border-2"
-                              )}
-                              onClick={() => field.onChange(option.value)}
-                            >
-                              <option.icon className="h-5 w-5" />
-                              <span className="text-xs font-medium">{option.label}</span>
-                            </Button>
-                          </FormControl>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="overallDiscipline"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Overall Discipline</FormLabel>
-                      <div className="flex flex-wrap gap-2">
-                        {qualitativeOptions.map((option) => (
-                          <FormControl key={option.value}>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className={cn(
-                                "flex flex-col h-auto items-center gap-1 p-3",
-                                option.color,
-                                field.value === option.value && "border-2"
-                              )}
-                              onClick={() => field.onChange(option.value)}
-                            >
-                              <option.icon className="h-5 w-5" />
-                              <span className="text-xs font-medium">{option.label}</span>
-                            </Button>
-                          </FormControl>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
+                <div className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="cultureBranch"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Branch Culture</FormLabel>
+                        <div className="flex flex-wrap gap-2 w-full">
+                          {qualitativeOptions.map((option) => (
+                            <FormControl key={option.value}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "flex flex-col h-auto items-center gap-1 p-3 flex-1 min-w-[80px]",
+                                  option.color,
+                                  field.value === option.value && "border-2"
+                                )}
+                                onClick={() => field.onChange(option.value)}
+                              >
+                                <option.icon className="h-5 w-5" />
+                                <span className="text-xs font-medium">{option.label}</span>
+                              </Button>
+                            </FormControl>
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="lineManagerBehavior"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Line Manager Behavior</FormLabel>
+                        <div className="flex flex-wrap gap-2 w-full">
+                          {qualitativeOptions.map((option) => (
+                            <FormControl key={option.value}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "flex flex-col h-auto items-center gap-1 p-3 flex-1 min-w-[80px]",
+                                  option.color,
+                                  field.value === option.value && "border-2"
+                                )}
+                                onClick={() => field.onChange(option.value)}
+                              >
+                                <option.icon className="h-5 w-5" />
+                                <span className="text-xs font-medium">{option.label}</span>
+                              </Button>
+                            </FormControl>
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="branchHygiene"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Branch Hygiene</FormLabel>
+                        <div className="flex flex-wrap gap-2 w-full">
+                          {qualitativeOptions.map((option) => (
+                            <FormControl key={option.value}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "flex flex-col h-auto items-center gap-1 p-3 flex-1 min-w-[80px]",
+                                  option.color,
+                                  field.value === option.value && "border-2"
+                                )}
+                                onClick={() => field.onChange(option.value)}
+                              >
+                                <option.icon className="h-5 w-5" />
+                                <span className="text-xs font-medium">{option.label}</span>
+                              </Button>
+                            </FormControl>
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="overallDiscipline"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Overall Discipline</FormLabel>
+                        <div className="flex flex-wrap gap-2 w-full">
+                          {qualitativeOptions.map((option) => (
+                            <FormControl key={option.value}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "flex flex-col h-auto items-center gap-1 p-3 flex-1 min-w-[80px]",
+                                  option.color,
+                                  field.value === option.value && "border-2"
+                                )}
+                                onClick={() => field.onChange(option.value)}
+                              >
+                                <option.icon className="h-5 w-5" />
+                                <span className="text-xs font-medium">{option.label}</span>
+                              </Button>
+                            </FormControl>
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+              
+              {/* Overall Feedback */}
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">Overall Feedback</h2>
                 <FormField
                   control={form.control}
                   name="feedback"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Additional Feedback</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="Any additional comments or observations (optional)"
-                          className="resize-none"
+                          className="resize-none min-h-[120px]"
                           {...field}
                           value={field.value || ""}
                         />

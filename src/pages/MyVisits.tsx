@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +29,7 @@ import {
 import { fetchUserBranchVisits } from "@/services/branchService";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
+import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
 
 type BranchVisitWithBranch = Database["public"]["Tables"]["branch_visits"]["Row"] & {
   branches: {
@@ -49,6 +49,8 @@ const MyVisits = () => {
   const [visits, setVisits] = useState<BranchVisitWithBranch[]>([]);
   const [filteredVisits, setFilteredVisits] = useState<BranchVisitWithBranch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedVisit, setSelectedVisit] = useState<BranchVisitWithBranch | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const isMobile = useIsMobile();
   
   useEffect(() => {
@@ -164,6 +166,15 @@ const MyVisits = () => {
           icon: null
         };
     }
+  };
+  
+  const handleViewDetails = (visit: BranchVisitWithBranch) => {
+    setSelectedVisit(visit);
+    setIsModalOpen(true);
+  };
+  
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
   };
   
   return (
@@ -439,7 +450,7 @@ const MyVisits = () => {
                   <Button 
                     variant="outline" 
                     className="w-full text-sm"
-                    onClick={() => {/* View visit details */}}
+                    onClick={() => handleViewDetails(visit)}
                   >
                     <Eye className="mr-2 h-4 w-4" />
                     View Details
@@ -450,6 +461,13 @@ const MyVisits = () => {
           })}
         </div>
       )}
+      
+      {/* Details Modal */}
+      <BranchVisitDetailsModal
+        visit={selectedVisit}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
     </div>
   );
 };
