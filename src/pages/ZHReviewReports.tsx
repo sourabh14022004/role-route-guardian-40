@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +13,7 @@ import { format, isValid } from "date-fns";
 import { Search, CalendarIcon, Check, X, Filter, Calendar as CalendarIcon2 } from "lucide-react";
 import { BranchVisitReport, fetchRecentReports, fetchReportById, fetchReportsByDateRange, updateReportStatus } from "@/services/reportService";
 import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 
 const getStatusBadge = (status: string | null) => {
   switch(status) {
@@ -159,8 +159,8 @@ const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportD
   );
 };
 
-const DateRangePicker = ({ onDateRangeChange }: { onDateRangeChange: (range: { from: Date | undefined, to: Date | undefined }) => void }) => {
-  const [date, setDate] = useState<{ from: Date | undefined; to: Date | undefined }>({
+const DateRangePicker = ({ onDateRangeChange }: { onDateRangeChange: (range: DateRange) => void }) => {
+  const [date, setDate] = useState<DateRange>({
     from: undefined,
     to: undefined
   });
@@ -241,7 +241,7 @@ const ZHReviewReports = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+  const [dateRange, setDateRange] = useState<DateRange>({
     from: undefined,
     to: undefined
   });
@@ -259,7 +259,7 @@ const ZHReviewReports = () => {
     setSelectedReportId(null);
   };
 
-  const handleDateRangeChange = (range: { from: Date | undefined, to: Date | undefined }) => {
+  const handleDateRangeChange = (range: DateRange) => {
     setDateRange(range);
   };
 
