@@ -19,6 +19,10 @@ import ZHDashboardLayout from "./components/zh/ZHDashboardLayout";
 import ZHDashboard from "./pages/ZHDashboard";
 import ZHBranchMapping from "./pages/ZHBranchMapping";
 import ZHBHRManagement from "./pages/ZHBHRManagement";
+import CHDashboardLayout from "./components/ch/CHDashboardLayout";
+import CHDashboard from "./pages/CHDashboard";
+import CHAnalytics from "./pages/CHAnalytics";
+import CHReports from "./pages/CHReports";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +45,13 @@ const AppRoutes = () => (
       <Route path="dashboard" element={<ZHDashboard />} />
       <Route path="branch-mapping" element={<ZHBranchMapping />} />
       <Route path="bhr-management" element={<ZHBHRManagement />} />
+    </Route>
+    
+    {/* CH routes with layout */}
+    <Route path="/ch" element={<CHDashboardLayout />}>
+      <Route path="dashboard" element={<CHDashboard />} />
+      <Route path="analytics" element={<CHAnalytics />} />
+      <Route path="reports" element={<CHReports />} />
     </Route>
     
     <Route path="/:role/dashboard" element={<RoleDashboard />} />

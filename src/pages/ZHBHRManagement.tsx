@@ -1,331 +1,300 @@
 
-import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import React, { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, User, MapPin } from "lucide-react";
-import { fetchZoneBHRs } from "@/services/zhService";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { Search, MapPin } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import BHRDetailsModal from "@/components/zh/BHRDetailsModal";
 
-type BHUser = {
+interface BHRUser {
   id: string;
   full_name: string;
   e_code: string;
   location: string;
-  gender: string;
   branches_assigned: number;
-};
+  visits_completed: number;
+  status?: string;
+}
 
 const ZHBHRManagement = () => {
   const { user } = useAuth();
-  
-  // Data states
-  const [bhUsers, setBHUsers] = useState<BHUser[]>([]);
-  const [filteredBHUsers, setFilteredBHUsers] = useState<BHUser[]>([]);
-  const [selectedBHUser, setSelectedBHUser] = useState<BHUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // Dialog states
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [assignedBranches, setAssignedBranches] = useState<any[]>([]);
-  
-  // Filter states
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Fetch data on component mount
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user) return;
-      
+  const [locationFilter, setLocationFilter] = useState("All Locations");
+  const [selectedBHRId, setSelectedBHRId] = useState<string | null>(null);
+
+  const { data: bhrs, isLoading } = useQuery({
+    queryKey: ['zh-bhrs-management'],
+    queryFn: async () => {
       try {
-        setIsLoading(true);
-        const bhUsersData = await fetchZoneBHRs(user.id);
-        setBHUsers(bhUsersData);
-        setFilteredBHUsers(bhUsersData);
-      } catch (error) {
-        console.error("Error loading BHR data:", error);
-        toast({
-          variant: "destructive",
-          title: "Error loading data",
-          description: "Failed to load BHR data. Please try again."
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadData();
-  }, [user]);
-  
-  // Filter BHRs when search query changes
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredBHUsers(bhUsers);
-      return;
-    }
-    
-    const query = searchQuery.toLowerCase();
-    const filtered = bhUsers.filter(
-      bhr => bhr.full_name.toLowerCase().includes(query) || 
-             bhr.e_code.toLowerCase().includes(query)
-    );
-    
-    setFilteredBHUsers(filtered);
-  }, [bhUsers, searchQuery]);
-  
-  // Load assigned branches for a specific BHR
-  const fetchBHRBranches = async (bhrId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('branch_assignments')
-        .select(`
-          branch_id,
-          branches (
-            id,
-            name,
-            location,
-            category
-          )
-        `)
-        .eq('user_id', bhrId);
+        // First, get the ZH profile to identify their location
+        const { data: zhProfile, error: zhError } = await supabase
+          .from('profiles')
+          .select('location')
+          .eq('id', user?.id || '')
+          .single();
         
-      if (error) throw error;
-      
-      return data.map((item: any) => item.branches);
-    } catch (error) {
-      console.error("Error fetching BHR's branches:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load assigned branches."
-      });
-      return [];
+        if (zhError) throw zhError;
+        
+        // Get all BH users in this zone/location
+        const { data: bhUsers, error: bhError } = await supabase
+          .from('profiles')
+          .select('id, full_name, e_code, location')
+          .eq('role', 'BH')
+          .eq('location', zhProfile?.location || '');
+        
+        if (bhError) throw bhError;
+        
+        // Get branch assignments for these users
+        const bhrIds = (bhUsers || []).map(user => user.id);
+        
+        const { data: assignments, error: assignmentError } = await supabase
+          .from('branch_assignments')
+          .select('user_id, branch_id')
+          .in('user_id', bhrIds);
+          
+        if (assignmentError) throw assignmentError;
+        
+        // Get branch visits for these users
+        const { data: visits, error: visitError } = await supabase
+          .from('branch_visits')
+          .select('user_id, branch_id, status')
+          .in('user_id', bhrIds);
+          
+        if (visitError) throw visitError;
+        
+        // Group assignments by user
+        const assignmentsByUser: Record<string, string[]> = {};
+        (assignments || []).forEach(assignment => {
+          if (!assignmentsByUser[assignment.user_id]) {
+            assignmentsByUser[assignment.user_id] = [];
+          }
+          assignmentsByUser[assignment.user_id].push(assignment.branch_id);
+        });
+        
+        // Group completed visits by user
+        const visitsByUser: Record<string, string[]> = {};
+        (visits || []).forEach(visit => {
+          if (visit.status === 'approved' || visit.status === 'submitted') {
+            if (!visitsByUser[visit.user_id]) {
+              visitsByUser[visit.user_id] = [];
+            }
+            visitsByUser[visit.user_id].push(visit.branch_id);
+          }
+        });
+        
+        // Combine the data
+        const bhrUsers: BHRUser[] = (bhUsers || []).map(bhr => {
+          const branches = assignmentsByUser[bhr.id] || [];
+          const visitsCompleted = visitsByUser[bhr.id] || [];
+          
+          const coverage = branches.length > 0 
+            ? Math.round((visitsCompleted.length / branches.length) * 100) 
+            : 0;
+            
+          let status = "Needs Attention";
+          if (coverage >= 90) status = "Good";
+          else if (coverage >= 70) status = "In Progress";
+          
+          return {
+            ...bhr,
+            branches_assigned: branches.length,
+            visits_completed: visitsCompleted.length,
+            status
+          };
+        });
+        
+        return bhrUsers;
+      } catch (error) {
+        console.error("Error fetching BHR users:", error);
+        return [];
+      }
     }
-  };
-  
-  const handleViewDetails = async (bhr: BHUser) => {
-    setSelectedBHUser(bhr);
+  });
+
+  // Get locations from BHRs for the filter
+  const locations = React.useMemo(() => {
+    if (!bhrs) return ["All Locations"];
+    return ["All Locations", ...new Set(bhrs.map(bhr => bhr.location))];
+  }, [bhrs]);
+
+  // Filter BHRs based on search and location
+  const filteredBHRs = React.useMemo(() => {
+    if (!bhrs) return [];
     
-    try {
-      const branches = await fetchBHRBranches(bhr.id);
-      setAssignedBranches(branches);
-      setDetailsDialogOpen(true);
-    } catch (error) {
-      console.error("Error loading BHR details:", error);
+    return bhrs.filter(bhr => {
+      const matchesSearch = searchQuery 
+        ? bhr.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+          bhr.e_code.toLowerCase().includes(searchQuery.toLowerCase())
+        : true;
+        
+      const matchesLocation = locationFilter === "All Locations" || bhr.location === locationFilter;
+      
+      return matchesSearch && matchesLocation;
+    });
+  }, [bhrs, searchQuery, locationFilter]);
+
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case "Good":
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Good</Badge>;
+      case "In Progress":
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">In Progress</Badge>;
+      default:
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">Needs Attention</Badge>;
     }
   };
-  
-  // Function to format branch category names
-  const formatCategoryName = (category: string) => {
-    return category.charAt(0).toUpperCase() + category.slice(1);
+
+  const handleBHRClick = (bhrId: string) => {
+    setSelectedBHRId(bhrId);
   };
-  
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-full p-8">
-        <div className="flex flex-col items-center">
-          <div className="h-8 w-8 rounded-full border-4 border-t-blue-600 border-b-blue-600 border-r-transparent border-l-transparent animate-spin"></div>
-          <p className="mt-4 text-sm text-slate-600">Loading BHR data...</p>
-        </div>
-      </div>
-    );
-  }
-  
+
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">BHR Management</h1>
-        <p className="text-slate-600">Manage Branch Head Representatives in your zone</p>
+        <h1 className="text-3xl font-bold">BHR Management</h1>
+        <p className="text-slate-600 mt-1">Monitor and manage Branch HR representatives</p>
       </div>
-      
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle>Branch Head Representatives</CardTitle>
-          <CardDescription>View and manage BHRs in your zone</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 h-4 w-4" />
-            <Input
-              placeholder="Search by name or E-Code..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+          <Input
+            placeholder="Search by name, email, or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
+        <Select value={locationFilter} onValueChange={setLocationFilter}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {locations.map(location => (
+              <SelectItem key={location} value={location}>{location}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        <Select defaultValue="All Channels">
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All Channels">All Channels</SelectItem>
+            <SelectItem value="Corporate">Corporate Banking</SelectItem>
+            <SelectItem value="SME">SME Banking</SelectItem>
+            <SelectItem value="Retail">Retail Banking</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* BHR Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {isLoading ? (
+          Array(3).fill(0).map((_, index) => (
+            <Card key={index} className="animate-pulse">
+              <CardContent className="p-6 h-64 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-full bg-slate-200 mb-4" />
+                <div className="h-6 w-40 bg-slate-200 rounded mb-2" />
+                <div className="h-4 w-20 bg-slate-200 rounded mb-2" />
+              </CardContent>
+            </Card>
+          ))
+        ) : filteredBHRs.length === 0 ? (
+          <div className="col-span-full py-12 text-center text-slate-500">
+            No BHRs found matching your search criteria
           </div>
-          
-          <div className="border rounded-md overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[250px]">Name</TableHead>
-                  <TableHead>E-Code</TableHead>
-                  <TableHead>Gender</TableHead>
-                  <TableHead className="text-center">Branches Assigned</TableHead>
-                  <TableHead className="text-right w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBHUsers.length > 0 ? (
-                  filteredBHUsers.map((bhr) => (
-                    <TableRow key={bhr.id}>
-                      <TableCell className="font-medium">{bhr.full_name}</TableCell>
-                      <TableCell>{bhr.e_code}</TableCell>
-                      <TableCell className="capitalize">{bhr.gender}</TableCell>
-                      <TableCell className="text-center">{bhr.branches_assigned}</TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleViewDetails(bhr)}
-                        >
-                          Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                      {searchQuery ? 
-                        "No BHRs match your search criteria" : 
-                        "No BHRs available in your zone"
-                      }
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* BHR Details Dialog */}
-      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>BHR Details</DialogTitle>
-            <DialogDescription>
-              Details for {selectedBHUser?.full_name}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedBHUser && (
-            <div className="space-y-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-slate-50 p-4 rounded-md">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-blue-100 p-2 rounded-full">
-                      <User className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{selectedBHUser.full_name}</h3>
-                      <p className="text-sm text-slate-600">{selectedBHUser.e_code}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-slate-500">Gender</p>
-                      <p className="text-sm capitalize">{selectedBHUser.gender}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Role</p>
-                      <p className="text-sm">BH</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-slate-50 p-4 rounded-md">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-green-100 p-2 rounded-full">
-                      <MapPin className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Location</h3>
-                      <p className="text-sm text-slate-600">{selectedBHUser.location}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Branches Assigned</p>
-                    <p className="text-sm">{selectedBHUser.branches_assigned}</p>
-                  </div>
-                </div>
-              </div>
+        ) : (
+          filteredBHRs.map(bhr => {
+            // Calculate coverage percentage
+            const coveragePercentage = bhr.branches_assigned > 0
+              ? Math.round((bhr.visits_completed / bhr.branches_assigned) * 100)
+              : 0;
+            
+            // Generate avatar initials
+            const initials = bhr.full_name
+              .split(' ')
+              .map(name => name.charAt(0))
+              .slice(0, 1)
+              .join('');
               
-              <div>
-                <h3 className="text-lg font-medium mb-3">Assigned Branches</h3>
-                {assignedBranches.length > 0 ? (
-                  <div className="border rounded-md overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Branch Name</TableHead>
-                          <TableHead>Location</TableHead>
-                          <TableHead>Category</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {assignedBranches.map((branch: any) => (
-                          <TableRow key={branch.id}>
-                            <TableCell className="font-medium">{branch.name}</TableCell>
-                            <TableCell>{branch.location}</TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                branch.category === 'platinum' ? 'bg-violet-100 text-violet-700' : 
-                                branch.category === 'diamond' ? 'bg-blue-100 text-blue-700' :
-                                branch.category === 'gold' ? 'bg-amber-100 text-amber-700' :
-                                branch.category === 'silver' ? 'bg-slate-100 text-slate-700' :
-                                'bg-orange-100 text-orange-700'
-                              }`}>
-                                {formatCategoryName(branch.category)}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+            return (
+              <Card key={bhr.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="h-14 w-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold">
+                      {initials}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-semibold text-lg">{bhr.full_name}</h3>
+                        {getStatusBadge(bhr.status)}
+                      </div>
+                      <div className="text-sm text-slate-500">{bhr.e_code}</div>
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center py-8 border rounded-md bg-slate-50">
-                    <p className="text-slate-500">No branches assigned to this BHR yet</p>
+                  
+                  <div className="mt-4 flex items-center text-sm text-slate-600">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    {bhr.location}
                   </div>
-                )}
-              </div>
-              
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Close</Button>
-                </DialogClose>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+                  
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Branch Visit Coverage</span>
+                      <span className="font-medium">
+                        {bhr.visits_completed}/{bhr.branches_assigned} branches
+                      </span>
+                    </div>
+                    <Progress 
+                      value={coveragePercentage} 
+                      className={`h-2 ${coveragePercentage >= 90 ? 'bg-green-200' : coveragePercentage >= 70 ? 'bg-blue-200' : 'bg-amber-200'}`}
+                    />
+                  </div>
+                  
+                  <div className="mt-6 grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="text-slate-500 text-xs mb-1">Branches Mapped</div>
+                      <div className="text-2xl font-bold">{bhr.branches_assigned}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-slate-500 text-xs mb-1">Visits Completed</div>
+                      <div className="text-2xl font-bold">{bhr.visits_completed}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t">
+                    <Button 
+                      variant="link" 
+                      className="w-full text-blue-600 font-medium p-0 h-auto"
+                      onClick={() => handleBHRClick(bhr.id)}
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* BHR Details Modal */}
+      <BHRDetailsModal 
+        bhId={selectedBHRId} 
+        open={!!selectedBHRId} 
+        onClose={() => setSelectedBHRId(null)}
+      />
     </div>
   );
 };

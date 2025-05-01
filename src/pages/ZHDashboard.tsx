@@ -141,9 +141,9 @@ const ZHDashboard = () => {
         const transformedData = (data || []).map(visit => ({
           id: visit.id,
           branch: {
-            name: visit.branches ? String(visit.branches.name || 'Unknown Branch') : 'Unknown Branch',
+            name: visit.branches?.name || 'Unknown Branch',
           },
-          bh_name: visit.profiles ? String(visit.profiles.full_name || 'Unknown BH') : 'Unknown BH',
+          bh_name: visit.profiles?.full_name || 'Unknown BH',
           visit_date: visit.visit_date ? new Date(visit.visit_date).toLocaleDateString('en-IN', {
             day: 'numeric',
             month: 'short',
@@ -249,8 +249,7 @@ const ZHDashboard = () => {
           if (!visit.user_id) return;
           
           const userId = visit.user_id;
-          const name = visit.profiles && typeof visit.profiles === 'object' ? 
-            String(visit.profiles.full_name || 'Unknown') : 'Unknown';
+          const name = visit.profiles?.full_name || 'Unknown';
           
           if (!bhrCounts[userId]) {
             bhrCounts[userId] = { name, reports: 0 };
