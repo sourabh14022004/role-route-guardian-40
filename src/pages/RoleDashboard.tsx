@@ -1,14 +1,17 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 const RoleDashboard = () => {
   const { role } = useParams<{ role: string }>();
   const navigate = useNavigate();
   const { user, session, loading } = useAuth();
+  const [verifyingRole, setVerifyingRole] = useState(true);
   
   useEffect(() => {
     if (loading) return;
@@ -22,27 +25,58 @@ const RoleDashboard = () => {
     // Verify user role matches the requested dashboard
     const checkUserRole = async () => {
       try {
+        setVerifyingRole(true);
+        
         const { data, error } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', user.id)
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching user profile:", error);
+          throw error;
+        }
         
         const validRoles = ["bh", "zh", "ch", "admin"];
+        const requestedRole = role?.toLowerCase();
         
-        if (!data || data.role.toLowerCase() !== role?.toLowerCase() || !validRoles.includes(role?.toLowerCase() || "")) {
+        if (!data || 
+            !data.role || 
+            data.role.toLowerCase() !== requestedRole || 
+            !validRoles.includes(requestedRole || "")) {
+          
           toast({
             variant: "destructive",
             title: "Access Denied",
             description: "You don't have permission to view this page."
           });
           navigate("/auth");
+          return;
+        }
+        
+        // Redirect to the appropriate dashboard
+        switch(requestedRole) {
+          case "bh":
+            navigate("/bh/dashboard");
+            break;
+          case "zh":
+            navigate("/zh/dashboard");
+            break;
+          case "ch":
+            navigate("/ch/dashboard");
+            break;
+          case "admin":
+            navigate("/admin/dashboard");
+            break;
+          default:
+            navigate("/auth");
         }
       } catch (error) {
         console.error("Error verifying user role:", error);
         navigate("/auth");
+      } finally {
+        setVerifyingRole(false);
       }
     };
     
@@ -50,10 +84,13 @@ const RoleDashboard = () => {
   }, [navigate, role, session, user, loading]);
 
   // Show loading state while checking authentication
-  if (loading) {
+  if (loading || verifyingRole) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="mb-4">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+        </div>
+        <p className="text-slate-600 text-lg">Verifying your credentials...</p>
       </div>
     );
   }
@@ -126,6 +163,12 @@ const RoleDashboard = () => {
               ))}
             </div>
           </div>
+        </div>
+        
+        <div className="mt-8 flex justify-center">
+          <Button onClick={() => navigate(`/${role}`)} variant="outline">
+            Go to {getRoleName()} Homepage
+          </Button>
         </div>
       </div>
     </div>

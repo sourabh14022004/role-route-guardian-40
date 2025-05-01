@@ -15,13 +15,15 @@ const StatCard = ({
   value, 
   icon, 
   change, 
-  suffix = "" 
+  suffix = "",
+  isLoading = false
 }: { 
   title: string; 
   value: number | string; 
   icon: React.ReactNode; 
   change?: number;
   suffix?: string;
+  isLoading?: boolean;
 }) => {
   return (
     <Card className="transition-all hover:shadow-md">
@@ -29,8 +31,14 @@ const StatCard = ({
         <div className="text-slate-500 text-sm mb-1">{title}</div>
         <div className="flex items-end justify-between">
           <div className="flex items-end gap-1">
-            <span className="text-4xl font-bold">{value}</span>
-            {suffix && <span className="text-2xl mb-1 text-slate-600">{suffix}</span>}
+            {isLoading ? (
+              <div className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
+            ) : (
+              <>
+                <span className="text-4xl font-bold">{value}</span>
+                {suffix && <span className="text-2xl mb-1 text-slate-600">{suffix}</span>}
+              </>
+            )}
           </div>
           <div className="bg-slate-100 p-2 rounded-full text-blue-600">
             {icon}
@@ -38,7 +46,9 @@ const StatCard = ({
         </div>
         {typeof change === 'number' && (
           <div className="mt-3 flex items-center text-sm">
-            {change > 0 ? (
+            {isLoading ? (
+              <div className="h-3 bg-gray-200 rounded animate-pulse w-20"></div>
+            ) : change > 0 ? (
               <div className="flex items-center bg-green-50 text-green-600 px-2 py-0.5 rounded">
                 <ArrowUpRight className="h-3 w-3 mr-1" />
                 +{change}%
@@ -62,26 +72,44 @@ const StatCard = ({
   );
 };
 
+const LoadingUI = () => (
+  <div className="flex justify-center py-8">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+  </div>
+);
+
+const ErrorUI = ({ message }: { message: string }) => (
+  <div className="py-4 text-center">
+    <div className="inline-flex items-center justify-center bg-red-50 p-2 rounded-full text-red-500 mb-3">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-alert-circle"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+    </div>
+    <p className="text-slate-600">{message}</p>
+    <Button variant="outline" size="sm" className="mt-3" onClick={() => window.location.reload()}>
+      Retry
+    </Button>
+  </div>
+);
+
 const CHDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: ['ch-dashboard-stats'],
     queryFn: fetchDashboardStats
   });
 
-  const { data: categoryStats, isLoading: categoryLoading } = useQuery({
+  const { data: categoryStats, isLoading: categoryLoading, isError: categoryError } = useQuery({
     queryKey: ['ch-branch-category-stats'],
     queryFn: fetchBranchCategoryStats
   });
 
-  const { data: monthlyTrends, isLoading: trendsLoading } = useQuery({
+  const { data: monthlyTrends, isLoading: trendsLoading, isError: trendsError } = useQuery({
     queryKey: ['ch-monthly-trends'],
     queryFn: fetchMonthlyTrends
   });
 
-  const { data: topPerformers, isLoading: performersLoading } = useQuery({
+  const { data: topPerformers, isLoading: performersLoading, isError: performersError } = useQuery({
     queryKey: ['ch-top-performers'],
     queryFn: fetchTopPerformers
   });
@@ -120,12 +148,14 @@ const CHDashboard = () => {
           title="Total Branches"
           value={statsLoading ? "..." : stats?.totalBranches || 0}
           icon={<Building className="h-5 w-5" />}
+          isLoading={statsLoading}
         />
         
         <StatCard
           title="Visited Branches"
           value={statsLoading ? "..." : stats?.visitedBranches || 0}
           icon={<CheckCircle className="h-5 w-5" />}
+          isLoading={statsLoading}
         />
         
         <StatCard
@@ -134,12 +164,14 @@ const CHDashboard = () => {
           icon={<PieChart className="h-5 w-5" />}
           change={stats?.vsLastMonth?.coverage}
           suffix="%"
+          isLoading={statsLoading}
         />
         
         <StatCard
           title="Active BHRs"
           value={statsLoading ? "..." : stats?.activeBHRs || 0}
           icon={<Users className="h-5 w-5" />}
+          isLoading={statsLoading}
         />
       </div>
 
@@ -151,6 +183,7 @@ const CHDashboard = () => {
           icon={<PieChart className="h-5 w-5" />}
           change={stats?.vsLastMonth?.avgCoverage}
           suffix="%"
+          isLoading={statsLoading}
         />
         
         <StatCard
@@ -159,6 +192,7 @@ const CHDashboard = () => {
           icon={<TrendingDown className="h-5 w-5" />}
           change={stats?.vsLastMonth?.attritionRate}
           suffix="%"
+          isLoading={statsLoading}
         />
         
         <StatCard
@@ -167,6 +201,7 @@ const CHDashboard = () => {
           icon={<TrendingUp className="h-5 w-5" />}
           change={stats?.vsLastMonth?.manningPercentage}
           suffix="%"
+          isLoading={statsLoading}
         />
         
         <StatCard
@@ -175,6 +210,7 @@ const CHDashboard = () => {
           icon={<TrendingUp className="h-5 w-5" />}
           change={stats?.vsLastMonth?.erPercentage}
           suffix="%"
+          isLoading={statsLoading}
         />
       </div>
 
@@ -188,12 +224,16 @@ const CHDashboard = () => {
           
           <div className="p-6 space-y-6">
             {categoryLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <LoadingUI />
+            ) : categoryError ? (
+              <ErrorUI message="Failed to load category data" />
+            ) : !categoryStats || categoryStats.length === 0 ? (
+              <div className="py-4 text-center text-slate-500">
+                No category data available
               </div>
             ) : (
               <>
-                {categoryStats?.map((category, index) => (
+                {categoryStats.map((category, index) => (
                   <div key={index} className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="capitalize font-medium">{category.category}</span>
@@ -223,15 +263,23 @@ const CHDashboard = () => {
               <div className="flex justify-center py-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
+            ) : trendsError ? (
+              <div className="py-4 text-center text-slate-500">
+                Failed to load trend data
+              </div>
+            ) : !monthlyTrends || monthlyTrends.length === 0 ? (
+              <div className="py-4 text-center text-slate-500">
+                No trend data available
+              </div>
             ) : (
               <div className="space-y-4">
-                {monthlyTrends?.map((month, i) => (
+                {monthlyTrends.map((month, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className="w-28 text-slate-600">{month.month}</div>
                     <div className="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden">
                       <div
                         className={`h-full ${
-                          i >= 3 ? "bg-green-500" : "bg-blue-500"
+                          month.branchCoverage >= 75 ? "bg-green-500" : "bg-blue-500"
                         }`}
                         style={{ width: `${month.branchCoverage}%` }}
                       />
@@ -252,15 +300,23 @@ const CHDashboard = () => {
               <div className="flex justify-center py-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
+            ) : performersError ? (
+              <div className="py-4 text-center text-slate-500">
+                Failed to load performer data
+              </div>
+            ) : !topPerformers || topPerformers.length === 0 ? (
+              <div className="py-4 text-center text-slate-500">
+                No performer data available
+              </div>
             ) : (
               <div className="space-y-3">
-                {topPerformers?.map((performer, i) => (
+                {topPerformers.map((performer, i) => (
                   <div key={i} className="flex justify-between items-center">
                     <span className="text-sm font-medium">
-                      {`BHR${(i + 1).toString().padStart(2, '0')} - ${performer.name}`}
+                      {`${performer.e_code || 'BHR'} - ${performer.name}`}
                     </span>
                     <span className="px-2 py-0.5 text-sm rounded bg-green-50 text-green-700">
-                      {performer.coverage}%
+                      {performer.reports} reports
                     </span>
                   </div>
                 ))}
