@@ -47,6 +47,7 @@ type Branch = {
   location: string;
   category: string;
   bh_count: number;
+  bh_assignments?: Array<{ user_id: string, bh_name: string }>;
 };
 
 type BHUser = {
@@ -57,11 +58,6 @@ type BHUser = {
   branches_assigned: number;
 };
 
-type BranchAssignment = {
-  user_id: string;
-  bh_name: string;
-};
-
 const ZHBranchMapping = () => {
   const { user } = useAuth();
   
@@ -69,7 +65,6 @@ const ZHBranchMapping = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [bhUsers, setBHUsers] = useState<BHUser[]>([]);
   const [filteredBranches, setFilteredBranches] = useState<Branch[]>([]);
-  const [branchAssignments, setBranchAssignments] = useState<Record<string, BranchAssignment[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   
   // Filter states
@@ -105,47 +100,6 @@ const ZHBranchMapping = () => {
         setBranches(branchesData);
         setFilteredBranches(branchesData);
         setBHUsers(bhUsersData);
-        
-        // Fetch assignments for each branch
-        const assignmentsMap: Record<string, BranchAssignment[]> = {};
-        
-        // Process branch assignments for all branches
-        const { data: allAssignments, error } = await supabase
-          .from('branch_assignments')
-          .select(`
-            branch_id,
-            user_id,
-            profiles:user_id(full_name)
-          `);
-          
-        if (error) {
-          console.error('Error fetching branch assignments:', error);
-          return;
-        }
-        
-        // Group assignments by branch
-        allAssignments?.forEach(assignment => {
-          const branchId = assignment.branch_id;
-          const userId = assignment.user_id;
-          let bhName = 'Unknown';
-          
-          // Extract BH name
-          if (assignment.profiles && typeof assignment.profiles === 'object') {
-            const profile = assignment.profiles as { full_name?: string };
-            bhName = profile.full_name || 'Unknown';
-          }
-          
-          if (!assignmentsMap[branchId]) {
-            assignmentsMap[branchId] = [];
-          }
-          
-          assignmentsMap[branchId].push({
-            user_id: userId,
-            bh_name: bhName
-          });
-        });
-        
-        setBranchAssignments(assignmentsMap);
       } catch (error) {
         console.error("Error loading branch mapping data:", error);
         toast({
@@ -210,44 +164,6 @@ const ZHBranchMapping = () => {
             fetchZoneBHRs(user.id)
           ]);
           
-          // Fetch updated assignments
-          const { data: allAssignments, error } = await supabase
-            .from('branch_assignments')
-            .select(`
-              branch_id,
-              user_id,
-              profiles:user_id(full_name)
-            `);
-            
-          if (error) {
-            console.error('Error fetching branch assignments:', error);
-            return;
-          }
-          
-          // Update assignments
-          const assignmentsMap: Record<string, BranchAssignment[]> = {};
-          
-          allAssignments?.forEach(assignment => {
-            const branchId = assignment.branch_id;
-            const userId = assignment.user_id;
-            let bhName = 'Unknown';
-            
-            if (assignment.profiles && typeof assignment.profiles === 'object') {
-              const profile = assignment.profiles as { full_name?: string };
-              bhName = profile.full_name || 'Unknown';
-            }
-            
-            if (!assignmentsMap[branchId]) {
-              assignmentsMap[branchId] = [];
-            }
-            
-            assignmentsMap[branchId].push({
-              user_id: userId,
-              bh_name: bhName
-            });
-          });
-          
-          setBranchAssignments(assignmentsMap);
           setBranches(branchesData);
           setFilteredBranches(branchesData);
           setBHUsers(bhUsersData);
@@ -265,44 +181,6 @@ const ZHBranchMapping = () => {
             fetchZoneBHRs(user.id)
           ]);
           
-          // Fetch updated assignments
-          const { data: allAssignments, error } = await supabase
-            .from('branch_assignments')
-            .select(`
-              branch_id,
-              user_id,
-              profiles:user_id(full_name)
-            `);
-            
-          if (error) {
-            console.error('Error fetching branch assignments:', error);
-            return;
-          }
-          
-          // Update assignments
-          const assignmentsMap: Record<string, BranchAssignment[]> = {};
-          
-          allAssignments?.forEach(assignment => {
-            const branchId = assignment.branch_id;
-            const userId = assignment.user_id;
-            let bhName = 'Unknown';
-            
-            if (assignment.profiles && typeof assignment.profiles === 'object') {
-              const profile = assignment.profiles as { full_name?: string };
-              bhName = profile.full_name || 'Unknown';
-            }
-            
-            if (!assignmentsMap[branchId]) {
-              assignmentsMap[branchId] = [];
-            }
-            
-            assignmentsMap[branchId].push({
-              user_id: userId,
-              bh_name: bhName
-            });
-          });
-          
-          setBranchAssignments(assignmentsMap);
           setBranches(branchesData);
           setFilteredBranches(branchesData);
           setBHUsers(bhUsersData);
@@ -401,8 +279,8 @@ const ZHBranchMapping = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
-                          {branchAssignments[branch.id] && branchAssignments[branch.id].length > 0 ? (
-                            branchAssignments[branch.id].map((assignment, idx) => (
+                          {branch.bh_assignments && branch.bh_assignments.length > 0 ? (
+                            branch.bh_assignments.map((assignment, idx) => (
                               <Badge key={idx} variant="secondary" className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200">
                                 {assignment.bh_name}
                                 <button 

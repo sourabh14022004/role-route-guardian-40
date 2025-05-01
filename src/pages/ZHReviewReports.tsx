@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CalendarIcon, Check, X, Filter } from "lucide-react";
-import { BranchVisitReport, fetchRecentReports, fetchReportById, updateReportStatus } from "@/services/reportService";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, isValid } from "date-fns";
+import { Search, CalendarIcon, Check, X, Filter, Calendar as CalendarIcon2 } from "lucide-react";
+import { BranchVisitReport, fetchRecentReports, fetchReportById, fetchReportsByDateRange, updateReportStatus } from "@/services/reportService";
+import { cn } from "@/lib/utils";
 
 const getStatusBadge = (status: string | null) => {
   switch(status) {
@@ -155,20 +159,108 @@ const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportD
   );
 };
 
+const DateRangePicker = ({ onDateRangeChange }: { onDateRangeChange: (range: { from: Date | undefined, to: Date | undefined }) => void }) => {
+  const [date, setDate] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  });
+  
+  useEffect(() => {
+    // Only trigger the callback if we have a complete range or no dates at all
+    if ((date.from === undefined && date.to === undefined) || 
+        (date.from !== undefined && date.to !== undefined)) {
+      onDateRangeChange(date);
+    }
+  }, [date, onDateRangeChange]);
+
+  return (
+    <div className="grid gap-2">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            id="date"
+            variant={"outline"}
+            className={cn(
+              "w-full md:w-[300px] justify-start text-left font-normal",
+              !date && "text-muted-foreground"
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {date.from ? (
+              date.to ? (
+                <>
+                  {format(date.from, "LLL dd, yyyy")} - {format(date.to, "LLL dd, yyyy")}
+                </>
+              ) : (
+                format(date.from, "LLL dd, yyyy")
+              )
+            ) : (
+              <span>Pick a date range</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            initialFocus
+            mode="range"
+            defaultMonth={date.from}
+            selected={date}
+            onSelect={setDate}
+            numberOfMonths={2}
+            className="p-3 pointer-events-auto"
+          />
+          <div className="p-3 border-t border-border flex justify-between">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setDate({ from: undefined, to: undefined });
+              }}
+            >
+              Clear
+            </Button>
+            <Button 
+              size="sm"
+              onClick={() => {
+                if (date.from && !date.to) {
+                  setDate(prev => ({ from: prev.from, to: prev.from }));
+                }
+              }}
+              disabled={!date.from || !!date.to}
+            >
+              Apply
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
+
 const ZHReviewReports = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  });
 
   const { data: reports = [], isLoading, refetch } = useQuery({
-    queryKey: ['zh-all-reports'],
-    queryFn: () => fetchRecentReports(100) // Fetch more reports for this page
+    queryKey: ['zh-all-reports', dateRange],
+    queryFn: () => dateRange.from || dateRange.to 
+      ? fetchReportsByDateRange(dateRange.from, dateRange.to, 100)
+      : fetchRecentReports(100)
   });
 
   const handleStatusUpdate = async (reportId: string, status: "approved" | "rejected") => {
     await updateReportStatus(reportId, status);
     refetch();
     setSelectedReportId(null);
+  };
+
+  const handleDateRangeChange = (range: { from: Date | undefined, to: Date | undefined }) => {
+    setDateRange(range);
   };
 
   const filteredReports = reports.filter((report) => {
@@ -202,30 +294,36 @@ const ZHReviewReports = () => {
 
       <Card className="mb-6 hover:shadow-md transition-shadow">
         <CardContent className="p-5">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-              <Input
-                placeholder="Search by branch name or BHR name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                <Input
+                  placeholder="Search by branch name or BHR name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="flex items-center">
+                    <Filter className="h-4 w-4 mr-2 text-slate-400" />
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="submitted">Submitted</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="w-full md:w-48">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="flex items-center">
-                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            <div>
+              <DateRangePicker onDateRangeChange={handleDateRangeChange} />
             </div>
           </div>
         </CardContent>
@@ -241,7 +339,7 @@ const ZHReviewReports = () => {
           ) : filteredReports.length === 0 ? (
             <div className="py-12 text-center text-slate-500">
               <div className="flex justify-center mb-3">
-                <CalendarIcon className="h-12 w-12 text-slate-300" />
+                <CalendarIcon2 className="h-12 w-12 text-slate-300" />
               </div>
               <h3 className="text-lg font-medium mb-1">No reports found</h3>
               <p>No branch visit reports match your current filters.</p>

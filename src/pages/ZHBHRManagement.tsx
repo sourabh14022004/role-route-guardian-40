@@ -4,19 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchZoneBHRs } from "@/services/zhService";
 import { fetchBHRReportStats } from "@/services/reportService";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Eye, User } from "lucide-react";
+import { Search, Filter, Eye, User, MapPin } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import BHRDetailsModal from "@/components/zh/BHRDetailsModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,16 +59,6 @@ const ZHBHRManagement = () => {
     return matchesSearch && matchesLocation;
   });
 
-  // Get statistics for each BHR
-  const getBHRStats = async (bhId: string) => {
-    try {
-      return await fetchBHRReportStats(bhId);
-    } catch (error) {
-      console.error("Error fetching BHR stats:", error);
-      return { total: 0, approved: 0, pending: 0, rejected: 0, draft: 0 };
-    }
-  };
-
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -118,49 +100,39 @@ const ZHBHRManagement = () => {
         </CardContent>
       </Card>
       
-      <Card className="hover:shadow-md transition-shadow bg-gradient-to-br from-card to-secondary/80 backdrop-blur-sm">
-        <CardHeader className="bg-slate-50 border-b">
-          <CardTitle>Branch Head Representatives</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {usersLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-              <span className="sr-only">Loading...</span>
-            </div>
-          ) : filteredBHRs.length === 0 ? (
-            <div className="py-12 text-center text-slate-500">
-              <div className="flex justify-center mb-3">
-                <User className="h-12 w-12 text-slate-300" />
-              </div>
-              <h3 className="text-lg font-medium mb-1">No BHRs found</h3>
-              <p>No Branch Head Representatives match your current filters.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-medium">Name</TableHead>
-                  <TableHead className="font-medium">Employee Code</TableHead>
-                  <TableHead className="font-medium">Location</TableHead>
-                  <TableHead className="font-medium">Assigned Branches</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBHRs.map((bhr) => (
-                  <TableRow key={bhr.id} className="hover:bg-slate-50">
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-medium text-sm">
-                          {bhr.full_name?.charAt(0) || 'B'}
-                        </div>
-                        {bhr.full_name}
+      {usersLoading ? (
+        <div className="flex justify-center py-8">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <span className="sr-only">Loading...</span>
+        </div>
+      ) : filteredBHRs.length === 0 ? (
+        <div className="py-12 text-center text-slate-500">
+          <div className="flex justify-center mb-3">
+            <User className="h-12 w-12 text-slate-300" />
+          </div>
+          <h3 className="text-lg font-medium mb-1">No BHRs found</h3>
+          <p>No Branch Head Representatives match your current filters.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredBHRs.map((bhr) => (
+            <Card key={bhr.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start">
+                  <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xl mr-4 flex-shrink-0">
+                    {bhr.full_name?.charAt(0) || 'B'}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg truncate">{bhr.full_name}</h3>
+                    <p className="text-sm text-slate-500 mb-1">{bhr.e_code || 'No employee code'}</p>
+                    {bhr.location && (
+                      <div className="flex items-center text-sm text-slate-600 mb-3">
+                        <MapPin className="h-3.5 w-3.5 mr-1" />
+                        {bhr.location}
                       </div>
-                    </TableCell>
-                    <TableCell>{bhr.e_code || 'N/A'}</TableCell>
-                    <TableCell>{bhr.location || 'Not assigned'}</TableCell>
-                    <TableCell>
+                    )}
+                    
+                    <div className="my-3">
                       {bhr.branches_assigned > 0 ? (
                         <Badge className="bg-blue-100 text-blue-800">
                           {bhr.branches_assigned} branch{bhr.branches_assigned !== 1 ? 'es' : ''}
@@ -170,25 +142,26 @@ const ZHBHRManagement = () => {
                           No branches
                         </Badge>
                       )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setSelectedBHId(bhr.id)}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t flex justify-end">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setSelectedBHId(bhr.id)}
+                    className="bg-slate-50 hover:bg-slate-100 text-slate-700 w-full"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
       
       {/* BHR Details Modal */}
       <BHRDetailsModal

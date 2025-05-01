@@ -1,9 +1,10 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
 
 type Branch = Database['public']['Tables']['branches']['Row'];
-type BranchWithAssignments = Branch & { bh_count: number };
+type BranchWithAssignments = Branch & { bh_count: number; bh_assignments?: Array<{ user_id: string, bh_name: string }> };
 type BHRUser = Database['public']['Tables']['profiles']['Row'] & { branches_assigned: number };
 
 export async function fetchZoneBranches(userId: string): Promise<BranchWithAssignments[]> {
@@ -20,7 +21,42 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
 
     if (branchError) throw branchError;
 
-    // Process the data to count BHs per branch
+    // Get all branch assignments with BH names
+    const { data: allAssignments, error: assignmentsError } = await supabase
+      .from('branch_assignments')
+      .select(`
+        branch_id,
+        user_id,
+        profiles:user_id(full_name)
+      `);
+      
+    if (assignmentsError) throw assignmentsError;
+
+    // Group assignments by branch id
+    const assignmentsByBranch: Record<string, Array<{user_id: string, bh_name: string}>> = {};
+
+    allAssignments?.forEach(assignment => {
+      const branchId = assignment.branch_id;
+      const userId = assignment.user_id;
+      let bhName = 'Unknown';
+      
+      // Extract BH name
+      if (assignment.profiles && typeof assignment.profiles === 'object') {
+        const profile = assignment.profiles as { full_name?: string };
+        bhName = profile.full_name || 'Unknown';
+      }
+
+      if (!assignmentsByBranch[branchId]) {
+        assignmentsByBranch[branchId] = [];
+      }
+
+      assignmentsByBranch[branchId].push({
+        user_id: userId,
+        bh_name: bhName
+      });
+    });
+    
+    // Process the data to count BHs per branch and add assignments data
     const processedBranches = branches.map(branch => {
       // Count unique BHs for this branch
       const uniqueBhs = new Set();
@@ -35,7 +71,8 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
 
       return {
         ...branch,
-        bh_count: uniqueBhs.size
+        bh_count: uniqueBhs.size,
+        bh_assignments: assignmentsByBranch[branch.id] || []
       };
     });
 
