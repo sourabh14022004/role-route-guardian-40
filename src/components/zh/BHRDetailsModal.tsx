@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, Clock, MapPin, User } from "lucide-react";
+import { Calendar, Clock, MapPin, User, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchBHRReportStats } from "@/services/reportService";
@@ -156,9 +156,9 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
   const getCategoryBadge = (category: string) => {
     switch(category.toLowerCase()) {
       case "platinum":
-        return <Badge className="bg-slate-800 text-white">Platinum</Badge>;
+        return <Badge className="bg-violet-100 text-violet-800">Platinum</Badge>;
       case "diamond":
-        return <Badge className="bg-blue-200 text-blue-800">Diamond</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800">Diamond</Badge>;
       case "gold":
         return <Badge className="bg-amber-100 text-amber-800">Gold</Badge>;
       case "silver":
@@ -180,7 +180,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>BHR Details</DialogTitle>
+          <DialogTitle className="text-xl">BHR Details</DialogTitle>
         </DialogHeader>
 
         {profileLoading ? (
@@ -191,7 +191,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
           <div className="py-4 text-center text-slate-500">BHR profile not found</div>
         ) : (
           <>
-            <div className="flex flex-col md:flex-row gap-4 md:items-start">
+            <div className="flex flex-col md:flex-row gap-4 md:items-start mb-6">
               <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-2xl font-bold shadow-md">
                 {bhrProfile.full_name.charAt(0)}
               </div>
@@ -217,26 +217,26 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
             </div>
 
             {/* Report Statistics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-              <Card className="bg-slate-50 border-slate-200">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 mb-6">
+              <Card className="bg-slate-50 border-slate-200 shadow-sm">
                 <CardContent className="p-4">
                   <p className="text-sm text-slate-500">Total Reports</p>
                   <p className="text-2xl font-bold">{reportStats?.total || 0}</p>
                 </CardContent>
               </Card>
-              <Card className="bg-green-50 border-green-100">
+              <Card className="bg-green-50 border-green-100 shadow-sm">
                 <CardContent className="p-4">
                   <p className="text-sm text-green-700">Approved</p>
                   <p className="text-2xl font-bold">{reportStats?.approved || 0}</p>
                 </CardContent>
               </Card>
-              <Card className="bg-blue-50 border-blue-100">
+              <Card className="bg-blue-50 border-blue-100 shadow-sm">
                 <CardContent className="p-4">
                   <p className="text-sm text-blue-700">Pending</p>
                   <p className="text-2xl font-bold">{reportStats?.pending || 0}</p>
                 </CardContent>
               </Card>
-              <Card className="bg-red-50 border-red-100">
+              <Card className="bg-red-50 border-red-100 shadow-sm">
                 <CardContent className="p-4">
                   <p className="text-sm text-red-700">Rejected</p>
                   <p className="text-2xl font-bold">{reportStats?.rejected || 0}</p>
@@ -245,11 +245,11 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
             </div>
 
             <Tabs defaultValue="branches" className="mt-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
                 <TabsTrigger value="branches">Assigned Branches</TabsTrigger>
                 <TabsTrigger value="reports">Reports</TabsTrigger>
               </TabsList>
-              <TabsContent value="branches" className="max-h-[300px] overflow-y-auto">
+              <TabsContent value="branches" className="max-h-[300px] overflow-y-auto bg-white rounded-md shadow-sm border">
                 {branchesLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -267,8 +267,8 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                     </TableHeader>
                     <TableBody>
                       {assignedBranches.map((branch) => (
-                        <TableRow key={branch.id}>
-                          <TableCell>{branch.name}</TableCell>
+                        <TableRow key={branch.id} className="hover:bg-slate-50">
+                          <TableCell className="font-medium">{branch.name}</TableCell>
                           <TableCell>{branch.location}</TableCell>
                           <TableCell>{getCategoryBadge(branch.category)}</TableCell>
                         </TableRow>
@@ -277,7 +277,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                   </Table>
                 )}
               </TabsContent>
-              <TabsContent value="reports" className="max-h-[300px] overflow-y-auto">
+              <TabsContent value="reports" className="max-h-[300px] overflow-y-auto bg-white rounded-md shadow-sm border">
                 {reportsLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -296,8 +296,8 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                     </TableHeader>
                     <TableBody>
                       {recentReports.map(report => (
-                        <TableRow key={report.id}>
-                          <TableCell>{report.branches && typeof report.branches === 'object' ? 
+                        <TableRow key={report.id} className="hover:bg-slate-50">
+                          <TableCell className="font-medium">{report.branches && typeof report.branches === 'object' ? 
                             (report.branches as any).name : 'Unknown'}</TableCell>
                           <TableCell>{formatDate(report.visit_date)}</TableCell>
                           <TableCell>{getStatusBadge(report.status)}</TableCell>
@@ -305,6 +305,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                             <Button 
                               variant="ghost" 
                               size="sm" 
+                              className="hover:bg-slate-200"
                               onClick={() => setSelectedReportId(report.id)}
                             >
                               View
@@ -323,7 +324,17 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
               <Dialog open={!!selectedReportId} onOpenChange={(open) => !open && setSelectedReportId(null)}>
                 <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Branch Visit Report</DialogTitle>
+                    <DialogTitle className="flex justify-between items-center">
+                      <span>Branch Visit Report</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-full"
+                        onClick={() => setSelectedReportId(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </DialogTitle>
                   </DialogHeader>
                   
                   {reportDetailsLoading ? (
@@ -334,7 +345,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                     <div className="py-4 text-center text-slate-500">Report not found</div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-md">
                         <div>
                           <p className="text-sm font-medium text-slate-500">Branch</p>
                           <p className="font-medium">{reportDetails.branches ? reportDetails.branches.name : 'Unknown'}</p>
@@ -353,25 +364,29 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-slate-500">Manning Percentage</p>
-                        <p className="font-medium">{reportDetails.manning_percentage}%</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-slate-500">Attrition Percentage</p>
-                        <p className="font-medium">{reportDetails.attrition_percentage}%</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-slate-500">HR Connect Session</p>
-                        <p className="font-medium">{reportDetails.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
-                      </div>
+                      <Card className="bg-white shadow-sm">
+                        <CardContent className="p-4 space-y-4">
+                          <div>
+                            <p className="text-sm font-medium text-slate-500">Manning Percentage</p>
+                            <p className="font-medium">{reportDetails.manning_percentage}%</p>
+                          </div>
+  
+                          <div>
+                            <p className="text-sm font-medium text-slate-500">Attrition Percentage</p>
+                            <p className="font-medium">{reportDetails.attrition_percentage}%</p>
+                          </div>
+  
+                          <div>
+                            <p className="text-sm font-medium text-slate-500">HR Connect Session</p>
+                            <p className="font-medium">{reportDetails.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
 
                       {reportDetails.feedback && (
                         <div className="space-y-2">
                           <p className="text-sm font-medium text-slate-500">Feedback</p>
-                          <div className="bg-slate-50 p-3 rounded-md">
+                          <div className="bg-slate-50 p-4 rounded-md shadow-sm">
                             <p>{reportDetails.feedback}</p>
                           </div>
                         </div>

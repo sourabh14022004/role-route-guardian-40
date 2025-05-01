@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, Clock, Eye, CheckCircle } from "lucide-react";
+import { X, Clock, Eye, CheckCircle, AlertTriangle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Database } from "@/integrations/supabase/types";
 
@@ -63,6 +63,12 @@ const BranchVisitDetailsModal = ({
           label: 'Approved', 
           className: 'bg-green-100 text-green-800 hover:bg-green-100',
           icon: <CheckCircle className="h-3 w-3 mr-1" />
+        };
+      case 'rejected':
+        return { 
+          label: 'Rejected', 
+          className: 'bg-red-100 text-red-800 hover:bg-red-100',
+          icon: <AlertTriangle className="h-3 w-3 mr-1" />
         };
       default:
         return { 

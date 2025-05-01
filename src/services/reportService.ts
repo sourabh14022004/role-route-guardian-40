@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface BranchVisitReport {
@@ -15,6 +16,20 @@ export interface BranchVisitReport {
   branch_category?: string;
   bh_name?: string;
   bh_code?: string;
+  total_employees_invited?: number;
+  total_participants?: number;
+  non_vendor_percentage?: number;
+  er_percentage?: number;
+  cwt_cases?: number;
+  performance_level?: string;
+  new_employees_total?: number;
+  new_employees_covered?: number;
+  star_employees_total?: number;
+  star_employees_covered?: number;
+  culture_branch?: string;
+  line_manager_behavior?: string;
+  branch_hygiene?: string;
+  overall_discipline?: string;
 }
 
 export const fetchBHRReportStats = async (bhId: string) => {
@@ -163,6 +178,20 @@ export const fetchReportById = async (reportId: string): Promise<BranchVisitRepo
         manning_percentage,
         attrition_percentage,
         feedback,
+        total_employees_invited,
+        total_participants,
+        non_vendor_percentage,
+        er_percentage,
+        cwt_cases,
+        performance_level,
+        new_employees_total,
+        new_employees_covered,
+        star_employees_total,
+        star_employees_covered,
+        culture_branch,
+        line_manager_behavior,
+        branch_hygiene,
+        overall_discipline,
         profiles:user_id (full_name, e_code),
         branches:branch_id (name, location, category)
       `)
@@ -187,6 +216,20 @@ export const fetchReportById = async (reportId: string): Promise<BranchVisitRepo
       hr_connect_session: data.hr_connect_session,
       manning_percentage: data.manning_percentage,
       attrition_percentage: data.attrition_percentage,
+      total_employees_invited: data.total_employees_invited,
+      total_participants: data.total_participants,
+      non_vendor_percentage: data.non_vendor_percentage,
+      er_percentage: data.er_percentage,
+      cwt_cases: data.cwt_cases,
+      performance_level: data.performance_level,
+      new_employees_total: data.new_employees_total,
+      new_employees_covered: data.new_employees_covered,
+      star_employees_total: data.star_employees_total,
+      star_employees_covered: data.star_employees_covered,
+      culture_branch: data.culture_branch,
+      line_manager_behavior: data.line_manager_behavior,
+      branch_hygiene: data.branch_hygiene,
+      overall_discipline: data.overall_discipline,
       branch_name: branches?.name || 'Unknown Branch',
       branch_location: branches?.location || 'Unknown Location',
       branch_category: branches?.category || 'unknown',

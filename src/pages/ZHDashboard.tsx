@@ -63,9 +63,7 @@ const ZHDashboard = () => {
         const { data: visits, error: visitsError } = await supabase
           .from("branch_visits")
           .select(`
-            branch_id,
             branches:branch_id (
-              name,
               category
             )
           `)
@@ -75,12 +73,19 @@ const ZHDashboard = () => {
         if (visitsError) throw visitsError;
         
         // Process category data for pie chart based on actual visit data
-        const categories: Record<string, number> = {};
+        const categories: Record<string, number> = {
+          'platinum': 0,
+          'diamond': 0,
+          'gold': 0,
+          'silver': 0,
+          'bronze': 0,
+          'unknown': 0
+        };
         
         if (visits && visits.length > 0) {
           visits.forEach((visit) => {
             const branchData = visit.branches as any;
-            const category = branchData?.category ? branchData.category.toLowerCase() : 'unknown';
+            const category = branchData?.category?.toLowerCase() || 'unknown';
             categories[category] = (categories[category] || 0) + 1;
           });
         }
@@ -94,11 +99,13 @@ const ZHDashboard = () => {
           'unknown': '#cbd5e1'  // slate light
         };
         
-        const categoryChartData = Object.entries(categories).map(([name, value]) => ({
-          name: name.charAt(0).toUpperCase() + name.slice(1),
-          value,
-          color: colors[name as keyof typeof colors] || '#cbd5e1'
-        }));
+        const categoryChartData = Object.entries(categories)
+          .filter(([_, value]) => value > 0) // Only include categories with visits
+          .map(([name, value]) => ({
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            value,
+            color: colors[name as keyof typeof colors] || '#cbd5e1'
+          }));
         
         setCategoryData(categoryChartData);
         
@@ -289,7 +296,7 @@ const ZHDashboard = () => {
                             outerRadius={80}
                             paddingAngle={5}
                             dataKey="value"
-                            label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                            label={({name, value}) => `${name} (${value})`}
                           >
                             {categoryData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.color} />
@@ -315,6 +322,9 @@ const ZHDashboard = () => {
                             layout="horizontal"
                             verticalAlign="bottom"
                             align="center"
+                            formatter={(value, entry, index) => (
+                              <span className="text-sm font-medium text-slate-700">{value}</span>
+                            )}
                           />
                         </PieChart>
                       </ResponsiveContainer>
