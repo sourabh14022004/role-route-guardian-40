@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,23 +11,25 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart2, Users, ClipboardCheck, TrendingUp } from "lucide-react";
+import { BarChart2, Users, ClipboardCheck } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getActiveBHRsCount, getTotalBranchVisitsInMonth } from "@/services/reportService";
-import BHRDetailsModal from "@/components/zh/BHRDetailsModal";
+import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 const ZHDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeBHRs, setActiveBHRs] = useState(0);
   const [totalBHRs, setTotalBHRs] = useState(0);
-  const [monthlyCoverage, setMonthlyCoverage] = useState(0);
   const [totalBranches, setTotalBranches] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [recentReports, setRecentReports] = useState<any[]>([]);
-  const [selectedBHId, setSelectedBHId] = useState<string | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [categoryData, setCategoryData] = useState<{name: string; value: number; color: string}[]>([]);
   
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -55,10 +58,39 @@ const ZHDashboard = () => {
         if (branchError) throw branchError;
         setTotalBranches(branchCount || 0);
         
-        // Get monthly visit coverage
-        const monthlyVisitsCount = await getTotalBranchVisitsInMonth();
-        const coverage = totalBranches > 0 ? Math.round((monthlyVisitsCount / totalBranches) * 100) : 0;
-        setMonthlyCoverage(coverage);
+        // Get branch category stats for pie chart
+        const { data: categoryStats, error: categoryError } = await supabase
+          .from("branch_visits")
+          .select(`
+            branches:branch_id (category)
+          `)
+          .gte('visit_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+        
+        if (categoryError) throw categoryError;
+        
+        // Process category data for pie chart
+        const categories: Record<string, number> = {};
+        categoryStats?.forEach((item) => {
+          const category = (item.branches as any)?.category || 'unknown';
+          categories[category] = (categories[category] || 0) + 1;
+        });
+        
+        const colors = {
+          'platinum': '#9333ea', // purple
+          'diamond': '#2563eb', // blue
+          'gold': '#eab308',   // amber
+          'silver': '#94a3b8', // slate
+          'bronze': '#f97316', // orange
+          'unknown': '#cbd5e1'  // slate light
+        };
+        
+        const categoryChartData = Object.entries(categories).map(([name, value]) => ({
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          value,
+          color: colors[name as keyof typeof colors] || '#cbd5e1'
+        }));
+        
+        setCategoryData(categoryChartData);
         
         // Get recent reports
         const { data: reports, error: reportsError } = await supabase
@@ -68,6 +100,7 @@ const ZHDashboard = () => {
             visit_date,
             status,
             user_id,
+            branch_id,
             profiles:user_id (full_name, e_code),
             branches:branch_id (name, location)
           `)
@@ -90,7 +123,7 @@ const ZHDashboard = () => {
     };
     
     fetchDashboardData();
-  }, [user, totalBranches]);
+  }, [user]);
   
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { 
@@ -113,8 +146,8 @@ const ZHDashboard = () => {
     }
   };
   
-  const handleViewBHR = (bhId: string) => {
-    setSelectedBHId(bhId);
+  const handleViewReport = (reportId: string) => {
+    setSelectedReportId(reportId);
     setIsModalOpen(true);
   };
   
@@ -131,7 +164,7 @@ const ZHDashboard = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center">
@@ -156,18 +189,8 @@ const ZHDashboard = () => {
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center">
                   <ClipboardCheck className="h-8 w-8 text-emerald-500 mb-2" />
-                  <div className="text-3xl font-bold">{monthlyCoverage}%</div>
-                  <p className="text-sm text-slate-500">Monthly Coverage</p>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center">
-                  <TrendingUp className="h-8 w-8 text-violet-500 mb-2" />
-                  <div className="text-3xl font-bold">78%</div>
-                  <p className="text-sm text-slate-500">Performance Score</p>
+                  <div className="text-3xl font-bold">{recentReports.length}</div>
+                  <p className="text-sm text-slate-500">Recent Reports</p>
                 </div>
               </CardContent>
             </Card>
@@ -191,16 +214,60 @@ const ZHDashboard = () => {
             
             <Card>
               <CardHeader>
-                <CardTitle>Branch Coverage</CardTitle>
+                <CardTitle>Branch Category Distribution</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Monthly Progress</p>
-                    <p className="text-sm text-slate-500">{monthlyCoverage}%</p>
+                {categoryData.length > 0 ? (
+                  <div className="h-[200px] w-full">
+                    <ChartContainer 
+                      config={{
+                        platinum: { color: '#9333ea' },
+                        diamond: { color: '#2563eb' },
+                        gold: { color: '#eab308' },
+                        silver: { color: '#94a3b8' },
+                        bronze: { color: '#f97316' },
+                        unknown: { color: '#cbd5e1' }
+                      }}
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoryData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                            label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {categoryData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-white p-2 border rounded shadow-md">
+                                    <p className="font-medium">{data.name}: {data.value} reports</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
                   </div>
-                  <Progress value={monthlyCoverage} className="h-2" />
-                </div>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center">
+                    <p className="text-slate-500">No category data available</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -245,7 +312,7 @@ const ZHDashboard = () => {
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              onClick={() => handleViewBHR(report.user_id)}
+                              onClick={() => handleViewReport(report.id)}
                             >
                               View
                             </Button>
@@ -271,13 +338,13 @@ const ZHDashboard = () => {
         </>
       )}
       
-      {/* BHR Details Modal */}
-      <BHRDetailsModal 
-        bhId={selectedBHId} 
-        open={isModalOpen} 
+      {/* Branch Visit Details Modal */}
+      <BranchVisitDetailsModal 
+        visit={recentReports.find(r => r.id === selectedReportId)} 
+        isOpen={isModalOpen} 
         onClose={() => {
           setIsModalOpen(false);
-          setSelectedBHId(null);
+          setSelectedReportId(null);
         }}
       />
     </div>

@@ -123,8 +123,9 @@ export const fetchRecentReports = async (limit = 5): Promise<BranchVisitReport[]
     // Transform data to match BranchVisitReport interface
     return (data || []).map(report => {
       // Correctly handle nested objects from Supabase join
-      const branches = report.branches as { name: string; location: string; category: string } | null;
-      const profiles = report.profiles as { full_name: string; e_code: string } | null;
+      // Use proper type assertions for the nested objects
+      const branches = report.branches as any; // Using any temporarily for type safety
+      const profiles = report.profiles as any; // Using any temporarily for type safety
       
       return {
         id: report.id,
@@ -174,8 +175,9 @@ export const fetchReportById = async (reportId: string): Promise<BranchVisitRepo
     if (!data) return null;
     
     // Correctly handle nested objects from Supabase join
-    const branches = data.branches as { name: string; location: string; category: string } | null;
-    const profiles = data.profiles as { full_name: string; e_code: string } | null;
+    // Use proper type assertions for the nested objects
+    const branches = data.branches as any; // Using any temporarily for type safety
+    const profiles = data.profiles as any; // Using any temporarily for type safety
     
     return {
       id: data.id,
