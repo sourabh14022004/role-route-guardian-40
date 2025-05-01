@@ -121,22 +121,28 @@ export const fetchRecentReports = async (limit = 5): Promise<BranchVisitReport[]
     if (error) throw error;
     
     // Transform data to match BranchVisitReport interface
-    return (data || []).map(report => ({
-      id: report.id,
-      user_id: report.user_id,
-      branch_id: report.branch_id,
-      visit_date: report.visit_date,
-      status: report.status,
-      feedback: report.feedback,
-      hr_connect_session: report.hr_connect_session,
-      manning_percentage: report.manning_percentage,
-      attrition_percentage: report.attrition_percentage,
-      branch_name: report.branches?.name,
-      branch_location: report.branches?.location,
-      branch_category: report.branches?.category,
-      bh_name: report.profiles?.full_name,
-      bh_code: report.profiles?.e_code
-    }));
+    return (data || []).map(report => {
+      // Correctly handle nested objects from Supabase join
+      const branches = report.branches as { name: string; location: string; category: string } | null;
+      const profiles = report.profiles as { full_name: string; e_code: string } | null;
+      
+      return {
+        id: report.id,
+        user_id: report.user_id,
+        branch_id: report.branch_id,
+        visit_date: report.visit_date,
+        status: report.status,
+        feedback: report.feedback,
+        hr_connect_session: report.hr_connect_session,
+        manning_percentage: report.manning_percentage,
+        attrition_percentage: report.attrition_percentage,
+        branch_name: branches?.name,
+        branch_location: branches?.location,
+        branch_category: branches?.category,
+        bh_name: profiles?.full_name,
+        bh_code: profiles?.e_code
+      };
+    });
   } catch (error) {
     console.error("Error fetching recent reports:", error);
     return [];
@@ -167,6 +173,10 @@ export const fetchReportById = async (reportId: string): Promise<BranchVisitRepo
     
     if (!data) return null;
     
+    // Correctly handle nested objects from Supabase join
+    const branches = data.branches as { name: string; location: string; category: string } | null;
+    const profiles = data.profiles as { full_name: string; e_code: string } | null;
+    
     return {
       id: data.id,
       user_id: data.user_id,
@@ -177,11 +187,11 @@ export const fetchReportById = async (reportId: string): Promise<BranchVisitRepo
       hr_connect_session: data.hr_connect_session,
       manning_percentage: data.manning_percentage,
       attrition_percentage: data.attrition_percentage,
-      branch_name: data.branches?.name,
-      branch_location: data.branches?.location,
-      branch_category: data.branches?.category,
-      bh_name: data.profiles?.full_name,
-      bh_code: data.profiles?.e_code
+      branch_name: branches?.name,
+      branch_location: branches?.location,
+      branch_category: branches?.category,
+      bh_name: profiles?.full_name,
+      bh_code: profiles?.e_code
     };
   } catch (error) {
     console.error("Error fetching report by ID:", error);
