@@ -9,106 +9,106 @@ type BranchVisit = Database["public"]["Tables"]["branch_visits"]["Row"];
 
 // Branches
 export const fetchBranches = async (): Promise<Branch[]> => {
-  try {
-    const { data, error } = await supabase
-      .from("branches")
-      .select("*")
-      .order("name");
-    
-    if (error) throw error;
-    return data || [];
-  } catch (error: any) {
-    console.error("Error fetching branches:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load branches: ${error.message}`,
-    });
-    return [];
-  }
-};
-
-export const getBranchById = async (branchId: string): Promise<Branch | null> => {
-  try {
-    const { data, error } = await supabase
-      .from("branches")
-      .select("*")
-      .eq("id", branchId)
-      .single();
-    
-    if (error) throw error;
-    return data;
-  } catch (error: any) {
-    console.error(`Error fetching branch ${branchId}:`, error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load branch details: ${error.message}`,
-    });
-    return null;
-  }
-};
-
-// Branch Assignments
-export const fetchUserBranchAssignments = async (userId: string): Promise<BranchAssignment[]> => {
-  try {
-    const { data, error } = await supabase
-      .from("branch_assignments")
-      .select("*, branches(*)")
-      .eq("user_id", userId);
-    
-    if (error) throw error;
-    return data || [];
-  } catch (error: any) {
-    console.error("Error fetching branch assignments:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load assigned branches: ${error.message}`,
-    });
-    return [];
-  }
-};
-
-export const fetchAssignedBranchesWithDetails = async (userId: string): Promise<Branch[]> => {
-  try {
-    const { data, error } = await supabase
-      .from("branch_assignments")
-      .select(`
-        branch_id,
-        branches (*)
-      `)
-      .eq("user_id", userId);
-    
-    if (error) throw error;
-    
-    console.log("Fetched branch assignments:", data);
-    
-    // Extract branches from the nested structure
-    if (!data || data.length === 0) {
-      console.log("No branches found for user");
+    try {
+      const { data, error } = await supabase
+        .from("branches")
+        .select("*")
+        .order("name");
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error("Error fetching branches:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to load branches: ${error.message}`,
+      });
       return [];
     }
-    
-    // Extract branches properly from the nested data
-    const branches = data
-      .filter(item => item.branches) // Ensure branches exist
-      .map(item => item.branches as Branch);
+  };
+  
+  export const getBranchById = async (branchId: string): Promise<Branch | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("branches")
+        .select("*")
+        .eq("id", branchId)
+        .single();
       
-    console.log("Processed branches:", branches);
-    
-    return branches;
-  } catch (error: any) {
-    console.error("Error fetching assigned branches:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load assigned branches: ${error.message}`,
-    });
-    return [];
-  }
-};
-
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error(`Error fetching branch ${branchId}:`, error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to load branch details: ${error.message}`,
+      });
+      return null;
+    }
+  };
+  
+  // Branch Assignments
+  export const fetchUserBranchAssignments = async (userId: string): Promise<BranchAssignment[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("branch_assignments")
+        .select("*, branches(*)")
+        .eq("user_id", userId);
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error("Error fetching branch assignments:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to load assigned branches: ${error.message}`,
+      });
+      return [];
+    }
+  };
+  
+  export const fetchAssignedBranchesWithDetails = async (userId: string): Promise<Branch[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("branch_assignments")
+        .select(`
+          branch_id,
+          branches (*)
+        `)
+        .eq("user_id", userId);
+      
+      if (error) throw error;
+      
+      console.log("Fetched branch assignments:", data);
+      
+      // Extract branches from the nested structure
+      if (!data || data.length === 0) {
+        console.log("No branches found for user");
+        return [];
+      }
+      
+      // Extract branches properly from the nested data
+      const branches = data
+        .filter(item => item.branches) // Ensure branches exist
+        .map(item => item.branches as Branch);
+        
+      console.log("Processed branches:", branches);
+      
+      return branches;
+    } catch (error: any) {
+      console.error("Error fetching assigned branches:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to load assigned branches: ${error.message}`,
+      });
+      return [];
+    }
+  };
+  
 // Branch Visits
 export const fetchUserBranchVisits = async (userId: string): Promise<BranchVisit[]> => {
   try {
