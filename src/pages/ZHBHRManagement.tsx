@@ -5,11 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
 import { Search, MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchBHRReportStats } from "@/services/reportService";
 import BHRDetailsModal from "@/components/zh/BHRDetailsModal";
 
 interface BHRUser {
@@ -18,8 +18,12 @@ interface BHRUser {
   e_code: string;
   location: string;
   branches_assigned: number;
-  visits_completed: number;
-  status?: string;
+  reports_stats?: {
+    total: number;
+    approved: number;
+    pending: number;
+    rejected: number;
+  };
 }
 
 const ZHBHRManagement = () => {
@@ -60,14 +64,6 @@ const ZHBHRManagement = () => {
           
         if (assignmentError) throw assignmentError;
         
-        // Get branch visits for these users
-        const { data: visits, error: visitError } = await supabase
-          .from('branch_visits')
-          .select('user_id, branch_id, status')
-          .in('user_id', bhrIds);
-          
-        if (visitError) throw visitError;
-        
         // Group assignments by user
         const assignmentsByUser: Record<string, string[]> = {};
         (assignments || []).forEach(assignment => {
@@ -77,39 +73,29 @@ const ZHBHRManagement = () => {
           assignmentsByUser[assignment.user_id].push(assignment.branch_id);
         });
         
-        // Group completed visits by user
-        const visitsByUser: Record<string, string[]> = {};
-        (visits || []).forEach(visit => {
-          if (visit.status === 'approved' || visit.status === 'submitted') {
-            if (!visitsByUser[visit.user_id]) {
-              visitsByUser[visit.user_id] = [];
-            }
-            visitsByUser[visit.user_id].push(visit.branch_id);
-          }
-        });
+        // Get reports count for each BHR
+        const bhrsWithReportStats: BHRUser[] = [];
         
-        // Combine the data
-        const bhrUsers: BHRUser[] = (bhUsers || []).map(bhr => {
+        // Process BHRs one by one with their assigned branches
+        for (const bhr of (bhUsers || [])) {
           const branches = assignmentsByUser[bhr.id] || [];
-          const visitsCompleted = visitsByUser[bhr.id] || [];
           
-          const coverage = branches.length > 0 
-            ? Math.round((visitsCompleted.length / branches.length) * 100) 
-            : 0;
-            
-          let status = "Needs Attention";
-          if (coverage >= 90) status = "Good";
-          else if (coverage >= 70) status = "In Progress";
+          // Get report stats for this BHR
+          const reportStats = await fetchBHRReportStats(bhr.id);
           
-          return {
+          bhrsWithReportStats.push({
             ...bhr,
             branches_assigned: branches.length,
-            visits_completed: visitsCompleted.length,
-            status
-          };
-        });
+            reports_stats: {
+              total: reportStats.total,
+              approved: reportStats.approved,
+              pending: reportStats.pending,
+              rejected: reportStats.rejected
+            }
+          });
+        }
         
-        return bhrUsers;
+        return bhrsWithReportStats;
       } catch (error) {
         console.error("Error fetching BHR users:", error);
         return [];
@@ -138,17 +124,6 @@ const ZHBHRManagement = () => {
       return matchesSearch && matchesLocation;
     });
   }, [bhrs, searchQuery, locationFilter]);
-
-  const getStatusBadge = (status?: string) => {
-    switch (status) {
-      case "Good":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Good</Badge>;
-      case "In Progress":
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">In Progress</Badge>;
-      default:
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">Needs Attention</Badge>;
-    }
-  };
 
   const handleBHRClick = (bhrId: string) => {
     setSelectedBHRId(bhrId);
@@ -216,11 +191,6 @@ const ZHBHRManagement = () => {
           </div>
         ) : (
           filteredBHRs.map(bhr => {
-            // Calculate coverage percentage
-            const coveragePercentage = bhr.branches_assigned > 0
-              ? Math.round((bhr.visits_completed / bhr.branches_assigned) * 100)
-              : 0;
-            
             // Generate avatar initials
             const initials = bhr.full_name
               .split(' ')
@@ -238,7 +208,6 @@ const ZHBHRManagement = () => {
                     <div className="flex-1">
                       <div className="flex justify-between items-start">
                         <h3 className="font-semibold text-lg">{bhr.full_name}</h3>
-                        {getStatusBadge(bhr.status)}
                       </div>
                       <div className="text-sm text-slate-500">{bhr.e_code}</div>
                     </div>
@@ -249,27 +218,29 @@ const ZHBHRManagement = () => {
                     {bhr.location}
                   </div>
                   
-                  <div className="mt-4">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Branch Visit Coverage</span>
-                      <span className="font-medium">
-                        {bhr.visits_completed}/{bhr.branches_assigned} branches
-                      </span>
-                    </div>
-                    <Progress 
-                      value={coveragePercentage} 
-                      className={`h-2 ${coveragePercentage >= 90 ? 'bg-green-200' : coveragePercentage >= 70 ? 'bg-blue-200' : 'bg-amber-200'}`}
-                    />
-                  </div>
-                  
                   <div className="mt-6 grid grid-cols-2 gap-4">
                     <div className="text-center">
                       <div className="text-slate-500 text-xs mb-1">Branches Mapped</div>
                       <div className="text-2xl font-bold">{bhr.branches_assigned}</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-slate-500 text-xs mb-1">Visits Completed</div>
-                      <div className="text-2xl font-bold">{bhr.visits_completed}</div>
+                      <div className="text-slate-500 text-xs mb-1">Reports Submitted</div>
+                      <div className="text-2xl font-bold">{bhr.reports_stats?.total || 0}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <div className="text-center bg-green-50 p-2 rounded-md">
+                      <div className="text-xs text-green-700">Approved</div>
+                      <div className="font-bold">{bhr.reports_stats?.approved || 0}</div>
+                    </div>
+                    <div className="text-center bg-blue-50 p-2 rounded-md">
+                      <div className="text-xs text-blue-700">Pending</div>
+                      <div className="font-bold">{bhr.reports_stats?.pending || 0}</div>
+                    </div>
+                    <div className="text-center bg-red-50 p-2 rounded-md">
+                      <div className="text-xs text-red-700">Rejected</div>
+                      <div className="font-bold">{bhr.reports_stats?.rejected || 0}</div>
                     </div>
                   </div>
                   

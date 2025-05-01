@@ -19,6 +19,7 @@ import ZHDashboardLayout from "./components/zh/ZHDashboardLayout";
 import ZHDashboard from "./pages/ZHDashboard";
 import ZHBranchMapping from "./pages/ZHBranchMapping";
 import ZHBHRManagement from "./pages/ZHBHRManagement";
+import ZHReviewReports from "./pages/ZHReviewReports";
 import CHDashboardLayout from "./components/ch/CHDashboardLayout";
 import CHDashboard from "./pages/CHDashboard";
 import CHAnalytics from "./pages/CHAnalytics";
@@ -45,6 +46,7 @@ const AppRoutes = () => (
       <Route path="dashboard" element={<ZHDashboard />} />
       <Route path="branch-mapping" element={<ZHBranchMapping />} />
       <Route path="bhr-management" element={<ZHBHRManagement />} />
+      <Route path="review-reports" element={<ZHReviewReports />} />
     </Route>
     
     {/* CH routes with layout */}

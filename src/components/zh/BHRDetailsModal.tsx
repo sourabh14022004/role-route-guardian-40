@@ -1,26 +1,15 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Calendar, Clock, MapPin, User } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
-import { Calendar, MapPin } from "lucide-react";
-
-type BHR = Database['public']['Tables']['profiles']['Row'] & {
-  branches_assigned?: number;
-  visits_completed?: number;
-};
-
-type BHRVisit = {
-  id: string;
-  branch_name: string;
-  visit_date: string;
-  status: string;
-  coverage_percentage: number;
-};
+import { fetchBHRReportStats } from "@/services/reportService";
 
 interface BHRDetailsModalProps {
   bhId: string | null;
@@ -29,239 +18,343 @@ interface BHRDetailsModalProps {
 }
 
 const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
-  // Fetch BHR details
-  const { data: bhrDetails, isLoading: bhrLoading } = useQuery({
-    queryKey: ['bhr-details', bhId],
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+
+  const { data: bhrProfile, isLoading: profileLoading } = useQuery({
+    queryKey: ['bhr-profile', bhId],
     queryFn: async () => {
       if (!bhId) return null;
       
-      try {
-        // Get BHR profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', bhId)
-          .single();
-        
-        if (profileError) throw profileError;
-        
-        // Get branch assignments
-        const { data: assignments, error: assignmentError } = await supabase
-          .from('branch_assignments')
-          .select('branch_id')
-          .eq('user_id', bhId);
-        
-        if (assignmentError) throw assignmentError;
-        
-        // Get completed visits
-        const { data: visits, error: visitError } = await supabase
-          .from('branch_visits')
-          .select('id')
-          .eq('user_id', bhId)
-          .eq('status', 'approved');
-        
-        if (visitError) throw visitError;
-        
-        return {
-          ...profile,
-          branches_assigned: assignments?.length || 0,
-          visits_completed: visits?.length || 0
-        } as BHR;
-      } catch (error) {
-        console.error("Error fetching BHR details:", error);
-        return null;
-      }
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', bhId)
+        .single();
+      
+      if (error) throw error;
+      return data;
     },
     enabled: !!bhId && open
   });
 
-  // Fetch BHR's recent visits
-  const { data: recentVisits, isLoading: visitsLoading } = useQuery({
-    queryKey: ['bhr-recent-visits', bhId],
+  const { data: assignedBranches, isLoading: branchesLoading } = useQuery({
+    queryKey: ['bhr-branches', bhId],
     queryFn: async () => {
       if (!bhId) return [];
       
-      try {
-        const { data, error } = await supabase
-          .from('branch_visits')
-          .select(`
+      const { data, error } = await supabase
+        .from('branch_assignments')
+        .select(`
+          branch_id,
+          branches:branch_id (
             id,
-            visit_date,
-            status,
-            manning_percentage,
-            branches:branch_id(name)
-          `)
-          .eq('user_id', bhId)
-          .order('visit_date', { ascending: false })
-          .limit(5);
-        
-        if (error) throw error;
-        
-        return (data || []).map(visit => {
-          // Safely extract the branch name
-          let branchName = 'Unknown Branch';
-          if (visit.branches && typeof visit.branches === 'object' && visit.branches !== null) {
-            const branchObj = visit.branches as { name?: string };
-            if (branchObj && typeof branchObj.name === 'string') {
-              branchName = branchObj.name;
-            }
-          }
-            
-          return {
-            id: visit.id,
-            branch_name: branchName,
-            visit_date: new Date(visit.visit_date).toLocaleDateString('en-US', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric'
-            }),
-            status: visit.status || 'draft',
-            coverage_percentage: visit.manning_percentage || 0
-          };
-        });
-      } catch (error) {
-        console.error("Error fetching BHR visits:", error);
-        return [];
-      }
+            name,
+            location,
+            category
+          )
+        `)
+        .eq('user_id', bhId);
+      
+      if (error) throw error;
+      
+      return (data || []).map(item => item.branches);
     },
     enabled: !!bhId && open
   });
 
-  // Early return if no BHR selected
-  if (!bhId) return null;
+  const { data: reportStats } = useQuery({
+    queryKey: ['bhr-report-stats', bhId],
+    queryFn: async () => {
+      if (!bhId) return null;
+      return fetchBHRReportStats(bhId);
+    },
+    enabled: !!bhId && open
+  });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Approved</Badge>;
-      case 'submitted':
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">Submitted</Badge>;
+  const { data: recentReports, isLoading: reportsLoading } = useQuery({
+    queryKey: ['bhr-recent-reports', bhId],
+    queryFn: async () => {
+      if (!bhId) return [];
+      
+      const { data, error } = await supabase
+        .from('branch_visits')
+        .select(`
+          id,
+          visit_date,
+          status,
+          branches:branch_id (
+            name,
+            location,
+            category
+          )
+        `)
+        .eq('user_id', bhId)
+        .order('visit_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      return data || [];
+    },
+    enabled: !!bhId && open
+  });
+
+  const { data: reportDetails, isLoading: reportDetailsLoading } = useQuery({
+    queryKey: ['bhr-report-details', selectedReportId],
+    queryFn: async () => {
+      if (!selectedReportId) return null;
+      
+      const { data, error } = await supabase
+        .from('branch_visits')
+        .select('*, branches:branch_id(name, location)')
+        .eq('id', selectedReportId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedReportId
+  });
+
+  const getStatusBadge = (status: string | null) => {
+    switch(status) {
+      case "approved":
+        return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
+      case "submitted":
+        return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>;
+      case "rejected":
+        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default:
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">Draft</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800">Draft</Badge>;
     }
   };
 
-  const coveragePercentage = bhrDetails?.branches_assigned 
-    ? Math.round((bhrDetails.visits_completed || 0) / bhrDetails.branches_assigned * 100)
-    : 0;
-
-  const getPerformanceStatus = () => {
-    if (coveragePercentage >= 90) return "Good";
-    if (coveragePercentage >= 70) return "In Progress";
-    return "Needs Attention";
-  };
-
-  const getPerformanceStatusColor = (status: string) => {
-    switch (status) {
-      case "Good": return "bg-green-100 text-green-800";
-      case "In Progress": return "bg-amber-100 text-amber-800";
-      default: return "bg-red-100 text-red-800";
+  const getCategoryBadge = (category: string) => {
+    switch(category.toLowerCase()) {
+      case "platinum":
+        return <Badge className="bg-slate-800 text-white">Platinum</Badge>;
+      case "diamond":
+        return <Badge className="bg-blue-200 text-blue-800">Diamond</Badge>;
+      case "gold":
+        return <Badge className="bg-amber-100 text-amber-800">Gold</Badge>;
+      case "silver":
+        return <Badge className="bg-slate-200 text-slate-800">Silver</Badge>;
+      default:
+        return <Badge className="bg-orange-100 text-orange-800">Bronze</Badge>;
     }
   };
 
-  const performanceStatus = getPerformanceStatus();
-  const statusColorClass = getPerformanceStatusColor(performanceStatus);
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[700px]">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>BHR Details</DialogTitle>
         </DialogHeader>
 
-        {bhrLoading ? (
+        {profileLoading ? (
           <div className="flex justify-center py-8">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
-        ) : !bhrDetails ? (
-          <div className="py-8 text-center text-slate-500">
-            No data available for this BHR
-          </div>
+        ) : !bhrProfile ? (
+          <div className="py-4 text-center text-slate-500">BHR profile not found</div>
         ) : (
           <>
-            {/* BHR Profile */}
-            <div className="flex flex-col md:flex-row gap-4 items-center md:items-start">
-              <div className="flex-shrink-0 h-20 w-20 bg-slate-100 rounded-full flex items-center justify-center text-2xl font-bold text-slate-700">
-                {bhrDetails.full_name?.charAt(0) || 'B'}
+            <div className="flex flex-col md:flex-row gap-4 md:items-start">
+              <div className="h-16 w-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl font-bold">
+                {bhrProfile.full_name.charAt(0)}
               </div>
               <div className="flex-1">
-                <div className="flex flex-wrap gap-3 items-center justify-center md:justify-start">
-                  <h3 className="text-xl font-bold">{bhrDetails.full_name}</h3>
-                  <Badge className={statusColorClass}>
-                    {performanceStatus}
-                  </Badge>
-                </div>
-                <div className="text-slate-600 mt-1 text-center md:text-left">{bhrDetails.e_code}</div>
-                <div className="flex gap-2 items-center mt-2 text-slate-600 justify-center md:justify-start">
-                  <MapPin className="h-4 w-4" />
-                  <span>{bhrDetails.location}</span>
-                </div>
+                <h3 className="text-xl font-semibold">{bhrProfile.full_name}</h3>
+                <p className="text-slate-500">{bhrProfile.e_code}</p>
                 
-                <div className="mt-4">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Branch Visit Coverage</span>
-                    <span className="font-medium">
-                      {bhrDetails.visits_completed}/{bhrDetails.branches_assigned} branches
-                    </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div className="flex items-center">
+                    <User className="h-5 w-5 text-slate-400 mr-2" />
+                    <span>{bhrProfile.role}</span>
                   </div>
-                  <Progress 
-                    value={coveragePercentage} 
-                    className={`h-2 ${coveragePercentage >= 90 ? 'bg-green-200' : coveragePercentage >= 70 ? 'bg-blue-200' : 'bg-amber-200'}`}
-                  />
+                  <div className="flex items-center">
+                    <MapPin className="h-5 w-5 text-slate-400 mr-2" />
+                    <span>{bhrProfile.location}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Clock className="h-5 w-5 text-slate-400 mr-2" />
+                    <span>Joined {formatDate(bhrProfile.created_at)}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Stats Summary */}
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="bg-slate-50 p-4 rounded-lg text-center">
-                <div className="text-slate-500 text-sm">Branches Mapped</div>
-                <div className="text-3xl font-bold mt-1">{bhrDetails.branches_assigned}</div>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-lg text-center">
-                <div className="text-slate-500 text-sm">Visits Completed</div>
-                <div className="text-3xl font-bold mt-1">{bhrDetails.visits_completed}</div>
-              </div>
+            {/* Report Statistics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <Card className="bg-slate-50 border-slate-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-slate-500">Total Reports</p>
+                  <p className="text-2xl font-bold">{reportStats?.total || 0}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-green-50 border-green-100">
+                <CardContent className="p-4">
+                  <p className="text-sm text-green-700">Approved</p>
+                  <p className="text-2xl font-bold">{reportStats?.approved || 0}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-blue-50 border-blue-100">
+                <CardContent className="p-4">
+                  <p className="text-sm text-blue-700">Pending</p>
+                  <p className="text-2xl font-bold">{reportStats?.pending || 0}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-red-50 border-red-100">
+                <CardContent className="p-4">
+                  <p className="text-sm text-red-700">Rejected</p>
+                  <p className="text-2xl font-bold">{reportStats?.rejected || 0}</p>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Recent Visits */}
-            <div className="mt-6">
-              <h4 className="font-semibold text-lg mb-3">Recent Branch Visits</h4>
-              
-              {visitsLoading ? (
-                <div className="flex justify-center py-4">
-                  <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                </div>
-              ) : recentVisits?.length === 0 ? (
-                <div className="py-4 text-center text-slate-500 bg-slate-50 rounded-lg">
-                  No recent visits found
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {recentVisits?.map((visit) => (
-                    <Card key={visit.id}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className="font-medium">{visit.branch_name}</div>
-                            <div className="text-sm text-slate-500 flex items-center mt-1">
-                              <Calendar className="h-3.5 w-3.5 mr-1" />
-                              {visit.visit_date}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            {getStatusBadge(visit.status)}
-                            <span className="text-sm">
-                              {visit.coverage_percentage}% coverage
-                            </span>
+            <Tabs defaultValue="branches" className="mt-6">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="branches">Assigned Branches</TabsTrigger>
+                <TabsTrigger value="reports">Reports</TabsTrigger>
+              </TabsList>
+              <TabsContent value="branches" className="max-h-[300px] overflow-y-auto">
+                {branchesLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                  </div>
+                ) : !assignedBranches || assignedBranches.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500">No branches assigned</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Branch Name</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Category</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {assignedBranches.map((branch: any) => (
+                        <TableRow key={branch.id}>
+                          <TableCell>{branch.name}</TableCell>
+                          <TableCell>{branch.location}</TableCell>
+                          <TableCell>{getCategoryBadge(branch.category)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+              <TabsContent value="reports" className="max-h-[300px] overflow-y-auto">
+                {reportsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                  </div>
+                ) : !recentReports || recentReports.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500">No reports submitted</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Branch</TableHead>
+                        <TableHead>Visit Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentReports.map(report => (
+                        <TableRow key={report.id}>
+                          <TableCell>{report.branches?.name}</TableCell>
+                          <TableCell>{formatDate(report.visit_date)}</TableCell>
+                          <TableCell>{getStatusBadge(report.status)}</TableCell>
+                          <TableCell>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => setSelectedReportId(report.id)}
+                            >
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            {/* Report Details Dialog */}
+            {selectedReportId && (
+              <Dialog open={!!selectedReportId} onOpenChange={(open) => !open && setSelectedReportId(null)}>
+                <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Branch Visit Report</DialogTitle>
+                  </DialogHeader>
+                  
+                  {reportDetailsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                    </div>
+                  ) : !reportDetails ? (
+                    <div className="py-4 text-center text-slate-500">Report not found</div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-slate-500">Branch</p>
+                          <p className="font-medium">{reportDetails.branches?.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-500">Location</p>
+                          <p className="font-medium">{reportDetails.branches?.location}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-500">Visit Date</p>
+                          <p className="font-medium">{formatDate(reportDetails.visit_date)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-500">Status</p>
+                          <div className="mt-1">{getStatusBadge(reportDetails.status)}</div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-slate-500">Manning Percentage</p>
+                        <p className="font-medium">{reportDetails.manning_percentage}%</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-slate-500">Attrition Percentage</p>
+                        <p className="font-medium">{reportDetails.attrition_percentage}%</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-slate-500">HR Connect Session</p>
+                        <p className="font-medium">{reportDetails.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
+                      </div>
+
+                      {reportDetails.feedback && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-slate-500">Feedback</p>
+                          <div className="bg-slate-50 p-3 rounded-md">
+                            <p>{reportDetails.feedback}</p>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+                      )}
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+            )}
           </>
         )}
       </DialogContent>

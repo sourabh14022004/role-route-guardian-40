@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, Map, Users, Menu, LogOut } from "lucide-react";
+import { LayoutDashboard, Map, Users, Menu, LogOut, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,6 +43,7 @@ const ZHDashboardLayout = () => {
     { icon: LayoutDashboard, label: "Dashboard", path: "/zh/dashboard" },
     { icon: Map, label: "Branch Mapping", path: "/zh/branch-mapping" },
     { icon: Users, label: "BHR Management", path: "/zh/bhr-management" },
+    { icon: ClipboardList, label: "Review Reports", path: "/zh/review-reports" },
   ];
 
   const handleLogout = async () => {
