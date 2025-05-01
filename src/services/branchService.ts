@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth } from "date-fns";
 
@@ -212,5 +211,81 @@ export const getActiveBHRCount = async () => {
   } catch (error) {
     console.error("Error calculating active BHRs:", error);
     return 0;
+  }
+};
+
+// Add the missing functions that are imported in other components
+
+// Fetch assigned branches with details
+export const fetchAssignedBranchesWithDetails = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("branch_assignments")
+      .select(`
+        branch_id,
+        branches:branch_id (
+          id,
+          name,
+          location,
+          category,
+          status
+        )
+      `)
+      .eq("user_id", userId);
+    
+    if (error) throw error;
+    
+    // Transform the data to make it easier to work with
+    const branches = data?.map(item => ({
+      id: item.branch_id,
+      ...item.branches
+    })) || [];
+    
+    return branches;
+  } catch (error) {
+    console.error("Error fetching assigned branches:", error);
+    return [];
+  }
+};
+
+// Create a branch visit record
+export const createBranchVisit = async (visitData: any) => {
+  try {
+    const { data, error } = await supabase
+      .from("branch_visits")
+      .insert(visitData)
+      .select();
+    
+    if (error) throw error;
+    
+    return data[0];
+  } catch (error) {
+    console.error("Error creating branch visit:", error);
+    throw error;
+  }
+};
+
+// Fetch branch visits for a user
+export const fetchUserBranchVisits = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("branch_visits")
+      .select(`
+        *,
+        branches:branch_id (
+          name,
+          location,
+          category
+        )
+      `)
+      .eq("user_id", userId)
+      .order("visit_date", { ascending: false });
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching user branch visits:", error);
+    return [];
   }
 };
