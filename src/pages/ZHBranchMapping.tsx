@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -201,112 +200,67 @@ const ZHBranchMapping = () => {
   const handleConfirmDialog = async () => {
     try {
       if (dialogType === "assign" && selectedBranch && selectedBHUser) {
-        await assignBranchToBHR(selectedBHUser, selectedBranch.id);
+        const result = await assignBranchToBHR(selectedBHUser, selectedBranch.id);
         
-        // Reload data
-        if (user) {
-          const [branchesData, bhUsersData] = await Promise.all([
-            fetchZoneBranches(user.id),
-            fetchZoneBHRs(user.id)
-          ]);
-          
-          // Fetch updated assignments
-          const { data: allAssignments, error } = await supabase
-            .from('branch_assignments')
-            .select(`
-              branch_id,
-              user_id,
-              profiles:user_id(full_name)
-            `);
-            
-          if (error) {
-            console.error('Error fetching branch assignments:', error);
-            return;
+        // Find the BHR name from the result or from the BHUsers list
+        const bhUser = bhUsers.find(user => user.id === selectedBHUser);
+        const bhName = result?.bh_name || bhUser?.full_name || 'Unknown';
+        
+        // Update the assignments in state
+        setBranchAssignments(prev => {
+          const updated = { ...prev };
+          if (!updated[selectedBranch.id]) {
+            updated[selectedBranch.id] = [];
           }
           
-          // Update assignments
-          const assignmentsMap: Record<string, BranchAssignment[]> = {};
+          // Only add if it doesn't already exist
+          const exists = updated[selectedBranch.id].some(
+            assignment => assignment.user_id === selectedBHUser
+          );
           
-          allAssignments?.forEach(assignment => {
-            const branchId = assignment.branch_id;
-            const userId = assignment.user_id;
-            let bhName = 'Unknown';
-            
-            if (assignment.profiles && typeof assignment.profiles === 'object') {
-              const profile = assignment.profiles as { full_name?: string };
-              bhName = profile.full_name || 'Unknown';
-            }
-            
-            if (!assignmentsMap[branchId]) {
-              assignmentsMap[branchId] = [];
-            }
-            
-            assignmentsMap[branchId].push({
-              user_id: userId,
+          if (!exists) {
+            updated[selectedBranch.id].push({
+              user_id: selectedBHUser,
               bh_name: bhName
             });
-          });
+          }
           
-          setBranchAssignments(assignmentsMap);
-          setBranches(branchesData);
-          setFilteredBranches(branchesData);
-          setBHUsers(bhUsersData);
-        }
-      } else if (dialogType === "unassign" && selectedBranchForUnassign) {
-        await unassignBranchFromBHR(
-          selectedBranchForUnassign.bhUserId,
-          selectedBranchForUnassign.branchId
+          return updated;
+        });
+        
+        // Update branch count in branches list
+        setBranches(prev => 
+          prev.map(branch => 
+            branch.id === selectedBranch.id 
+              ? { ...branch, bh_count: (branch.bh_count || 0) + 1 }
+              : branch
+          )
         );
         
-        // Reload data
-        if (user) {
-          const [branchesData, bhUsersData] = await Promise.all([
-            fetchZoneBranches(user.id),
-            fetchZoneBHRs(user.id)
-          ]);
-          
-          // Fetch updated assignments
-          const { data: allAssignments, error } = await supabase
-            .from('branch_assignments')
-            .select(`
-              branch_id,
-              user_id,
-              profiles:user_id(full_name)
-            `);
-            
-          if (error) {
-            console.error('Error fetching branch assignments:', error);
-            return;
-          }
-          
-          // Update assignments
-          const assignmentsMap: Record<string, BranchAssignment[]> = {};
-          
-          allAssignments?.forEach(assignment => {
-            const branchId = assignment.branch_id;
-            const userId = assignment.user_id;
-            let bhName = 'Unknown';
-            
-            if (assignment.profiles && typeof assignment.profiles === 'object') {
-              const profile = assignment.profiles as { full_name?: string };
-              bhName = profile.full_name || 'Unknown';
-            }
-            
-            if (!assignmentsMap[branchId]) {
-              assignmentsMap[branchId] = [];
-            }
-            
-            assignmentsMap[branchId].push({
-              user_id: userId,
-              bh_name: bhName
-            });
-          });
-          
-          setBranchAssignments(assignmentsMap);
-          setBranches(branchesData);
-          setFilteredBranches(branchesData);
-          setBHUsers(bhUsersData);
-        }
+        // Also update filtered branches
+        setFilteredBranches(prev => 
+          prev.map(branch => 
+            branch.id === selectedBranch.id 
+              ? { ...branch, bh_count: (branch.bh_count || 0) + 1 }
+              : branch
+          )
+        );
+        
+        // Update BH user's assigned branches count
+        setBHUsers(prev => 
+          prev.map(user => 
+            user.id === selectedBHUser 
+              ? { ...user, branches_assigned: (user.branches_assigned || 0) + 1 }
+              : user
+          )
+        );
+      } else if (dialogType === "unassign" && selectedBranchForUnassign) {
+        await handleUnassignBHR(
+          selectedBranchForUnassign.branchId,
+          selectedBranchForUnassign.branchName,
+          selectedBranchForUnassign.bhUserId,
+          selectedBranchForUnassign.bhName
+        );
       }
     } catch (error) {
       console.error("Error during branch assignment operation:", error);

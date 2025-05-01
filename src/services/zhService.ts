@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
@@ -168,7 +169,13 @@ export async function assignBranchToBHR(bhUserId: string, branchId: string) {
       .insert({
         user_id: bhUserId,
         branch_id: branchId
-      });
+      })
+      .select(`
+        user_id,
+        branch_id,
+        profiles:user_id(full_name)
+      `)
+      .single();
     
     if (error) throw error;
     
@@ -177,7 +184,17 @@ export async function assignBranchToBHR(bhUserId: string, branchId: string) {
       description: "The branch has been assigned to the BHR."
     });
     
-    return data;
+    // Transform the data to include the BH name
+    let bhName = 'Unknown';
+    if (data.profiles && typeof data.profiles === 'object') {
+      const profile = data.profiles as { full_name?: string };
+      bhName = profile.full_name || 'Unknown';
+    }
+    
+    return {
+      ...data,
+      bh_name: bhName
+    };
   } catch (error: any) {
     console.error("Error assigning branch to BHR:", error);
     
