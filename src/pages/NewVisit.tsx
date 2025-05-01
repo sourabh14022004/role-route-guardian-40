@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -105,7 +104,9 @@ const NewVisit = () => {
       if (!user) return;
       
       try {
+        console.log("Fetching branches for user:", user.id);
         const assignedBranches = await fetchAssignedBranchesWithDetails(user.id);
+        console.log("Branches loaded:", assignedBranches);
         setBranches(assignedBranches);
         
         // Set default branch category based on first branch if available
@@ -342,11 +343,15 @@ const NewVisit = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {branches.map(branch => (
-                            <SelectItem key={branch.id} value={branch.id}>
-                              {branch.name} ({branch.location})
-                            </SelectItem>
-                          ))}
+                          {branches.length === 0 ? (
+                            <SelectItem value="no-branches" disabled>No branches assigned</SelectItem>
+                          ) : (
+                            branches.map(branch => (
+                              <SelectItem key={branch.id} value={branch.id}>
+                                {branch.name} ({branch.location})
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />

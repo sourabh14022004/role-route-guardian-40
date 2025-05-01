@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
@@ -75,14 +74,28 @@ export const fetchAssignedBranchesWithDetails = async (userId: string): Promise<
     const { data, error } = await supabase
       .from("branch_assignments")
       .select(`
+        branch_id,
         branches (*)
       `)
       .eq("user_id", userId);
     
     if (error) throw error;
     
+    console.log("Fetched branch assignments:", data);
+    
     // Extract branches from the nested structure
-    const branches = data?.map(item => item.branches) || [];
+    if (!data || data.length === 0) {
+      console.log("No branches found for user");
+      return [];
+    }
+    
+    // Extract branches properly from the nested data
+    const branches = data
+      .filter(item => item.branches) // Ensure branches exist
+      .map(item => item.branches as Branch);
+      
+    console.log("Processed branches:", branches);
+    
     return branches;
   } catch (error: any) {
     console.error("Error fetching assigned branches:", error);
