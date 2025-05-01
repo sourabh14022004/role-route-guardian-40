@@ -10,6 +10,7 @@ import { ArrowRight, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import BHRDetailsModal from "@/components/zh/BHRDetailsModal";
 
 interface BranchVisit {
   id: string;
@@ -91,6 +92,7 @@ const ErrorFallback = ({ message }: { message: string }) => {
 const ZHDashboard = () => {
   const { user } = useAuth();
   const [selectedVisit, setSelectedVisit] = useState<BranchVisit | null>(null);
+  const [selectedBhId, setSelectedBhId] = useState<string | null>(null);
 
   // Fetch BHR data from Supabase
   const { data: bhrData, isLoading: bhrLoading } = useQuery({
@@ -138,24 +140,40 @@ const ZHDashboard = () => {
         if (error) throw error;
 
         // Transform the data to match our interface - with safety checks
-        const transformedData = (data || []).map(visit => ({
-          id: visit.id,
-          branch: {
-            name: visit.branches?.name || 'Unknown Branch',
-          },
-          bh_name: visit.profiles?.full_name || 'Unknown BH',
-          visit_date: visit.visit_date ? new Date(visit.visit_date).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-          }) : 'Unknown Date',
-          report_details: {
-            feedback: visit.feedback || 'No feedback provided',
-            manning_percentage: Number(visit.manning_percentage || 0),
-            attrition_percentage: Number(visit.attrition_percentage || 0),
-            hr_connect_session: Boolean(visit.hr_connect_session || false),
-          }
-        }));
+        const transformedData = (data || []).map(visit => {
+          // Extract branch name safely
+          const branchName = visit.branches ? 
+            // Check if branches is an object with a name property
+            (typeof visit.branches === 'object' && visit.branches !== null && 'name' in visit.branches) ? 
+              visit.branches.name : 'Unknown Branch' 
+            : 'Unknown Branch';
+          
+          // Extract BH name safely
+          const bhName = visit.profiles ? 
+            // Check if profiles is an object with a full_name property
+            (typeof visit.profiles === 'object' && visit.profiles !== null && 'full_name' in visit.profiles) ? 
+              visit.profiles.full_name : 'Unknown BH' 
+            : 'Unknown BH';
+            
+          return {
+            id: visit.id,
+            branch: {
+              name: branchName,
+            },
+            bh_name: bhName,
+            visit_date: visit.visit_date ? new Date(visit.visit_date).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric'
+            }) : 'Unknown Date',
+            report_details: {
+              feedback: visit.feedback || 'No feedback provided',
+              manning_percentage: Number(visit.manning_percentage || 0),
+              attrition_percentage: Number(visit.attrition_percentage || 0),
+              hr_connect_session: Boolean(visit.hr_connect_session || false),
+            }
+          };
+        });
         
         return transformedData;
       } catch (error: any) {
@@ -243,16 +261,22 @@ const ZHDashboard = () => {
         if (error) throw error;
         
         // Count reports by BHR - with safety checks
-        const bhrCounts: Record<string, { name: string, reports: number }> = {};
+        const bhrCounts: Record<string, { id: string, name: string, reports: number }> = {};
         
         (data || []).forEach(visit => {
           if (!visit.user_id) return;
           
           const userId = visit.user_id;
-          const name = visit.profiles?.full_name || 'Unknown';
+          
+          // Extract BH name safely
+          const name = visit.profiles ? 
+            // Check if profiles is an object with a full_name property
+            (typeof visit.profiles === 'object' && visit.profiles !== null && 'full_name' in visit.profiles) ? 
+              visit.profiles.full_name : 'Unknown' 
+            : 'Unknown';
           
           if (!bhrCounts[userId]) {
-            bhrCounts[userId] = { name, reports: 0 };
+            bhrCounts[userId] = { id: userId, name, reports: 0 };
           }
           bhrCounts[userId].reports++;
         });
@@ -376,7 +400,11 @@ const ZHDashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {bhrReportCounts.map((bhr, index) => (
-                    <div key={index} className="flex justify-between items-center">
+                    <div 
+                      key={index} 
+                      className="flex justify-between items-center cursor-pointer hover:bg-slate-50 p-2 rounded-md"
+                      onClick={() => setSelectedBhId(bhr.id)}
+                    >
                       <p className="text-sm font-medium">{bhr.name}</p>
                       <Badge variant="secondary">{bhr.reports} reports</Badge>
                     </div>
@@ -398,6 +426,13 @@ const ZHDashboard = () => {
         visit={selectedVisit} 
         open={!!selectedVisit} 
         onClose={() => setSelectedVisit(null)}
+      />
+
+      {/* BHR Details Modal */}
+      <BHRDetailsModal
+        bhId={selectedBhId}
+        open={!!selectedBhId}
+        onClose={() => setSelectedBhId(null)}
       />
     </div>
   );

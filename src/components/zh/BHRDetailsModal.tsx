@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -97,17 +96,26 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
         
         if (error) throw error;
         
-        return (data || []).map(visit => ({
-          id: visit.id,
-          branch_name: visit.branches?.name || 'Unknown Branch',
-          visit_date: new Date(visit.visit_date).toLocaleDateString('en-US', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-          }),
-          status: visit.status || 'draft',
-          coverage_percentage: visit.manning_percentage || 0
-        }));
+        return (data || []).map(visit => {
+          // Correctly access the nested branch name
+          const branchName = visit.branches ? 
+            // Handle the case when branches is an object with a name property
+            (typeof visit.branches === 'object' && visit.branches !== null && 'name' in visit.branches) ? 
+              visit.branches.name : 'Unknown Branch' 
+            : 'Unknown Branch';
+            
+          return {
+            id: visit.id,
+            branch_name: branchName,
+            visit_date: new Date(visit.visit_date).toLocaleDateString('en-US', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric'
+            }),
+            status: visit.status || 'draft',
+            coverage_percentage: visit.manning_percentage || 0
+          };
+        });
       } catch (error) {
         console.error("Error fetching BHR visits:", error);
         return [];
