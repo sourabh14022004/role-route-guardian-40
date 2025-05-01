@@ -738,7 +738,7 @@ export async function fetchAnalyticsData(month?: string, year?: string) {
     const topBHR = topPerformers.length > 0 ? topPerformers[0] : null;
     
     // Calculate top category by coverage
-    const { data: categoryData } = await fetchCategoryBreakdown();
+    const categoryData = await fetchCategoryBreakdown();
     const topCategory = categoryData && categoryData.length > 0 ? 
       categoryData.reduce((prev, current) => 
         prev.coverage > current.coverage ? prev : current
