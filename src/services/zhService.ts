@@ -24,7 +24,9 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
       .from('branches')
       .select(`
         *,
-        branch_assignments(user_id)
+        branch_assignments!inner (
+          user_id
+        )
       `)
       .eq('location', zhProfile.location);
 
@@ -57,65 +59,65 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
 }
 
 export async function fetchZoneBHRs(userId: string): Promise<BHRUser[]> {
-  try {
-    // First, get the ZH profile to identify their location
-    const { data: zhProfile, error: zhError } = await supabase
-      .from('profiles')
-      .select('location')
-      .eq('id', userId)
-      .single();
-
-    if (zhError) throw zhError;
-    if (!zhProfile) throw new Error('Zone Head profile not found');
-
-    // Get all BH users in this zone/location
-    const { data: bhUsers, error: bhError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('location', zhProfile.location)
-      .eq('role', 'BH');
-
-    if (bhError) throw bhError;
-    
-    // Get branch assignments for these users in a separate query
-    const bhUserIds = bhUsers.map(user => user.id);
-    
-    // Only proceed if we have users
-    if (bhUserIds.length === 0) {
-      return [] as BHRUser[];
-    }
-    
-    const { data: assignments, error: assignmentsError } = await supabase
-      .from('branch_assignments')
-      .select('user_id, branch_id')
-      .in('user_id', bhUserIds);
+    try {
+      // First, get the ZH profile to identify their location
+      const { data: zhProfile, error: zhError } = await supabase
+        .from('profiles')
+        .select('location')
+        .eq('id', userId)
+        .single();
+  
+      if (zhError) throw zhError;
+      if (!zhProfile) throw new Error('Zone Head profile not found');
+  
+      // Get all BH users in this zone/location
+      const { data: bhUsers, error: bhError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('location', zhProfile.location)
+        .eq('role', 'BH');
+  
+      if (bhError) throw bhError;
       
-    if (assignmentsError) throw assignmentsError;
-    
-    // Group assignments by user
-    const assignmentsByUser: Record<string, string[]> = {};
-    assignments?.forEach(assignment => {
-      if (!assignmentsByUser[assignment.user_id]) {
-        assignmentsByUser[assignment.user_id] = [];
+      // Get branch assignments for these users in a separate query
+      const bhUserIds = bhUsers.map(user => user.id);
+      
+      // Only proceed if we have users
+      if (bhUserIds.length === 0) {
+        return [] as BHRUser[];
       }
-      assignmentsByUser[assignment.user_id].push(assignment.branch_id);
-    });
-    
-    // Process the data to count branches per BH
-    const processedBHRs = bhUsers.map(user => {
-      const branchIds = assignmentsByUser[user.id] || [];
-      return {
-        ...user,
-        branches_assigned: branchIds.length
-      };
-    });
-
-    return processedBHRs as BHRUser[];
-  } catch (error) {
-    console.error("Error fetching zone BHRs:", error);
-    throw error;
+      
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('branch_assignments')
+        .select('user_id, branch_id')
+        .in('user_id', bhUserIds);
+        
+      if (assignmentsError) throw assignmentsError;
+      
+      // Group assignments by user
+      const assignmentsByUser: Record<string, string[]> = {};
+      assignments?.forEach(assignment => {
+        if (!assignmentsByUser[assignment.user_id]) {
+          assignmentsByUser[assignment.user_id] = [];
+        }
+        assignmentsByUser[assignment.user_id].push(assignment.branch_id);
+      });
+      
+      // Process the data to count branches per BH
+      const processedBHRs = bhUsers.map(user => {
+        const branchIds = assignmentsByUser[user.id] || [];
+        return {
+          ...user,
+          branches_assigned: branchIds.length
+        };
+      });
+  
+      return processedBHRs as BHRUser[];
+    } catch (error) {
+      console.error("Error fetching zone BHRs:", error);
+      throw error;
+    }
   }
-}
 
 export async function fetchDashboardStats(userId: string) {
   try {
