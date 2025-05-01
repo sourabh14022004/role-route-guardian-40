@@ -1,6 +1,13 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth } from "date-fns";
+
+// Fix for the category type issue
+type BranchWithCategory = {
+  branches?: {
+    category: string;
+  };
+  branch_id: string;
+};
 
 // Get stats about branch visits for a BH user
 export const getBranchVisitStats = async (userId: string) => {
@@ -80,7 +87,7 @@ export const getBranchCategoryCoverage = async (userId: string) => {
     // Count by category
     const categoryCounts: Record<string, { total: number, visited: number }> = {};
     
-    assignedBranches?.forEach(assignment => {
+    assignedBranches?.forEach((assignment: BranchWithCategory) => {
       const category = assignment.branches?.category || "unknown";
       if (!categoryCounts[category]) {
         categoryCounts[category] = { total: 0, visited: 0 };
@@ -212,5 +219,73 @@ export const getActiveBHRCount = async () => {
   } catch (error) {
     console.error("Error calculating active BHRs:", error);
     return 0;
+  }
+};
+
+// Include the previously added functions
+// Fetch user branch visits with branch details
+export const fetchUserBranchVisits = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("branch_visits")
+      .select(`
+        *,
+        branches:branch_id(*)
+      `)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching user branch visits:", error);
+    return [];
+  }
+};
+
+// Fetch branches assigned to a BH user with details
+export const fetchAssignedBranchesWithDetails = async (userId: string) => {
+  try {
+    const { data: assignments, error: assignmentError } = await supabase
+      .from("branch_assignments")
+      .select("branch_id")
+      .eq("user_id", userId);
+    
+    if (assignmentError) throw assignmentError;
+    
+    if (!assignments || assignments.length === 0) {
+      return [];
+    }
+    
+    const branchIds = assignments.map(assignment => assignment.branch_id);
+    
+    const { data: branches, error: branchError } = await supabase
+      .from("branches")
+      .select("*")
+      .in("id", branchIds);
+    
+    if (branchError) throw branchError;
+    
+    return branches || [];
+  } catch (error) {
+    console.error("Error fetching assigned branches:", error);
+    return [];
+  }
+};
+
+// Create a new branch visit
+export const createBranchVisit = async (visitData: any) => {
+  try {
+    const { data, error } = await supabase
+      .from("branch_visits")
+      .insert(visitData)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error creating branch visit:", error);
+    throw error;
   }
 };

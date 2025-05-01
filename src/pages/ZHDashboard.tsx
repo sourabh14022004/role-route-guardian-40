@@ -23,6 +23,22 @@ import {
 } from "lucide-react";
 import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
 
+// Define proper types for the report data
+type ReportData = {
+  id: string;
+  visit_date: string;
+  status: string;
+  created_at: string;
+  profiles: {
+    full_name: string;
+    e_code: string;
+  };
+  branches: {
+    name: string;
+    location: string;
+  };
+}
+
 const ZHDashboard = () => {
   const [reportDetailsModalOpen, setReportDetailsModalOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<any>(null);
@@ -33,7 +49,7 @@ const ZHDashboard = () => {
     queryFn: fetchZHDashboardStats,
   });
   
-  // Fetch recent reports
+  // Fetch recent reports with proper typing
   const { data: recentReports, isLoading: reportsLoading } = useQuery({
     queryKey: ["recent-reports"],
     queryFn: async () => {
@@ -51,7 +67,7 @@ const ZHDashboard = () => {
         .limit(5);
         
       if (error) throw error;
-      return data || [];
+      return (data || []) as ReportData[];
     },
   });
   
@@ -252,11 +268,11 @@ const ZHDashboard = () => {
                   <div key={report.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
                     <div className="flex-1">
                       <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-                        <h4 className="font-medium">{report.branches?.name}</h4>
-                        <span className="text-sm text-slate-500">{report.branches?.location}</span>
+                        <h4 className="font-medium">{report.branches.name}</h4>
+                        <span className="text-sm text-slate-500">{report.branches.location}</span>
                       </div>
                       <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mt-1">
-                        <span className="text-sm">{report.profiles?.full_name}</span>
+                        <span className="text-sm">{report.profiles.full_name}</span>
                         <span className="text-xs text-slate-500">{formatDate(report.visit_date)}</span>
                       </div>
                     </div>
