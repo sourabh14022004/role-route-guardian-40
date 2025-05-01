@@ -27,7 +27,7 @@ interface BHRUser {
   e_code: string;
   location: string;
   branches_assigned: number;
-  email: string;
+  // The email field is removed as it's not in the BHRUser type in zhService.ts
 }
 
 const ZHBHRManagement = () => {
@@ -49,7 +49,7 @@ const ZHBHRManagement = () => {
       const uniqueLocations = [...new Set(bhrs.map(bhr => bhr.location).filter(Boolean))];
       setLocations(uniqueLocations as string[]);
       
-      return bhrs as BHRUser[];
+      return bhrs;
     },
     enabled: !!user?.id
   });
