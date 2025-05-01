@@ -18,6 +18,7 @@ const RoleDashboard = () => {
     
     // Check if user is authenticated
     if (!session || !user) {
+      console.log("User not authenticated, redirecting to auth");
       navigate("/auth");
       return;
     }
@@ -26,6 +27,7 @@ const RoleDashboard = () => {
     const checkUserRole = async () => {
       try {
         setVerifyingRole(true);
+        console.log("Checking user role for:", user.id, "requested role:", role);
         
         const { data, error } = await supabase
           .from('profiles')
@@ -38,14 +40,20 @@ const RoleDashboard = () => {
           throw error;
         }
         
+        console.log("User profile data:", data);
+        
         const validRoles = ["bh", "zh", "ch", "admin"];
         const requestedRole = role?.toLowerCase();
+        const userRole = data?.role?.toLowerCase();
+        
+        console.log("User role:", userRole, "Requested role:", requestedRole);
         
         if (!data || 
-            !data.role || 
-            data.role.toLowerCase() !== requestedRole || 
+            !userRole || 
+            userRole !== requestedRole || 
             !validRoles.includes(requestedRole || "")) {
           
+          console.log("Access denied - role mismatch or invalid role");
           toast({
             variant: "destructive",
             title: "Access Denied",
@@ -55,6 +63,7 @@ const RoleDashboard = () => {
           return;
         }
         
+        console.log("Role verified, redirecting to appropriate dashboard");
         // Redirect to the appropriate dashboard
         switch(requestedRole) {
           case "bh":
