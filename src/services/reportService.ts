@@ -1,190 +1,136 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { startOfMonth, endOfMonth } from "date-fns";
 
-export interface BranchVisitReport {
-  id: string;
-  user_id: string;
-  branch_id: string;
-  visit_date: string;
-  bh_name?: string;
-  branch_name?: string;
-  branch_category: "platinum" | "diamond" | "gold" | "silver" | "bronze";
-  hr_connect_session: boolean | null;
-  manning_percentage: number | null;
-  attrition_percentage: number | null;
-  feedback: string | null;
-  status: "draft" | "submitted" | "approved" | "rejected" | null;
-  created_at: string;
-}
-
-export async function fetchRecentReports(limit = 5) {
+export const fetchBHRReportStats = async (userId: string) => {
   try {
-    const { data, error } = await supabase
-      .from('branch_visits')
-      .select(`
-        id,
-        user_id,
-        branch_id,
-        visit_date,
-        branch_category,
-        hr_connect_session,
-        manning_percentage,
-        attrition_percentage,
-        feedback,
-        status,
-        created_at,
-        branches:branch_id(name),
-        profiles:user_id(full_name)
-      `)
-      .order('visit_date', { ascending: false })
-      .limit(limit);
-    
-    if (error) throw error;
-
-    // Transform the data to match our interface
-    const transformedData = (data || []).map(visit => {
-      // Safely extract branch name
-      let branchName = 'Unknown Branch';
-      if (visit.branches && typeof visit.branches === 'object') {
-        const branchObj = visit.branches as { name?: string };
-        if (branchObj && typeof branchObj.name === 'string') {
-          branchName = branchObj.name;
-        }
-      }
-      
-      // Safely extract BH name
-      let bhName = 'Unknown BH';
-      if (visit.profiles && typeof visit.profiles === 'object') {
-        const profileObj = visit.profiles as { full_name?: string };
-        if (profileObj && typeof profileObj.full_name === 'string') {
-          bhName = profileObj.full_name;
-        }
-      }
-      
-      return {
-        id: visit.id,
-        user_id: visit.user_id,
-        branch_id: visit.branch_id,
-        branch_name: branchName,
-        bh_name: bhName,
-        visit_date: visit.visit_date,
-        branch_category: visit.branch_category,
-        hr_connect_session: visit.hr_connect_session,
-        manning_percentage: visit.manning_percentage,
-        attrition_percentage: visit.attrition_percentage,
-        feedback: visit.feedback,
-        status: visit.status,
-        created_at: visit.created_at
-      };
-    });
-    
-    return transformedData;
-  } catch (error: any) {
-    console.error("Error fetching reports:", error);
-    return [];
-  }
-}
-
-export async function fetchReportById(reportId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('branch_visits')
-      .select(`
-        *,
-        branches:branch_id(name, location, category),
-        profiles:user_id(full_name, e_code)
-      `)
-      .eq('id', reportId)
-      .single();
+    // Fetch all reports for this BHR
+    const { data: reports, error } = await supabase
+      .from("branch_visits")
+      .select("id, status")
+      .eq("user_id", userId);
     
     if (error) throw error;
     
-    if (!data) return null;
-    
-    // Safely extract properties from joined tables
-    const branchName = data.branches && typeof data.branches === 'object' 
-      ? (data.branches as any).name 
-      : undefined;
-      
-    const branchLocation = data.branches && typeof data.branches === 'object'
-      ? (data.branches as any).location
-      : undefined;
-      
-    const bhName = data.profiles && typeof data.profiles === 'object'
-      ? (data.profiles as any).full_name
-      : undefined;
-      
-    const bhCode = data.profiles && typeof data.profiles === 'object'
-      ? (data.profiles as any).e_code
-      : undefined;
+    // Calculate stats
+    const total = reports?.length || 0;
+    const approved = reports?.filter(report => report.status === "approved").length || 0;
+    const rejected = reports?.filter(report => report.status === "rejected").length || 0;
+    const pending = reports?.filter(report => report.status === "submitted").length || 0;
+    const draft = reports?.filter(report => report.status === "draft").length || 0;
     
     return {
-      ...data,
-      branch_name: branchName,
-      branch_location: branchLocation,
-      bh_name: bhName,
-      bh_code: bhCode
+      total,
+      approved,
+      rejected,
+      pending,
+      draft
     };
-  } catch (error: any) {
-    console.error("Error fetching report:", error);
-    return null;
-  }
-}
-
-export async function updateReportStatus(reportId: string, status: "approved" | "rejected") {
-  try {
-    const { data, error } = await supabase
-      .from('branch_visits')
-      .update({ status })
-      .eq('id', reportId)
-      .select();
-    
-    if (error) throw error;
-    
-    toast({
-      title: `Report ${status}`,
-      description: `The report has been ${status} successfully.`
-    });
-    
-    return data;
-  } catch (error: any) {
-    console.error("Error updating report status:", error);
-    toast({
-      variant: "destructive",
-      title: "Failed to update report",
-      description: error.message || "An unexpected error occurred."
-    });
-    return null;
-  }
-}
-
-export async function fetchBHRReportStats(bhId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('branch_visits')
-      .select('id, status')
-      .eq('user_id', bhId);
-    
-    if (error) throw error;
-    
-    const stats = {
-      total: data?.length || 0,
-      approved: data?.filter(report => report.status === 'approved').length || 0,
-      pending: data?.filter(report => report.status === 'submitted').length || 0,
-      rejected: data?.filter(report => report.status === 'rejected').length || 0,
-      draft: data?.filter(report => report.status === 'draft').length || 0
-    };
-    
-    return stats;
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error fetching BHR report stats:", error);
     return {
       total: 0,
-      approved: 0,
-      pending: 0,
+      approved: 0, 
       rejected: 0,
+      pending: 0,
       draft: 0
     };
   }
-}
+};
+
+export const fetchZHDashboardStats = async () => {
+  try {
+    const currentDate = new Date();
+    const monthStart = startOfMonth(currentDate).toISOString();
+    const monthEnd = endOfMonth(currentDate).toISOString();
+    
+    // Get total BHRs
+    const { count: totalBHRs, error: bhrError } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact" })
+      .eq("role", "BH");
+    
+    if (bhrError) throw bhrError;
+    
+    // Get active BHRs (submitted reports this month)
+    const { data: activeReports, error: activeError } = await supabase
+      .from("branch_visits")
+      .select("user_id")
+      .gte("created_at", monthStart)
+      .lte("created_at", monthEnd);
+    
+    if (activeError) throw activeError;
+    
+    const activeBHRs = new Set(activeReports?.map(report => report.user_id)).size;
+    
+    // Get report statistics
+    const { data: reports, error: reportsError } = await supabase
+      .from("branch_visits")
+      .select("status");
+    
+    if (reportsError) throw reportsError;
+    
+    const totalReports = reports?.length || 0;
+    const pendingReports = reports?.filter(report => report.status === "submitted").length || 0;
+    
+    // Get this month's reports
+    const { data: monthReports, error: monthError } = await supabase
+      .from("branch_visits")
+      .select("status")
+      .gte("created_at", monthStart)
+      .lte("created_at", monthEnd);
+      
+    if (monthError) throw monthError;
+    
+    const monthlySubmissions = monthReports?.length || 0;
+    
+    // Get branch statistics
+    const { count: totalBranches, error: branchError } = await supabase
+      .from("branches")
+      .select("*", { count: "exact" });
+    
+    if (branchError) throw branchError;
+    
+    // Get mapped branches
+    const { data: mappedBranches, error: mappedError } = await supabase
+      .from("branch_assignments")
+      .select("branch_id");
+      
+    if (mappedError) throw mappedError;
+    
+    const mappedBranchCount = new Set(mappedBranches?.map(branch => branch.branch_id)).size;
+    
+    return {
+      bhrs: {
+        total: totalBHRs || 0,
+        active: activeBHRs
+      },
+      reports: {
+        total: totalReports,
+        pending: pendingReports,
+        monthly: monthlySubmissions
+      },
+      branches: {
+        total: totalBranches || 0,
+        mapped: mappedBranchCount
+      }
+    };
+  } catch (error) {
+    console.error("Error fetching ZH dashboard stats:", error);
+    return {
+      bhrs: {
+        total: 0,
+        active: 0
+      },
+      reports: {
+        total: 0,
+        pending: 0,
+        monthly: 0
+      },
+      branches: {
+        total: 0,
+        mapped: 0
+      }
+    };
+  }
+};

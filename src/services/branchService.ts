@@ -1,452 +1,216 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { Database } from "@/integrations/supabase/types";
+import { startOfMonth, endOfMonth } from "date-fns";
 
-type Branch = Database["public"]["Tables"]["branches"]["Row"];
-type BranchAssignment = Database["public"]["Tables"]["branch_assignments"]["Row"];
-type BranchVisit = Database["public"]["Tables"]["branch_visits"]["Row"];
-
-// Branches
-export const fetchBranches = async (): Promise<Branch[]> => {
-    try {
-      const { data, error } = await supabase
-        .from("branches")
-        .select("*")
-        .order("name");
-      
-      if (error) throw error;
-      return data || [];
-    } catch (error: any) {
-      console.error("Error fetching branches:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to load branches: ${error.message}`,
-      });
-      return [];
-    }
-  };
-  
-  export const getBranchById = async (branchId: string): Promise<Branch | null> => {
-    try {
-      const { data, error } = await supabase
-        .from("branches")
-        .select("*")
-        .eq("id", branchId)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    } catch (error: any) {
-      console.error(`Error fetching branch ${branchId}:`, error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to load branch details: ${error.message}`,
-      });
-      return null;
-    }
-  };
-  
-  // Branch Assignments
-  export const fetchUserBranchAssignments = async (userId: string): Promise<BranchAssignment[]> => {
-    try {
-      const { data, error } = await supabase
-        .from("branch_assignments")
-        .select("*, branches(*)")
-        .eq("user_id", userId);
-      
-      if (error) throw error;
-      return data || [];
-    } catch (error: any) {
-      console.error("Error fetching branch assignments:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to load assigned branches: ${error.message}`,
-      });
-      return [];
-    }
-  };
-  
-  export const fetchAssignedBranchesWithDetails = async (userId: string): Promise<Branch[]> => {
-    try {
-      // Use fetchBranches to get all branches instead of filtering by assignments
-      const branches = await fetchBranches();
-      
-      console.log("Fetched all branches:", branches);
-      
-      return branches;
-    } catch (error: any) {
-      console.error("Error fetching branches:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to load branches: ${error.message}`,
-      });
-      return [];
-    }
-  };
-  
-// Branch Visits
-export const fetchUserBranchVisits = async (userId: string): Promise<BranchVisit[]> => {
+// Get stats about branch visits for a BH user
+export const getBranchVisitStats = async (userId: string) => {
   try {
-    const { data, error } = await supabase
-      .from("branch_visits")
-      .select(`
-        *,
-        branches (name, location, category)
-      `)
-      .eq("user_id", userId)
-      .order("visit_date", { ascending: false });
-    
-    if (error) throw error;
-    return data || [];
-  } catch (error: any) {
-    console.error("Error fetching branch visits:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load branch visits: ${error.message}`,
-    });
-    return [];
-  }
-};
-
-export const fetchVisitById = async (visitId: string): Promise<BranchVisit | null> => {
-  try {
-    const { data, error } = await supabase
-      .from("branch_visits")
-      .select(`
-        *,
-        branches (name, location, category)
-      `)
-      .eq("id", visitId)
-      .single();
-    
-    if (error) throw error;
-    return data;
-  } catch (error: any) {
-    console.error(`Error fetching visit ${visitId}:`, error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load visit details: ${error.message}`,
-    });
-    return null;
-  }
-};
-
-export const createBranchVisit = async (visitData: Database["public"]["Tables"]["branch_visits"]["Insert"]): Promise<BranchVisit | null> => {
-  try {
-    const { data, error } = await supabase
-      .from("branch_visits")
-      .insert(visitData)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    toast({
-      title: "Success",
-      description: "Branch visit has been created",
-    });
-    
-    return data;
-  } catch (error: any) {
-    console.error("Error creating branch visit:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to create branch visit: ${error.message}`,
-    });
-    return null;
-  }
-};
-
-export const updateBranchVisit = async (visitId: string, visitData: Database["public"]["Tables"]["branch_visits"]["Update"]): Promise<BranchVisit | null> => {
-  try {
-    // Add updated_at timestamp
-    const updatedData = {
-      ...visitData,
-      updated_at: new Date().toISOString(),
-    };
-    
-    const { data, error } = await supabase
-      .from("branch_visits")
-      .update(updatedData)
-      .eq("id", visitId)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    toast({
-      title: "Success",
-      description: "Branch visit has been updated",
-    });
-    
-    return data;
-  } catch (error: any) {
-    console.error(`Error updating visit ${visitId}:`, error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to update branch visit: ${error.message}`,
-    });
-    return null;
-  }
-};
-
-export const getBranchVisitStats = async (userId: string): Promise<{
-  assignedBranches: number;
-  branchesVisited: number;
-  pendingVisits: number;
-  completionRate: number;
-}> => {
-  try {
-    // Get assigned branches count
-    const { data: assignmentsData, error: assignmentsError } = await supabase
+    // Get assigned branches
+    const { data: branchAssignments, error: assignmentError } = await supabase
       .from("branch_assignments")
       .select("branch_id")
       .eq("user_id", userId);
     
-    if (assignmentsError) throw assignmentsError;
+    if (assignmentError) throw assignmentError;
     
-    const assignedBranchIds = assignmentsData.map(assignment => assignment.branch_id);
-    const assignedBranchesCount = assignedBranchIds.length;
+    const assignedBranches = branchAssignments?.length || 0;
     
-    if (assignedBranchesCount === 0) {
-      return {
-        assignedBranches: 0,
-        branchesVisited: 0,
-        pendingVisits: 0,
-        completionRate: 0
-      };
-    }
-    
-    // Get visited branches (distinct branch IDs from visits)
-    const { data: visitsData, error: visitsError } = await supabase
+    // Get visited branches
+    const { data: branchVisits, error: visitsError } = await supabase
       .from("branch_visits")
-      .select("branch_id")
-      .eq("user_id", userId)
-      .in("branch_id", assignedBranchIds);
+      .select("branch_id, status")
+      .eq("user_id", userId);
     
     if (visitsError) throw visitsError;
     
-    // Get unique visited branch IDs
-    const visitedBranchIds = [...new Set(visitsData.map(visit => visit.branch_id))];
-    const branchesVisitedCount = visitedBranchIds.length;
+    // Count unique branches visited
+    const visitedBranchIds = new Set(branchVisits?.map(visit => visit.branch_id) || []);
+    const branchesVisited = visitedBranchIds.size;
     
-    // Calculate pending and completion rate
-    const pendingVisits = assignedBranchesCount - branchesVisitedCount;
-    const completionRate = Math.round((branchesVisitedCount / assignedBranchesCount) * 100);
+    // Count pending visits
+    const pendingVisits = branchVisits?.filter(visit => visit.status === "submitted" || visit.status === "draft").length || 0;
+    
+    // Calculate completion rate
+    const completionRate = assignedBranches > 0 ? Math.round((branchesVisited / assignedBranches) * 100) : 0;
     
     return {
-      assignedBranches: assignedBranchesCount,
-      branchesVisited: branchesVisitedCount,
-      pendingVisits: pendingVisits,
-      completionRate: completionRate
+      assignedBranches,
+      branchesVisited,
+      pendingVisits,
+      completionRate,
     };
-  } catch (error: any) {
-    console.error("Error getting branch visit stats:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load stats: ${error.message}`,
-    });
-    
+  } catch (error) {
+    console.error("Error fetching branch visit stats:", error);
     return {
       assignedBranches: 0,
       branchesVisited: 0,
       pendingVisits: 0,
-      completionRate: 0
+      completionRate: 0,
     };
   }
 };
 
-export const getBranchCategoryCoverage = async (userId: string): Promise<Array<{
-  category: string;
-  completion: number;
-  color: string;
-}>> => {
+// Get branch category coverage stats
+export const getBranchCategoryCoverage = async (userId: string) => {
   try {
-    // Default colors for categories
-    const categoryColors: Record<string, string> = {
-      platinum: "bg-violet-500",
-      diamond: "bg-blue-500",
-      gold: "bg-amber-500",
-      silver: "bg-slate-400",
-      bronze: "bg-orange-700"
-    };
-    
-    // Get assigned branches per category
-    const { data: assignedBranches, error: assignedError } = await supabase
+    // Get assigned branches with their categories
+    const { data: assignedBranches, error: assignmentError } = await supabase
       .from("branch_assignments")
       .select(`
         branch_id,
-        branches (category)
+        branches:branch_id (
+          category
+        )
       `)
       .eq("user_id", userId);
     
-    if (assignedError) throw assignedError;
-    
-    // Count assigned branches by category
-    const assignedByCategory: Record<string, string[]> = {};
-    assignedBranches.forEach(item => {
-      if (!item.branches) return;
-      const category = (item.branches as any).category;
-      if (!assignedByCategory[category]) {
-        assignedByCategory[category] = [];
-      }
-      assignedByCategory[category].push(item.branch_id);
-    });
+    if (assignmentError) throw assignmentError;
     
     // Get visited branches
-    const { data: visits, error: visitsError } = await supabase
+    const { data: branchVisits, error: visitsError } = await supabase
       .from("branch_visits")
-      .select("branch_id, branches(category)")
+      .select("branch_id")
       .eq("user_id", userId);
     
     if (visitsError) throw visitsError;
     
-    // Count unique visited branches by category
-    const visitedByCategory: Record<string, Set<string>> = {};
-    visits.forEach(visit => {
-      if (!visit.branches) return;
-      const category = (visit.branches as any).category;
-      if (!visitedByCategory[category]) {
-        visitedByCategory[category] = new Set();
+    // Set of visited branch ids
+    const visitedBranchIds = new Set(branchVisits?.map(visit => visit.branch_id) || []);
+    
+    // Count by category
+    const categoryCounts: Record<string, { total: number, visited: number }> = {};
+    
+    assignedBranches?.forEach(assignment => {
+      const category = assignment.branches?.category || "unknown";
+      if (!categoryCounts[category]) {
+        categoryCounts[category] = { total: 0, visited: 0 };
       }
-      visitedByCategory[category].add(visit.branch_id);
-    });
-    
-    // Calculate completion rates by category
-    const coverage = Object.keys(assignedByCategory).map(category => {
-      const assigned = assignedByCategory[category].length;
-      const visited = visitedByCategory[category] ? visitedByCategory[category].size : 0;
-      const completion = assigned > 0 ? Math.round((visited / assigned) * 100) : 0;
+      categoryCounts[category].total += 1;
       
-      return {
-        category,
-        completion,
-        color: categoryColors[category]
-      };
+      if (visitedBranchIds.has(assignment.branch_id)) {
+        categoryCounts[category].visited += 1;
+      }
     });
     
-    return coverage;
-  } catch (error: any) {
-    console.error("Error getting branch category coverage:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load category coverage: ${error.message}`,
+    // Calculate completion percentage for each category
+    return Object.entries(categoryCounts).map(([category, counts]) => {
+      const completion = counts.total > 0 ? Math.round((counts.visited / counts.total) * 100) : 0;
+      
+      // Assign color based on category
+      let color = "bg-orange-500";
+      switch (category) {
+        case "platinum":
+          color = "bg-violet-500";
+          break;
+        case "diamond":
+          color = "bg-blue-500";
+          break;
+        case "gold":
+          color = "bg-amber-500";
+          break;
+        case "silver":
+          color = "bg-slate-400";
+          break;
+      }
+      
+      return { category, completion, color };
     });
-    
-    // Return default structure with zeros
+  } catch (error) {
+    console.error("Error fetching branch category coverage:", error);
     return [
-      { category: "Platinum", completion: 0, color: "bg-violet-500" },
-      { category: "Diamond", completion: 0, color: "bg-blue-500" },
-      { category: "Gold", completion: 0, color: "bg-amber-500" },
-      { category: "Silver", completion: 0, color: "bg-slate-400" },
-      { category: "Bronze", completion: 0, color: "bg-orange-700" }
+      { category: "platinum", completion: 0, color: "bg-violet-500" },
+      { category: "diamond", completion: 0, color: "bg-blue-500" },
+      { category: "gold", completion: 0, color: "bg-amber-500" },
+      { category: "silver", completion: 0, color: "bg-slate-400" },
+      { category: "bronze", completion: 0, color: "bg-orange-700" },
     ];
   }
 };
 
+// Get metrics for visits
 export const getVisitMetrics = async (userId: string) => {
   try {
-    // Get recent visits
-    const { data: visits, error: visitsError } = await supabase
+    // Get all visits
+    const { data: visits, error } = await supabase
       .from("branch_visits")
       .select("*")
-      .eq("user_id", userId)
-      .order("visit_date", { ascending: false })
-      .limit(10);
+      .eq("user_id", userId);
     
-    if (visitsError) throw visitsError;
+    if (error) throw error;
     
-    if (!visits || visits.length === 0) {
-      return {
-        hrConnectSessions: { completed: 0, total: 0 },
-        avgParticipation: 0,
-        employeeCoverage: 0,
-        newEmployeeCoverage: 0,
-      };
-    }
-    
-    // Calculate HR Connect metrics
-    const hrSessions = visits.filter(visit => visit.hr_connect_session === true).length;
+    // Calculate HR connect sessions
+    const hrSessions = visits?.filter(visit => visit.hr_connect_session) || [];
     
     // Calculate average participation
-    let totalParticipationRate = 0;
-    let participationCount = 0;
+    const participationRates = visits
+      ?.filter(visit => visit.total_employees_invited && visit.total_participants)
+      ?.map(visit => visit.total_participants / visit.total_employees_invited) || [];
     
-    visits.forEach(visit => {
-      if (visit.total_employees_invited && visit.total_participants && visit.total_employees_invited > 0) {
-        totalParticipationRate += (visit.total_participants / visit.total_employees_invited) * 100;
-        participationCount++;
-      }
-    });
-    
-    const avgParticipation = participationCount > 0 
-      ? Math.round(totalParticipationRate / participationCount) 
+    const avgParticipation = participationRates.length > 0
+      ? Math.round(
+          (participationRates.reduce((sum, rate) => sum + rate, 0) / participationRates.length) * 100
+        )
       : 0;
     
-    // Calculate employee coverage metrics
-    let totalEmployeeCoverage = 0;
-    let employeeCoverageCount = 0;
+    // Calculate employee coverage
+    const totalEmployeeCoverage = visits
+      ?.filter(visit => visit.total_employees_invited)
+      ?.reduce((acc, visit) => acc + (visit.total_employees_invited || 0), 0) || 0;
     
-    let totalNewEmployeeCoverage = 0;
-    let newEmployeeCoverageCount = 0;
+    // Calculate new employee coverage
+    const newEmployeeCoverageTotal = visits
+      ?.filter(visit => visit.new_employees_total && visit.new_employees_covered)
+      ?.reduce((acc, visit) => ({
+        total: acc.total + (visit.new_employees_total || 0),
+        covered: acc.covered + (visit.new_employees_covered || 0)
+      }), { total: 0, covered: 0 });
     
-    visits.forEach(visit => {
-      // Total employee coverage
-      const totalEmployees = (visit.total_employees_invited || 0);
-      const coveredEmployees = (visit.total_participants || 0);
-      
-      if (totalEmployees > 0) {
-        totalEmployeeCoverage += (coveredEmployees / totalEmployees) * 100;
-        employeeCoverageCount++;
-      }
-      
-      // New employee coverage
-      const newTotal = (visit.new_employees_total || 0);
-      const newCovered = (visit.new_employees_covered || 0);
-      
-      if (newTotal > 0) {
-        totalNewEmployeeCoverage += (newCovered / newTotal) * 100;
-        newEmployeeCoverageCount++;
-      }
-    });
-    
-    const employeeCoverage = employeeCoverageCount > 0 
-      ? Math.round(totalEmployeeCoverage / employeeCoverageCount) 
-      : 0;
-    
-    const newEmployeeCoverage = newEmployeeCoverageCount > 0 
-      ? Math.round(totalNewEmployeeCoverage / newEmployeeCoverageCount) 
+    const newEmployeeCoverage = newEmployeeCoverageTotal.total > 0
+      ? Math.round((newEmployeeCoverageTotal.covered / newEmployeeCoverageTotal.total) * 100)
       : 0;
     
     return {
-      hrConnectSessions: { completed: hrSessions, total: visits.length },
+      hrConnectSessions: {
+        completed: hrSessions.length,
+        total: visits?.length || 0
+      },
       avgParticipation,
-      employeeCoverage,
-      newEmployeeCoverage,
+      employeeCoverage: totalEmployeeCoverage,
+      newEmployeeCoverage
     };
-  } catch (error: any) {
-    console.error("Error getting visit metrics:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: `Failed to load visit metrics: ${error.message}`,
-    });
-    
+  } catch (error) {
+    console.error("Error fetching visit metrics:", error);
     return {
       hrConnectSessions: { completed: 0, total: 0 },
       avgParticipation: 0,
       employeeCoverage: 0,
-      newEmployeeCoverage: 0,
+      newEmployeeCoverage: 0
     };
+  }
+};
+
+// Add a new function to calculate active BHRs (those who submitted reports in the current month)
+export const getActiveBHRCount = async () => {
+  try {
+    const currentDate = new Date();
+    const monthStart = startOfMonth(currentDate).toISOString();
+    const monthEnd = endOfMonth(currentDate).toISOString();
+    
+    // Get unique user IDs who submitted reports this month
+    const { data, error } = await supabase
+      .from("branch_visits")
+      .select("user_id")
+      .gte("created_at", monthStart)
+      .lte("created_at", monthEnd);
+    
+    if (error) throw error;
+    
+    // Count unique BHRs
+    const uniqueBHRs = new Set(data?.map(visit => visit.user_id) || []);
+    
+    return uniqueBHRs.size;
+  } catch (error) {
+    console.error("Error calculating active BHRs:", error);
+    return 0;
   }
 };
