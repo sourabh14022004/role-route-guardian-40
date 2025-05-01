@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
@@ -72,38 +71,18 @@ export const fetchBranches = async (): Promise<Branch[]> => {
   
   export const fetchAssignedBranchesWithDetails = async (userId: string): Promise<Branch[]> => {
     try {
-      const { data, error } = await supabase
-        .from("branch_assignments")
-        .select(`
-          branch_id,
-          branches (*)
-        `)
-        .eq("user_id", userId);
+      // Use fetchBranches to get all branches instead of filtering by assignments
+      const branches = await fetchBranches();
       
-      if (error) throw error;
-      
-      console.log("Fetched branch assignments:", data);
-      
-      // Extract branches from the nested structure
-      if (!data || data.length === 0) {
-        console.log("No branches found for user");
-        return [];
-      }
-      
-      // Extract branches properly from the nested data
-      const branches = data
-        .filter(item => item.branches) // Ensure branches exist
-        .map(item => item.branches as Branch);
-        
-      console.log("Processed branches:", branches);
+      console.log("Fetched all branches:", branches);
       
       return branches;
     } catch (error: any) {
-      console.error("Error fetching assigned branches:", error);
+      console.error("Error fetching branches:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: `Failed to load assigned branches: ${error.message}`,
+        description: `Failed to load branches: ${error.message}`,
       });
       return [];
     }
@@ -316,7 +295,7 @@ export const getBranchCategoryCoverage = async (userId: string): Promise<Array<{
     const assignedByCategory: Record<string, string[]> = {};
     assignedBranches.forEach(item => {
       if (!item.branches) return;
-      const category = item.branches.category;
+      const category = (item.branches as any).category;
       if (!assignedByCategory[category]) {
         assignedByCategory[category] = [];
       }
@@ -335,7 +314,7 @@ export const getBranchCategoryCoverage = async (userId: string): Promise<Array<{
     const visitedByCategory: Record<string, Set<string>> = {};
     visits.forEach(visit => {
       if (!visit.branches) return;
-      const category = visit.branches.category;
+      const category = (visit.branches as any).category;
       if (!visitedByCategory[category]) {
         visitedByCategory[category] = new Set();
       }
