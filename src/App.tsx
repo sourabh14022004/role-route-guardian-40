@@ -15,6 +15,10 @@ import BHDashboardLayout from "./components/bh/BHDashboardLayout";
 import BHDashboard from "./pages/BHDashboard";
 import NewVisit from "./pages/NewVisit";
 import MyVisits from "./pages/MyVisits";
+import ZHDashboardLayout from "./components/zh/ZHDashboardLayout";
+import ZHDashboard from "./pages/ZHDashboard";
+import ZHBranchMapping from "./pages/ZHBranchMapping";
+import ZHBHRManagement from "./pages/ZHBHRManagement";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +34,13 @@ const AppRoutes = () => (
       <Route path="dashboard" element={<BHDashboard />} />
       <Route path="new-visit" element={<NewVisit />} />
       <Route path="my-visits" element={<MyVisits />} />
+    </Route>
+    
+    {/* ZH routes with layout */}
+    <Route path="/zh" element={<ZHDashboardLayout />}>
+      <Route path="dashboard" element={<ZHDashboard />} />
+      <Route path="branch-mapping" element={<ZHBranchMapping />} />
+      <Route path="bhr-management" element={<ZHBHRManagement />} />
     </Route>
     
     <Route path="/:role/dashboard" element={<RoleDashboard />} />
