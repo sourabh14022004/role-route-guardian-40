@@ -34,7 +34,7 @@ const ZHBHRManagement = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBHId, setSelectedBHId] = useState<string | null>(null);
-  const [locationFilter, setLocationFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("all");
   const [locations, setLocations] = useState<string[]>([]);
   
   // Fetch BHRs data
@@ -62,7 +62,7 @@ const ZHBHRManagement = () => {
       bhr.e_code?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesLocation = 
-      !locationFilter || 
+      locationFilter === "all" || 
       bhr.location === locationFilter;
     
     return matchesSearch && matchesLocation;
@@ -106,7 +106,7 @@ const ZHBHRManagement = () => {
                   <SelectValue placeholder="Filter by location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Locations</SelectItem>
+                  <SelectItem value="all">All Locations</SelectItem>
                   {locations.map((location) => (
                     <SelectItem key={location} value={location}>
                       {location}
