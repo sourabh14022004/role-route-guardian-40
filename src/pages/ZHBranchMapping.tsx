@@ -1,259 +1,242 @@
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Search, Plus, X } from "lucide-react";
+import { fetchZoneBranches, fetchZoneBHRs, assignBranchToBHR, unassignBranchFromBHR } from "@/services/zhService";
 import { toast } from "@/components/ui/use-toast";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 
-interface Branch {
-  id: string; 
+type Branch = {
+  id: string;
   name: string;
-  category: string;
   location: string;
-  assignedBHR?: string | null;
-  assignedBHRId?: string | null;
-}
+  category: string;
+  bh_count: number;
+};
 
-interface BHR {
+type BHUser = {
   id: string;
   full_name: string;
   e_code: string;
-}
+  location: string;
+  branches_assigned: number;
+};
 
 const ZHBranchMapping = () => {
-  const [showUnassigned, setShowUnassigned] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
-  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const { user } = useAuth();
+  
+  // Data states
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [bhUsers, setBHUsers] = useState<BHUser[]>([]);
+  const [filteredBranches, setFilteredBranches] = useState<Branch[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  
+  // Action states
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
-  const [selectedBHR, setSelectedBHR] = useState<string>("");
-
-  // Fetch branches from Supabase
-  const { data: branches, isLoading, refetch } = useQuery({
-    queryKey: ['branches-mapping'],
-    queryFn: async () => {
+  const [selectedBHUser, setSelectedBHUser] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogType, setDialogType] = useState<"assign" | "unassign">("assign");
+  const [selectedBranchForUnassign, setSelectedBranchForUnassign] = useState<{
+    branchId: string;
+    branchName: string;
+    bhUserId: string;
+  } | null>(null);
+  
+  // Fetch data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+      
       try {
-        const { data: branchAssignments, error: assignmentsError } = await supabase
-          .from('branch_assignments')
-          .select(`
-            id,
-            branch_id,
-            user_id,
-            profiles:user_id(id, full_name)
-          `);
-
-        if (assignmentsError) throw assignmentsError;
-
-        // Create a map of branch_id to BHR
-        const branchToBHR: Record<string, { id: string, name: string }> = {};
-        branchAssignments?.forEach(assignment => {
-          if (assignment.profiles) {
-            branchToBHR[assignment.branch_id] = { 
-              id: assignment.user_id,
-              name: (assignment.profiles as any).full_name || 'Unknown'
-            };
-          }
-        });
-
-        // Fetch all branches
-        const { data: branchData, error: branchError } = await supabase
-          .from('branches')
-          .select('*');
-
-        if (branchError) throw branchError;
-
-        // Map the branches with their assignments
-        const mappedBranches: Branch[] = (branchData || []).map(branch => ({
-          id: branch.id,
-          name: branch.name,
-          category: branch.category.charAt(0).toUpperCase() + branch.category.slice(1),
-          location: branch.location,
-          assignedBHR: branchToBHR[branch.id]?.name || null,
-          assignedBHRId: branchToBHR[branch.id]?.id || null
-        }));
-
-        return mappedBranches;
-      } catch (error: any) {
+        setIsLoading(true);
+        
+        // Fetch branches and BH users in parallel
+        const [branchesData, bhUsersData] = await Promise.all([
+          fetchZoneBranches(user.id),
+          fetchZoneBHRs(user.id)
+        ]);
+        
+        setBranches(branchesData);
+        setFilteredBranches(branchesData);
+        setBHUsers(bhUsersData);
+      } catch (error) {
+        console.error("Error loading branch mapping data:", error);
         toast({
           variant: "destructive",
-          title: "Error",
-          description: `Failed to load branches: ${error.message}`,
+          title: "Error loading data",
+          description: "Failed to load branch and BHR data. Please try again."
         });
-        return [];
+      } finally {
+        setIsLoading(false);
       }
-    }
-  });
-
-  // Fetch BHRs from Supabase
-  const { data: bhrs } = useQuery({
-    queryKey: ['bhrs'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, e_code')
-          .eq('role', 'BH');
-
-        if (error) throw error;
-        return data || [];
-      } catch (error: any) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: `Failed to load BHRs: ${error.message}`,
-        });
-        return [];
-      }
-    }
-  });
-
-  // Filter branches based on search term, category, location, and unassigned status
-  const filteredBranches = React.useMemo(() => {
-    if (!branches) return [];
-
-    return branches.filter(branch => {
-      // Filter by search term
-      const matchesSearch = searchTerm === "" || 
-        branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (branch.assignedBHR && branch.assignedBHR.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      // Filter by category
-      const matchesCategory = selectedCategory === "" || branch.category.toLowerCase() === selectedCategory.toLowerCase();
-      
-      // Filter by location
-      const matchesLocation = selectedLocation === "" || branch.location === selectedLocation;
-      
-      // Filter by unassigned status if checkbox is checked
-      const matchesUnassigned = !showUnassigned || !branch.assignedBHR;
-      
-      return matchesSearch && matchesCategory && matchesLocation && matchesUnassigned;
-    });
-  }, [branches, searchTerm, selectedCategory, selectedLocation, showUnassigned]);
-
-  // Extract unique locations for the dropdown
-  const uniqueLocations = React.useMemo(() => {
-    if (!branches) return [];
-    const locations = new Set(branches.map(branch => branch.location));
-    return Array.from(locations);
-  }, [branches]);
-
-  // Helper function to get badge color based on category
-  const getCategoryColor = (category: string) => {
-    const categoryColors: Record<string, string> = {
-      "Platinum": "text-purple-700 bg-purple-100",
-      "Diamond": "text-blue-700 bg-blue-100",
-      "Gold": "text-yellow-700 bg-yellow-100",
-      "Silver": "text-gray-700 bg-gray-100",
-      "Bronze": "text-orange-700 bg-orange-100"
     };
-    return categoryColors[category] || "";
-  };
-
-  const handleAssignClick = (branch: Branch) => {
+    
+    loadData();
+  }, [user]);
+  
+  // Filter branches when filters change
+  useEffect(() => {
+    let filtered = [...branches];
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        branch => branch.name.toLowerCase().includes(query) || 
+                 branch.location.toLowerCase().includes(query)
+      );
+    }
+    
+    if (categoryFilter && categoryFilter !== "all") {
+      filtered = filtered.filter(branch => branch.category === categoryFilter);
+    }
+    
+    setFilteredBranches(filtered);
+  }, [branches, searchQuery, categoryFilter]);
+  
+  const handleOpenAssignDialog = (branch: Branch) => {
     setSelectedBranch(branch);
-    setSelectedBHR(branch.assignedBHRId || "");
-    setIsAssignDialogOpen(true);
+    setSelectedBHUser(null);
+    setDialogType("assign");
+    setDialogOpen(true);
   };
-
-  const handleAssignBHR = async () => {
-    if (!selectedBranch || !selectedBHR) {
-      toast({
-        title: "Error",
-        description: "Please select a BHR to assign",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  
+  const handleOpenUnassignDialog = (branchId: string, branchName: string, bhUserId: string) => {
+    setSelectedBranchForUnassign({
+      branchId,
+      branchName,
+      bhUserId
+    });
+    setDialogType("unassign");
+    setDialogOpen(true);
+  };
+  
+  const handleConfirmDialog = async () => {
     try {
-      // Check if branch already has an assignment
-      if (selectedBranch.assignedBHRId) {
-        // Update existing assignment
-        const { error: updateError } = await supabase
-          .from('branch_assignments')
-          .update({
-            user_id: selectedBHR,
-            assigned_at: new Date().toISOString()
-          })
-          .eq('branch_id', selectedBranch.id);
-
-        if (updateError) throw updateError;
-      } else {
-        // Create new assignment
-        const { error: insertError } = await supabase
-          .from('branch_assignments')
-          .insert({
-            branch_id: selectedBranch.id,
-            user_id: selectedBHR,
-            assigned_at: new Date().toISOString()
-          });
-
-        if (insertError) throw insertError;
+      if (dialogType === "assign" && selectedBranch && selectedBHUser) {
+        await assignBranchToBHR(selectedBHUser, selectedBranch.id);
+        
+        // Refresh data
+        if (user) {
+          const [branchesData, bhUsersData] = await Promise.all([
+            fetchZoneBranches(user.id),
+            fetchZoneBHRs(user.id)
+          ]);
+          
+          setBranches(branchesData);
+          setFilteredBranches(branchesData);
+          setBHUsers(bhUsersData);
+        }
+      } else if (dialogType === "unassign" && selectedBranchForUnassign) {
+        await unassignBranchFromBHR(
+          selectedBranchForUnassign.bhUserId,
+          selectedBranchForUnassign.branchId
+        );
+        
+        // Refresh data
+        if (user) {
+          const [branchesData, bhUsersData] = await Promise.all([
+            fetchZoneBranches(user.id),
+            fetchZoneBHRs(user.id)
+          ]);
+          
+          setBranches(branchesData);
+          setFilteredBranches(branchesData);
+          setBHUsers(bhUsersData);
+        }
       }
-
-      toast({
-        title: "Success",
-        description: "Branch assignment updated successfully",
-      });
-
-      // Refetch branches to update the UI
-      refetch();
-      setIsAssignDialogOpen(false);
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to assign BHR: ${error.message}`,
-      });
+    } catch (error) {
+      console.error("Error during branch assignment operation:", error);
+    } finally {
+      setDialogOpen(false);
     }
   };
-
-  return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Branch Mapping</h1>
-        <p className="text-slate-600 mt-1">Assign BHRs to branches for visit management</p>
+  
+  // Function to format branch category names
+  const formatCategoryName = (category: string) => {
+    return category.charAt(0).toUpperCase() + category.slice(1);
+  };
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-full p-8">
+        <div className="flex flex-col items-center">
+          <div className="h-8 w-8 rounded-full border-4 border-t-blue-600 border-b-blue-600 border-r-transparent border-l-transparent animate-spin"></div>
+          <p className="mt-4 text-sm text-slate-600">Loading branch data...</p>
+        </div>
       </div>
-
-      {/* Filters */}
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <Input 
-              placeholder="Search branches or BHRs..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="w-full sm:w-40">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
+    );
+  }
+  
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-1">Branch Mapping</h1>
+        <p className="text-slate-600">Assign branches to Branch Head Representatives (BHRs)</p>
+      </div>
+      
+      <Card className="mb-6">
+        <CardHeader className="pb-2">
+          <CardTitle>Branches</CardTitle>
+          <CardDescription>Manage branch assignments for your zone</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 h-4 w-4" />
+              <Input
+                placeholder="Search branches by name or location..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            <Select
+              value={categoryFilter}
+              onValueChange={setCategoryFilter}
+            >
+              <SelectTrigger className="w-full md:w-52">
+                <SelectValue placeholder="Filter by Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 <SelectItem value="platinum">Platinum</SelectItem>
                 <SelectItem value="diamond">Diamond</SelectItem>
                 <SelectItem value="gold">Gold</SelectItem>
@@ -262,130 +245,114 @@ const ZHBranchMapping = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full sm:w-40">
-            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Locations" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Locations</SelectItem>
-                {uniqueLocations.map(location => (
-                  <SelectItem key={location} value={location}>{location}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Checkbox 
-            id="show-unassigned" 
-            checked={showUnassigned}
-            onCheckedChange={(checked) => setShowUnassigned(!!checked)}
-          />
-          <Label htmlFor="show-unassigned">Show only unassigned branches</Label>
-        </div>
-      </div>
-
-      {/* Branch Mapping Table */}
-      <div className="border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Branch Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Assigned BHR</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-4">
-                  Loading branches...
-                </TableCell>
-              </TableRow>
-            ) : filteredBranches.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-4">
-                  No branches found matching the filters.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredBranches.map((branch, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium">{branch.name}</TableCell>
-                  <TableCell>
-                    <Badge className={getCategoryColor(branch.category)} variant="outline">
-                      {branch.category}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{branch.location}</TableCell>
-                  <TableCell>
-                    {branch.assignedBHR ? branch.assignedBHR : (
-                      <span className="text-red-500">Unassigned</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleAssignClick(branch)}
-                    >
-                      {branch.assignedBHR ? "Reassign" : "Assign"}
-                    </Button>
-                  </TableCell>
+          
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[250px]">Branch Name</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-center">Assigned BHRs</TableHead>
+                  <TableHead className="text-right w-[100px]">Actions</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Assign BHR Dialog */}
-      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedBranch?.assignedBHR ? "Reassign BHR" : "Assign BHR"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="mb-2">
-              Branch: <span className="font-medium">{selectedBranch?.name}</span>
-            </p>
-            <p className="mb-4">
-              Category: <span className="font-medium">{selectedBranch?.category}</span>, 
-              Location: <span className="font-medium">{selectedBranch?.location}</span>
-            </p>
-            
-            <div className="space-y-2">
-              <Label htmlFor="bhr-select">Select BHR to assign</Label>
-              <Select value={selectedBHR} onValueChange={setSelectedBHR}>
-                <SelectTrigger id="bhr-select">
-                  <SelectValue placeholder="Select BHR" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bhrs?.map((bhr) => (
-                    <SelectItem key={bhr.id} value={bhr.id}>
-                      {bhr.full_name} ({bhr.e_code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              </TableHeader>
+              <TableBody>
+                {filteredBranches.length > 0 ? (
+                  filteredBranches.map((branch) => (
+                    <TableRow key={branch.id}>
+                      <TableCell className="font-medium">{branch.name}</TableCell>
+                      <TableCell>{branch.location}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          branch.category === 'platinum' ? 'bg-violet-100 text-violet-700' : 
+                          branch.category === 'diamond' ? 'bg-blue-100 text-blue-700' :
+                          branch.category === 'gold' ? 'bg-amber-100 text-amber-700' :
+                          branch.category === 'silver' ? 'bg-slate-100 text-slate-700' :
+                          'bg-orange-100 text-orange-700'
+                        }`}>
+                          {formatCategoryName(branch.category)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">{branch.bh_count}</TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleOpenAssignDialog(branch)}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          Assign
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                      {searchQuery || categoryFilter ? 
+                        "No branches match your search criteria" : 
+                        "No branches available in your zone"
+                      }
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAssignBHR}>
-              {selectedBranch?.assignedBHR ? "Reassign" : "Assign"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
+      
+      {/* Dialogs for assigning/unassigning */}
+      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogContent>
+          {dialogType === "assign" ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Assign Branch to BHR</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Select a BHR to assign to {selectedBranch?.name}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="py-4">
+                <Select value={selectedBHUser || ""} onValueChange={setSelectedBHUser}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a BHR" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bhUsers.map((bhUser) => (
+                      <SelectItem key={bhUser.id} value={bhUser.id}>
+                        {bhUser.full_name} ({bhUser.e_code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDialog} disabled={!selectedBHUser}>
+                  Assign
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unassign Branch</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to unassign {selectedBranchForUnassign?.branchName} from this BHR?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDialog} className="bg-red-600 hover:bg-red-700">
+                  Unassign
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
