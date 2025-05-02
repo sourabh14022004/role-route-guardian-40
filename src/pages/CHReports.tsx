@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,11 +12,25 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Download, FileText, Filter, RefreshCw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { generateReportData, fetchCategoryBreakdown } from "@/services/chService";
+import { 
+  fetchMonthlySummaryReport,
+  fetchCategoryBreakdown,
+  exportBranchVisitData,
+  exportBHRPerformanceSummary,
+  exportBranchAssignments
+} from "@/services/reportService";
 import { toast } from "@/components/ui/use-toast";
 
+// Utility to get the current month name
+const getCurrentMonthName = () => {
+  const months = ["January", "February", "March", "April", "May", "June", "July", 
+    "August", "September", "October", "November", "December"];
+  return months[new Date().getMonth()];
+};
+
+// Constants
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const CURRENT_YEAR = 2026;
+const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1];
 
 const StatSummary = ({ title, value, suffix = "" }: { title: string; value: number | string; suffix?: string }) => {
@@ -35,11 +49,13 @@ const CategoryCard = ({
   name, 
   branches, 
   coverage, 
+  averageVisits,
   color = "blue" 
 }: { 
   name: string; 
   branches: number;
-  coverage: number; 
+  coverage: number;
+  averageVisits: number;
   color?: "blue" | "purple" | "gold" | "silver" | "bronze";
 }) => {
   const getColorClasses = () => {
@@ -62,32 +78,43 @@ const CategoryCard = ({
         </Badge>
         <div className="mt-2 text-lg font-medium">{branches} branches</div>
       </div>
-      <div className="p-4">
-        <div className="flex justify-between text-sm mb-1">
-          <span>Coverage</span>
-          <span className="font-medium">{coverage}%</span>
+      <div className="p-4 space-y-3">
+        <div>
+          <div className="flex justify-between text-sm mb-1">
+            <span>Coverage</span>
+            <span className="font-medium">{coverage}%</span>
+          </div>
+          <Progress className="h-2" value={coverage} />
         </div>
-        <Progress className="h-2" value={coverage} />
+        <div className="flex justify-between text-sm">
+          <span>Avg. Visits per Branch</span>
+          <span className="font-medium">{averageVisits}</span>
+        </div>
       </div>
     </div>
   );
 };
 
-const DownloadButton = ({ label, icon }: { label: string; icon: React.ReactNode }) => {
-  const handleDownload = () => {
-    toast({
-      title: "Download started",
-      description: `${label} is being downloaded.`
-    });
-  };
+interface DownloadButtonProps {
+  label: string; 
+  icon: React.ReactNode; 
+  onClick: () => void;
+  isLoading?: boolean;
+}
 
+const DownloadButton = ({ label, icon, onClick, isLoading = false }: DownloadButtonProps) => {
   return (
     <Button 
       variant="outline" 
-      onClick={handleDownload} 
+      onClick={onClick} 
       className="flex items-center gap-2 h-auto py-3"
+      disabled={isLoading}
     >
-      {icon}
+      {isLoading ? (
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900"></div>
+      ) : (
+        icon
+      )}
       <div className="text-left">
         <div className="font-medium">{label}</div>
         <div className="text-xs text-slate-500">Download Excel</div>
@@ -98,33 +125,190 @@ const DownloadButton = ({ label, icon }: { label: string; icon: React.ReactNode 
 
 const CHReports = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState("May");
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName());
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR.toString());
+  const [selectedLocation, setSelectedLocation] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedBHR, setSelectedBHR] = useState("all");
+  const [isDownloadingVisits, setIsDownloadingVisits] = useState(false);
+  const [isDownloadingBHR, setIsDownloadingBHR] = useState(false);
+  const [isDownloadingAssignments, setIsDownloadingAssignments] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['ch-reports', selectedMonth, selectedYear],
-    queryFn: () => generateReportData(selectedMonth, selectedYear)
+  // Fetch summary report data
+  const { data: summaryData, isLoading: isSummaryLoading, refetch: refetchSummary } = useQuery({
+    queryKey: ['ch-reports-summary', selectedMonth, selectedYear],
+    queryFn: () => fetchMonthlySummaryReport(selectedMonth, selectedYear)
   });
 
-  const { data: categoryData, isLoading: categoryLoading } = useQuery({
+  // Fetch category breakdown data
+  const { data: categoryData, isLoading: isCategoryLoading, refetch: refetchCategory } = useQuery({
     queryKey: ['ch-category-breakdown', selectedMonth, selectedYear],
-    queryFn: fetchCategoryBreakdown
+    queryFn: () => fetchCategoryBreakdown(selectedMonth, selectedYear)
   });
 
   const resetFilters = () => {
-    setSelectedMonth("May");
+    setSelectedMonth(getCurrentMonthName());
     setSelectedYear(CURRENT_YEAR.toString());
-    refetch();
+    setSelectedLocation("all");
+    setSelectedCategory("all");
+    setSelectedBHR("all");
+    refetchSummary();
+    refetchCategory();
   };
 
   const getCategoryColorByName = (name: string): "blue" | "purple" | "gold" | "silver" | "bronze" => {
     switch (name.toLowerCase()) {
-      case "platinum": return "blue";
-      case "diamond": return "purple";
+      case "platinum": return "purple";
+      case "diamond": return "blue";
       case "gold": return "gold";
       case "silver": return "silver";
       case "bronze": return "bronze";
       default: return "blue";
+    }
+  };
+
+  // Export functions
+  const handleDownloadBranchVisits = async () => {
+    setIsDownloadingVisits(true);
+    try {
+      const data = await exportBranchVisitData(
+        selectedMonth, 
+        selectedYear, 
+        selectedLocation !== 'all' ? selectedLocation : undefined,
+        selectedCategory !== 'all' ? selectedCategory : undefined,
+        selectedBHR !== 'all' ? selectedBHR : undefined
+      );
+      
+      if (data.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "There are no branch visits matching your filters."
+        });
+        return;
+      }
+      
+      // Convert data to CSV
+      const headers = Object.keys(data[0]);
+      const csvContent = [
+        headers.join(','),
+        ...data.map(row => headers.map(header => JSON.stringify(row[header as keyof typeof row])).join(','))
+      ].join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `branch_visits_${selectedMonth}_${selectedYear}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Download complete",
+        description: "Branch visit data has been exported successfully."
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        variant: "destructive",
+        title: "Export failed",
+        description: "There was an error exporting the branch visit data."
+      });
+    } finally {
+      setIsDownloadingVisits(false);
+    }
+  };
+
+  const handleDownloadBHRPerformance = async () => {
+    setIsDownloadingBHR(true);
+    try {
+      const data = await exportBHRPerformanceSummary(selectedMonth, selectedYear);
+      
+      if (data.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "There are no BHR performance data to export."
+        });
+        return;
+      }
+      
+      // Convert data to CSV
+      const headers = Object.keys(data[0]);
+      const csvContent = [
+        headers.join(','),
+        ...data.map(row => headers.map(header => JSON.stringify(row[header as keyof typeof row])).join(','))
+      ].join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `bhr_performance_${selectedMonth}_${selectedYear}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Download complete",
+        description: "BHR performance summary has been exported successfully."
+      });
+    } catch (error) {
+      console.error("Error exporting BHR data:", error);
+      toast({
+        variant: "destructive",
+        title: "Export failed",
+        description: "There was an error exporting the BHR performance data."
+      });
+    } finally {
+      setIsDownloadingBHR(false);
+    }
+  };
+
+  const handleDownloadBranchAssignments = async () => {
+    setIsDownloadingAssignments(true);
+    try {
+      const data = await exportBranchAssignments();
+      
+      if (data.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "There are no branch assignments to export."
+        });
+        return;
+      }
+      
+      // Convert data to CSV
+      const headers = Object.keys(data[0]);
+      const csvContent = [
+        headers.join(','),
+        ...data.map(row => headers.map(header => JSON.stringify(row[header as keyof typeof row])).join(','))
+      ].join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'branch_assignments.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Download complete",
+        description: "Branch assignments data has been exported successfully."
+      });
+    } catch (error) {
+      console.error("Error exporting assignments data:", error);
+      toast({
+        variant: "destructive",
+        title: "Export failed",
+        description: "There was an error exporting the branch assignments data."
+      });
+    } finally {
+      setIsDownloadingAssignments(false);
     }
   };
 
@@ -159,6 +343,14 @@ const CHReports = () => {
               </Button>
               <Button 
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  refetchSummary();
+                  refetchCategory();
+                  toast({
+                    title: "Report generated",
+                    description: `Report for ${selectedMonth} ${selectedYear} has been generated.`
+                  });
+                }}
               >
                 <FileText className="h-4 w-4" />
                 Generate Report
@@ -199,7 +391,7 @@ const CHReports = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="location">Location</Label>
-                  <Select defaultValue="all">
+                  <Select value={selectedLocation} onValueChange={setSelectedLocation}>
                     <SelectTrigger id="location">
                       <SelectValue />
                     </SelectTrigger>
@@ -214,7 +406,7 @@ const CHReports = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="category">Branch Category</Label>
-                  <Select defaultValue="all">
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                     <SelectTrigger id="category">
                       <SelectValue />
                     </SelectTrigger>
@@ -231,7 +423,7 @@ const CHReports = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="bhr">BHR</Label>
-                  <Select defaultValue="all">
+                  <Select value={selectedBHR} onValueChange={setSelectedBHR}>
                     <SelectTrigger id="bhr">
                       <SelectValue />
                     </SelectTrigger>
@@ -248,7 +440,7 @@ const CHReports = () => {
                   <Label>Report Type</Label>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <Checkbox id="summary" checked />
+                      <Checkbox id="summary" defaultChecked />
                       <label
                         htmlFor="summary"
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -282,28 +474,28 @@ const CHReports = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatSummary
             title="Total Branch Visits"
-            value={isLoading ? "..." : data?.totalBranchVisits || 0}
+            value={isSummaryLoading ? "..." : summaryData?.totalBranchVisits || 0}
           />
           <StatSummary
             title="Coverage Percentage"
-            value={isLoading ? "..." : data?.coveragePercentage || 0}
+            value={isSummaryLoading ? "..." : summaryData?.coveragePercentage || 0}
             suffix="%"
           />
           <StatSummary
             title="Avg. Participation"
-            value={isLoading ? "..." : data?.avgParticipation || 0}
+            value={isSummaryLoading ? "..." : summaryData?.avgParticipation || 0}
             suffix="%"
           />
           <StatSummary
             title="Top Performer"
-            value={isLoading ? "..." : data?.topPerformer || ""}
+            value={isSummaryLoading ? "..." : summaryData?.topPerformer || "N/A"}
           />
         </div>
 
         <div className="mb-8">
           <h3 className="text-xl font-bold mb-4">Category Breakdown</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {categoryLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            {isCategoryLoading ? (
               <div className="col-span-full flex justify-center py-8">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
@@ -314,6 +506,7 @@ const CHReports = () => {
                   name={category.name}
                   branches={category.branches}
                   coverage={category.coverage}
+                  averageVisits={category.averageVisits}
                   color={getCategoryColorByName(category.name)}
                 />
               ))
@@ -329,14 +522,20 @@ const CHReports = () => {
           <DownloadButton 
             label="Branch Visit Data"
             icon={<Download className="h-5 w-5" />}
+            onClick={handleDownloadBranchVisits}
+            isLoading={isDownloadingVisits}
           />
           <DownloadButton 
             label="BHR Performance Summary"
             icon={<Download className="h-5 w-5" />}
+            onClick={handleDownloadBHRPerformance}
+            isLoading={isDownloadingBHR}
           />
           <DownloadButton 
-            label="HR Parameters Report"
+            label="Branch Assignments"
             icon={<Download className="h-5 w-5" />}
+            onClick={handleDownloadBranchAssignments}
+            isLoading={isDownloadingAssignments}
           />
         </div>
       </div>

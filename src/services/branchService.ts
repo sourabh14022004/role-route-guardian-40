@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
@@ -161,11 +162,11 @@ export const fetchAssignedBranchesWithDetails = async (userId: string) => {
     
     // Transform data structure for easier consumption
     const branchesWithDetails = data?.map(item => ({
-      id: item.branches.id,
-      name: item.branches.name,
-      location: item.branches.location,
-      category: item.branches.category,
-      zoneId: item.branches.zone_id
+      id: item.branches?.id,
+      name: item.branches?.name,
+      location: item.branches?.location,
+      category: item.branches?.category,
+      zoneId: item.branches?.zone_id
     })) || [];
     
     return branchesWithDetails;
@@ -280,11 +281,15 @@ export const getBranchCategoryCoverage = async (userId: string) => {
     // Group assigned branches by category
     const assignedByCategory: Record<string, string[]> = {};
     assignedBranches?.forEach(item => {
+      if (!item.branches || !item.branches.category) return;
+      
       const category = item.branches.category || 'unknown';
       if (!assignedByCategory[category]) {
         assignedByCategory[category] = [];
       }
-      assignedByCategory[category].push(item.branches.id);
+      if (item.branches.id) {
+        assignedByCategory[category].push(item.branches.id);
+      }
     });
     
     // Get current month's visits
@@ -304,6 +309,8 @@ export const getBranchCategoryCoverage = async (userId: string) => {
     // Count visits by category
     const visitsByCategory: Record<string, Set<string>> = {};
     visits?.forEach(visit => {
+      if (!visit.branch_category || !visit.branch_id) return;
+      
       const category = visit.branch_category;
       if (!visitsByCategory[category]) {
         visitsByCategory[category] = new Set();
