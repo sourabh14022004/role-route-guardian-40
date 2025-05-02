@@ -170,5 +170,4 @@ const QualitativeHeatmap = ({
   );
 };
 
-// Fix: Make sure to export as default
 export default QualitativeHeatmap;
