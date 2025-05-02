@@ -1,26 +1,12 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-
-// Define the types of qualitative data
-type QualitativeRating = "very_poor" | "poor" | "neutral" | "good" | "excellent" | null;
-type QualitativeMetric = "culture_branch" | "line_manager_behavior" | "branch_hygiene" | "overall_discipline";
-
-interface HeatmapData {
-  metric: QualitativeMetric;
-  very_poor: number;
-  poor: number;
-  neutral: number;
-  good: number;
-  excellent: number;
-  total: number;
-}
+import { getQualitativeMetricsForHeatmap, HeatmapData, QualitativeMetric } from "@/services/reportService";
 
 interface QualitativeHeatmapProps {
   title?: string;
-  dateRange?: { from: Date; to: Date } | null;
+  dateRange?: { from: Date; to: Date | undefined } | null;
   branchCategory?: string | null;
 }
 
@@ -61,63 +47,8 @@ const QualitativeHeatmap = ({
       setError(null);
 
       try {
-        let query = supabase.from('branch_visits')
-          .select(`
-            culture_branch,
-            line_manager_behavior,
-            branch_hygiene,
-            overall_discipline
-          `);
-
-        // Add date filtering if provided
-        if (dateRange) {
-          query = query
-            .gte('visit_date', dateRange.from.toISOString().split('T')[0])
-            .lte('visit_date', dateRange.to.toISOString().split('T')[0]);
-        }
-
-        // Add branch category filtering if provided
-        if (branchCategory) {
-          query = query.eq('branch_category', branchCategory.toLowerCase());
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-
-        // Process the data for the heatmap
-        const metrics: QualitativeMetric[] = [
-          "culture_branch",
-          "line_manager_behavior",
-          "branch_hygiene",
-          "overall_discipline"
-        ];
-
-        // Initialize the counts for each metric and rating
-        const processedData: HeatmapData[] = metrics.map(metric => ({
-          metric,
-          very_poor: 0,
-          poor: 0,
-          neutral: 0,
-          good: 0,
-          excellent: 0,
-          total: 0
-        }));
-
-        // Count the occurrences of each rating for each metric
-        data?.forEach(visit => {
-          metrics.forEach(metric => {
-            const rating = visit[metric as keyof typeof visit] as QualitativeRating;
-            if (rating) {
-              const metricData = processedData.find(d => d.metric === metric);
-              if (metricData) {
-                metricData[rating as keyof typeof metricData] += 1;
-                metricData.total += 1;
-              }
-            }
-          });
-        });
-
+        // Use our service function to get the data
+        const processedData = await getQualitativeMetricsForHeatmap(dateRange, branchCategory);
         setData(processedData);
       } catch (error) {
         console.error("Error fetching qualitative data:", error);

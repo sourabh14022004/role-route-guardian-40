@@ -23,17 +23,11 @@ import {
   Legend,
   BarChart,
   Bar,
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { fetchMonthlyTrends, fetchQualitativeAssessments } from "@/services/analyticsService";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchMonthlyTrends } from "@/services/analyticsService";
 import { toast } from "@/components/ui/use-toast";
 import {
   Select,
@@ -55,6 +49,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
+import { getVisitMetrics } from "@/services/branchService";
 
 const timeRangeOptions = [
   { value: "lastSevenDays", label: "Last 7 Days" },
@@ -75,7 +70,7 @@ const metricOptions = [
 ];
 
 const CHAnalytics = () => {
-  const [monthlyTrends, setMonthlyTrends] = useState([]);
+  const [monthlyTrends, setMonthlyTrends] = useState<any[]>([]);
   const [qualitativeData, setQualitativeData] = useState({
     discipline: 0,
     hygiene: 0,
@@ -94,7 +89,7 @@ const CHAnalytics = () => {
     erPercentage: false,
     nonVendorPercentage: false,
   });
-  const [categoryMetrics, setCategoryMetrics] = useState([]);
+  const [categoryMetrics, setCategoryMetrics] = useState<any[]>([]);
   // Set default date range to current month
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -113,10 +108,6 @@ const CHAnalytics = () => {
         const trendsData = await fetchMonthlyTrends(timeRange);
         setMonthlyTrends(trendsData);
         
-        // Fetch qualitative assessment data
-        const qualData = await fetchQualitativeAssessments();
-        setQualitativeData(qualData);
-
         // Fetch category metrics data directly from the branch_visits table
         await fetchCategoryMetrics();
       } catch (error) {
@@ -134,86 +125,22 @@ const CHAnalytics = () => {
     loadAnalyticsData();
   }, [timeRange]);
 
-  const handleMetricToggle = (metricId) => {
+  const handleMetricToggle = (metricId: string) => {
     setSelectedMetrics(prev => ({
       ...prev,
-      [metricId]: !prev[metricId]
+      [metricId]: !prev[metricId as keyof typeof prev]
     }));
   };
 
   // At least one metric must be selected
   const atLeastOneMetricSelected = Object.values(selectedMetrics).some(value => value);
 
-  // Fetch real category metrics data from branch_visits
+  // Fetch category metrics data
   const fetchCategoryMetrics = async () => {
     try {
-      // Get total branches count
-      const { count: totalBranches, error: branchError } = await supabase
-        .from('branches')
-        .select('*', { count: 'exact', head: true });
-      
-      if (branchError) throw branchError;
-      
-      // Get all branch visits with their categories
-      const { data: visits, error: visitsError } = await supabase
-        .from('branch_visits')
-        .select('branch_category, manning_percentage, attrition_percentage, er_percentage, cwt_cases')
-        .in('status', ['submitted', 'approved']);
-        
-      if (visitsError) throw visitsError;
-      
-      if (!visits || visits.length === 0) {
-        console.warn("No branch visits found");
-        return;
-      }
-      
-      // Group by category and calculate averages
-      const categoryStats = {};
-      
-      visits.forEach(visit => {
-        const category = visit.branch_category ? 
-          visit.branch_category.charAt(0).toUpperCase() + visit.branch_category.slice(1) : 'Unknown';
-        
-        if (!categoryStats[category]) {
-          categoryStats[category] = {
-            count: 0,
-            manning: 0,
-            attrition: 0,
-            er: 0,
-            cwt: 0
-          };
-        }
-        
-        categoryStats[category].count++;
-        
-        if (typeof visit.manning_percentage === 'number') {
-          categoryStats[category].manning += visit.manning_percentage;
-        }
-        
-        if (typeof visit.attrition_percentage === 'number') {
-          categoryStats[category].attrition += visit.attrition_percentage;
-        }
-        
-        if (typeof visit.er_percentage === 'number') {
-          categoryStats[category].er += visit.er_percentage;
-        }
-        
-        if (typeof visit.cwt_cases === 'number') {
-          categoryStats[category].cwt += visit.cwt_cases;
-        }
-      });
-      
-      // Calculate averages and format data
-      const formattedData = Object.entries(categoryStats).map(([category, stats]) => ({
-        name: category,
-        manning: Math.round(stats.manning / stats.count) || 0,
-        attrition: Math.round(stats.attrition / stats.count) || 0,
-        er: Math.round(stats.er / stats.count) || 0,
-        cwt: Math.round(stats.cwt / stats.count) || 0
-      }));
-      
-      console.log("Category metrics:", formattedData);
-      setCategoryMetrics(formattedData);
+      // Use the getVisitMetrics function from branchService
+      const metricsData = await getVisitMetrics();
+      setCategoryMetrics(metricsData);
       
     } catch (error) {
       console.error("Error fetching category metrics:", error);
@@ -224,43 +151,6 @@ const CHAnalytics = () => {
       });
     }
   };
-
-  // Format tooltip value with proper type checking
-  const formatTooltipValue = (value) => {
-    if (typeof value === 'number') {
-      return `${value.toFixed(1)}/5`;
-    }
-    return `${value}/5`;
-  };
-
-  // Prepare radar data for the qualitative assessment
-  const radarData = [
-    {
-      subject: "Discipline",
-      value: qualitativeData.discipline,
-      fullMark: 5,
-    },
-    {
-      subject: "Hygiene",
-      value: qualitativeData.hygiene,
-      fullMark: 5,
-    },
-    {
-      subject: "Culture",
-      value: qualitativeData.culture,
-      fullMark: 5,
-    },
-    {
-      subject: "Behavior",
-      value: qualitativeData.behavior,
-      fullMark: 5,
-    },
-    {
-      subject: "Overall",
-      value: qualitativeData.overall,
-      fullMark: 5,
-    },
-  ];
 
   return (
     <div className="p-6 space-y-6">
