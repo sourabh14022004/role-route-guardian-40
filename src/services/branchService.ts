@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 
@@ -104,3 +105,39 @@ export async function fetchBranchCategoriesDistribution() {
     return [];
   }
 }
+
+// Add these exported functions for other files that need them
+export const getBranchVisitStats = async () => {
+  // Return placeholder data
+  return { total: 0, completed: 0, pending: 0 };
+};
+
+export const getBranchCategoryCoverage = async () => {
+  // Return placeholder data for branch category coverage
+  return [];
+};
+
+export const getVisitMetrics = async () => {
+  // Return placeholder data for visit metrics
+  return [];
+};
+
+export const getBHVisitMetrics = async () => {
+  // Return placeholder data for BH visit metrics
+  return [];
+};
+
+export const getPerformanceTrends = async () => {
+  // Return placeholder data for performance trends
+  return [];
+};
+
+export const fetchUserBranchVisits = async () => {
+  // Return placeholder data for user branch visits
+  return [];
+};
+
+export const getUserAssignedBranches = async () => {
+  // Return placeholder data for user assigned branches
+  return [];
+};

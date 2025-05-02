@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
@@ -702,14 +703,21 @@ export const exportBranchAssignments = async () => {
 };
 
 // Export these functions that are referenced in other files
-export const getActiveBHRsCount = async () => ({ count: 0, total: 0 });
-export const getTotalBranchVisitsInMonth = async () => ({ count: 0 });
+export const getActiveBHRsCount = async () => {
+  // Return a number instead of an object to fix the React child error
+  return 0;
+};
+
+export const getTotalBranchVisitsInMonth = async () => {
+  // Return a number instead of an object to fix the React child error
+  return 0;
+};
+
 export interface BranchVisitReport {} // Empty interface to satisfy imports
 export const fetchRecentReports = async () => [];
-export const fetchReportById = async (id: string) => null;
 export const updateReportStatus = async () => false;
 
-// Fix for functions with TypeScript errors
+// Fix for functions with TypeScript errors - removed the stub declaration above
 export async function getBranchVisitsByRole(userId: string, role: string) {
   try {
     // Query options based on role
@@ -765,7 +773,7 @@ export async function getBranchVisitsByRole(userId: string, role: string) {
     if (error) throw error;
 
     // Process data for consistency across roles
-    const processedData = data?.map((visit) => {
+    const processedData = data?.map((visit: any) => {
       const formattedVisit = {
         ...visit,
         bhr_name: "",
@@ -800,7 +808,7 @@ export async function getBranchVisitsByRole(userId: string, role: string) {
   }
 }
 
-// Fix for fetchReportById function
+// The implementation of fetchReportById (removed the stub declaration above)
 export async function fetchReportById(reportId: string) {
   try {
     const { data, error } = await supabase
