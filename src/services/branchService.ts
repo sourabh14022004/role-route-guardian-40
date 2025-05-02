@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 
@@ -106,34 +107,137 @@ export async function fetchBranchCategoriesDistribution() {
 }
 
 // Add these exported functions for other files that need them
-export const getBranchVisitStats = async () => {
-  // Return placeholder data
-  return { total: 0, completed: 0, pending: 0 };
+export const getBranchVisitStats = async (userId?: string) => {
+  try {
+    if (!userId) return { total: 0, completed: 0, pending: 0 };
+    
+    // Get total branch visits
+    const { count: totalCount, error: totalError } = await supabase
+      .from('branch_visits')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    if (totalError) throw totalError;
+    
+    // Get completed visits
+    const { count: completedCount, error: completedError } = await supabase
+      .from('branch_visits')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'approved');
+    
+    if (completedError) throw completedError;
+    
+    // Get pending visits
+    const { count: pendingCount, error: pendingError } = await supabase
+      .from('branch_visits')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'submitted');
+    
+    if (pendingError) throw pendingError;
+    
+    return { 
+      total: totalCount || 0, 
+      completed: completedCount || 0, 
+      pending: pendingCount || 0 
+    };
+  } catch (error) {
+    console.error("Error fetching branch visit stats:", error);
+    return { total: 0, completed: 0, pending: 0 };
+  }
 };
 
 export const getBranchCategoryCoverage = async () => {
-  // Return placeholder data for branch category coverage
-  return [];
+  // Get coverage data for branch categories
+  try {
+    const { data, error } = await supabase.rpc('get_branch_category_coverage');
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching branch category coverage:", error);
+    return [];
+  }
 };
 
-export const getVisitMetrics = async () => {
-  // Return placeholder data for visit metrics
-  return [];
+export const getVisitMetrics = async (userId?: string) => {
+  try {
+    if (!userId) return [];
+    
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        visit_date,
+        status,
+        branch_id,
+        branches:branch_id (name, category)
+      `)
+      .eq('user_id', userId)
+      .order('visit_date', { ascending: false })
+      .limit(5);
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching visit metrics:", error);
+    return [];
+  }
 };
 
 export const getBHVisitMetrics = async () => {
-  // Return placeholder data for BH visit metrics
-  return [];
+  try {
+    // Get branch head visit metrics
+    const { data, error } = await supabase.rpc('get_bh_visit_metrics');
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching BH visit metrics:", error);
+    return [];
+  }
 };
 
 export const getPerformanceTrends = async () => {
-  // Return placeholder data for performance trends
-  return [];
+  try {
+    // Get performance trends
+    const { data, error } = await supabase.rpc('get_performance_trends');
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching performance trends:", error);
+    return [];
+  }
 };
 
-export const fetchUserBranchVisits = async () => {
-  // Return placeholder data for user branch visits
-  return [];
+export const fetchUserBranchVisits = async (userId: string) => {
+  try {
+    if (!userId) return [];
+    
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        visit_date,
+        status,
+        branches:branch_id (name, location, category)
+      `)
+      .eq('user_id', userId)
+      .order('visit_date', { ascending: false });
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching user branch visits:", error);
+    return [];
+  }
 };
 
 export const getUserAssignedBranches = async (userId: string) => {

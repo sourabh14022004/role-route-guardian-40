@@ -19,6 +19,7 @@ interface BHRUser {
   e_code: string;
   location: string;
   branches_assigned: number;
+  is_active: boolean;
 }
 
 const ZHBHRManagement = () => {
@@ -26,6 +27,7 @@ const ZHBHRManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBHId, setSelectedBHId] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState("all");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [locations, setLocations] = useState<string[]>([]);
   
   // Fetch BHRs data
@@ -45,7 +47,7 @@ const ZHBHRManagement = () => {
     enabled: !!user?.id
   });
 
-  // Filter BHRs based on search query and location
+  // Filter BHRs based on search query, location, and active status
   const filteredBHRs = bhUsers.filter((bhr) => {
     const matchesSearch = 
       !searchQuery || 
@@ -56,18 +58,13 @@ const ZHBHRManagement = () => {
       locationFilter === "all" || 
       bhr.location === locationFilter;
     
-    return matchesSearch && matchesLocation;
+    const matchesActive = 
+      activeFilter === "all" || 
+      (activeFilter === "active" && bhr.is_active) || 
+      (activeFilter === "inactive" && !bhr.is_active);
+    
+    return matchesSearch && matchesLocation && matchesActive;
   });
-
-  // Get statistics for each BHR
-  const getBHRStats = async (bhId: string) => {
-    try {
-      return await fetchBHRReportStats(bhId);
-    } catch (error) {
-      console.error("Error fetching BHR stats:", error);
-      return { total: 0, approved: 0, pending: 0, rejected: 0 };
-    }
-  };
 
   return (
     <div className="px-6 py-8 md:px-8 lg:px-10 max-w-7xl mx-auto">
@@ -103,6 +100,19 @@ const ZHBHRManagement = () => {
                       {location}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-60">
+              <Select value={activeFilter} onValueChange={setActiveFilter}>
+                <SelectTrigger className="flex items-center border-slate-200 rounded-lg bg-slate-50 hover:bg-white focus:border-blue-400 transition-all">
+                  <User className="h-4 w-4 mr-2 text-blue-500" />
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All BHRs</SelectItem>
+                  <SelectItem value="active">Active BHRs</SelectItem>
+                  <SelectItem value="inactive">Inactive BHRs</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -158,17 +168,24 @@ const BHRCard = ({ bhr, onViewDetails }: BHRCardProps) => {
   });
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 border-0 shadow-md rounded-xl bg-gradient-to-b from-white to-slate-50">
+    <Card className={`overflow-hidden hover:shadow-lg transition-all duration-300 border-0 shadow-md rounded-xl ${bhr.is_active ? 'bg-gradient-to-b from-white to-slate-50' : 'bg-gradient-to-b from-white to-gray-50'}`}>
       <CardContent className="p-0">
         <div className="p-6 pb-4">
           <div className="flex items-center gap-4 mb-4">
-            <Avatar className="h-16 w-16 bg-gradient-to-br from-blue-600 to-blue-500 text-white text-xl shadow-md">
-              <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-500 text-lg font-semibold">
+            <Avatar className={`h-16 w-16 text-white text-xl shadow-md ${bhr.is_active ? 'bg-gradient-to-br from-blue-600 to-blue-500' : 'bg-gradient-to-br from-gray-600 to-gray-500'}`}>
+              <AvatarFallback className={`text-lg font-semibold ${bhr.is_active ? 'bg-gradient-to-br from-blue-600 to-blue-500' : 'bg-gradient-to-br from-gray-600 to-gray-500'}`}>
                 {bhr.full_name?.charAt(0) || 'B'}
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="text-xl font-semibold text-slate-800">{bhr.full_name}</h3>
+              <div className="flex items-center">
+                <h3 className="text-xl font-semibold text-slate-800">{bhr.full_name}</h3>
+                {bhr.is_active ? (
+                  <Badge className="ml-2 bg-green-100 text-green-800">Active</Badge>
+                ) : (
+                  <Badge className="ml-2 bg-gray-100 text-gray-700">Inactive</Badge>
+                )}
+              </div>
               <p className="text-slate-500 font-medium">{bhr.e_code || 'No Employee Code'}</p>
             </div>
           </div>

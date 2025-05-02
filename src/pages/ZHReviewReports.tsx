@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,38 +25,24 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getBranchVisitsByRole } from "@/services/reportService";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const ZHReviewReports = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [reports, setReports] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [processingReports, setProcessingReports] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchReports = async () => {
-      if (!user) return;
-
-      setIsLoading(true);
-      try {
-        const data = await getBranchVisitsByRole(user.id, "zh");
-        setReports(data);
-      } catch (error) {
-        console.error("Error fetching reports:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load reports.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchReports();
-  }, [user]);
+  // Use React Query to fetch and cache the reports data
+  const { data: reports = [], isLoading, refetch } = useQuery({
+    queryKey: ['zh-reports'],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return await getBranchVisitsByRole(user.id, "zh");
+    },
+    enabled: !!user?.id
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -91,10 +78,8 @@ const ZHReviewReports = () => {
       
       if (error) throw error;
       
-      // Update the report in the UI
-      setReports(prevReports => prevReports.map(report => 
-        report.id === reportId ? { ...report, status: "approved" } : report
-      ));
+      // Refetch the reports to get updated data
+      refetch();
       
       toast({
         title: "Report approved",
@@ -126,10 +111,8 @@ const ZHReviewReports = () => {
       
       if (error) throw error;
       
-      // Update the report in the UI
-      setReports(prevReports => prevReports.map(report => 
-        report.id === reportId ? { ...report, status: "rejected" } : report
-      ));
+      // Refetch the reports to get updated data
+      refetch();
       
       toast({
         title: "Report rejected",
@@ -186,8 +169,9 @@ const ZHReviewReports = () => {
           </div>
 
           {isLoading ? (
-            <div className="flex justify-center py-16">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+              <p className="text-slate-600">Loading reports...</p>
             </div>
           ) : filteredReports.length === 0 ? (
             <div className="text-center py-8">
@@ -198,7 +182,7 @@ const ZHReviewReports = () => {
               </p>
             </div>
           ) : (
-            <ScrollArea>
+            <ScrollArea className="h-[500px]">
               <Table>
                 <TableCaption>
                   A list of all branch visit reports.
