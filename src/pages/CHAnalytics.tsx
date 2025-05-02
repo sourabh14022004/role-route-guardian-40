@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -36,6 +35,26 @@ import { Label } from "@/components/ui/label";
 import { fetchMonthlyTrends, fetchQualitativeAssessments } from "@/services/analyticsService";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { DateRange } from "react-day-picker";
+import { addMonths, format, startOfMonth } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
 
 const timeRangeOptions = [
   { value: "lastSevenDays", label: "Last 7 Days" },
@@ -76,6 +95,12 @@ const CHAnalytics = () => {
     nonVendorPercentage: false,
   });
   const [categoryMetrics, setCategoryMetrics] = useState([]);
+  // Set default date range to current month
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: new Date(),
+  });
+  const [branchCategory, setBranchCategory] = useState<string | null>(null);
 
   useEffect(() => {
     const loadAnalyticsData = async () => {
@@ -239,8 +264,67 @@ const CHAnalytics = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold tracking-tight">Analytics Dashboard</h1>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Analytics Dashboard</h1>
+          <p className="text-slate-500 mt-1">Performance insights across all branches</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          {/* Date Range Picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "justify-start text-left font-normal w-full sm:w-[240px]",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(date.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={setDate}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* Branch Category Filter */}
+          <Select onValueChange={value => setBranchCategory(value === "all" ? null : value)}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Branch Categories</SelectLabel>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="platinum">Platinum</SelectItem>
+                <SelectItem value="diamond">Diamond</SelectItem>
+                <SelectItem value="gold">Gold</SelectItem>
+                <SelectItem value="silver">Silver</SelectItem>
+                <SelectItem value="bronze">Bronze</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Tabs defaultValue="trends" className="space-y-4">
@@ -468,82 +552,10 @@ const CHAnalytics = () => {
         </TabsContent>
         
         <TabsContent value="qualitative" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Branch Qualitative Assessment</CardTitle>
-              <CardDescription>
-                Aggregated branch assessment ratings from {qualitativeData.count} branch visits
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center items-center h-80">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Radar Chart for Qualitative Assessment */}
-                  <div className="col-span-1 md:col-span-1">
-                    <h3 className="text-lg font-medium mb-4 text-center">Assessment Heat Map</h3>
-                    <ResponsiveContainer width="100%" height={350}>
-                      <RadarChart outerRadius={120} width={400} height={350} data={radarData}>
-                        <PolarGrid />
-                        <PolarAngleAxis dataKey="subject" />
-                        <PolarRadiusAxis angle={30} domain={[0, 5]} />
-                        <Radar
-                          name="Branch Quality Score"
-                          dataKey="value"
-                          stroke="#8884d8"
-                          fill="#8884d8"
-                          fillOpacity={0.6}
-                        />
-                        <Tooltip formatter={(value) => {
-                          return typeof value === 'number' ? [`${value.toFixed(1)}/5`, 'Rating'] : [`${value}/5`, 'Rating'];
-                        }} />
-                        <Legend />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* Bar Chart for Qualitative Values */}
-                  <div className="col-span-1 md:col-span-1">
-                    <h3 className="text-lg font-medium mb-4 text-center">Assessment Metrics</h3>
-                    <div className="space-y-6">
-                      {[
-                        { name: 'Discipline Rating', value: qualitativeData.discipline, color: '#3b82f6', max: 5 },
-                        { name: 'Hygiene Rating', value: qualitativeData.hygiene, color: '#10b981', max: 5 },
-                        { name: 'Culture Rating', value: qualitativeData.culture, color: '#8b5cf6', max: 5 },
-                        { name: 'Manager Behavior', value: qualitativeData.behavior, color: '#ec4899', max: 5 },
-                        { name: 'Overall Rating', value: qualitativeData.overall, color: '#f59e0b', max: 5 },
-                      ].map((item, idx) => (
-                        <div key={idx} className="flex flex-col">
-                          <div className="flex justify-between mb-2">
-                            <span className="text-sm font-medium">{item.name}</span>
-                            <span className="text-sm font-bold">
-                              {typeof item.value === 'number' ? item.value.toFixed(1) : item.value} / {item.max}
-                            </span>
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${((typeof item.value === 'number' ? item.value : 0) / item.max) * 100}%`,
-                                backgroundColor: item.color,
-                              }}
-                            />
-                          </div>
-                          <div className="flex justify-between mt-1">
-                            <span className="text-xs text-muted-foreground">Poor</span>
-                            <span className="text-xs text-muted-foreground">Excellent</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <QualitativeHeatmap 
+            dateRange={date} 
+            branchCategory={branchCategory}
+          />
         </TabsContent>
       </Tabs>
     </div>
