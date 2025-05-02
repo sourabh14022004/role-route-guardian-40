@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
@@ -497,5 +496,264 @@ export const getBHVisitMetrics = async (userId: string) => {
       employeeCoverage: 0,
       newEmployeeCoverage: 0
     };
+  }
+};
+
+// Get coverage and participation data for Coverage & Participation Trends chart
+export const getCoverageParticipationTrends = async (timeRange = 'lastSixMonths') => {
+  console.info("Fetching coverage and participation trends...");
+  
+  try {
+    // Determine date range based on timeRange
+    let startDate = new Date();
+    const endDate = new Date();
+    
+    switch(timeRange) {
+      case 'lastMonth':
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      case 'lastThreeMonths':
+        startDate.setMonth(startDate.getMonth() - 3);
+        break;
+      case 'lastSixMonths':
+        startDate.setMonth(startDate.getMonth() - 6);
+        break;
+      case 'lastYear':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+      default:
+        startDate.setMonth(startDate.getMonth() - 6);
+    }
+    
+    // Format dates for query
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    
+    // Get total branches count for coverage calculation
+    const { data: branches, error: branchError } = await supabase
+      .from('branches')
+      .select('id', { count: 'exact' });
+    
+    if (branchError) throw branchError;
+    const totalBranches = branches?.length || 0;
+    
+    // Get all visits within the date range grouped by month
+    const { data: visits, error: visitError } = await supabase
+      .from('branch_visits')
+      .select(`
+        visit_date,
+        branch_id,
+        total_employees_invited,
+        total_participants
+      `)
+      .gte('visit_date', startDateStr)
+      .lte('visit_date', endDateStr)
+      .in('status', ['submitted', 'approved']);
+    
+    if (visitError) throw visitError;
+    
+    if (!visits || visits.length === 0) {
+      return [];
+    }
+    
+    // Group visits by month
+    const visitsByMonth: Record<string, {
+      visits: typeof visits,
+      uniqueBranches: Set<string>,
+      totalInvited: number,
+      totalParticipated: number
+    }> = {};
+    
+    visits.forEach(visit => {
+      const visitDate = new Date(visit.visit_date);
+      const monthYear = `${visitDate.getFullYear()}-${String(visitDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!visitsByMonth[monthYear]) {
+        visitsByMonth[monthYear] = {
+          visits: [],
+          uniqueBranches: new Set(),
+          totalInvited: 0,
+          totalParticipated: 0
+        };
+      }
+      
+      visitsByMonth[monthYear].visits.push(visit);
+      visitsByMonth[monthYear].uniqueBranches.add(visit.branch_id);
+      visitsByMonth[monthYear].totalInvited += (visit.total_employees_invited || 0);
+      visitsByMonth[monthYear].totalParticipated += (visit.total_participants || 0);
+    });
+    
+    // Convert to array and format for chart
+    const trendsData = Object.entries(visitsByMonth).map(([monthYear, data]) => {
+      const [year, month] = monthYear.split('-').map(Number);
+      const date = new Date(year, month - 1);
+      const monthName = date.toLocaleString('default', { month: 'short' });
+      
+      const branchCoverage = totalBranches > 0 ? 
+        Math.round((data.uniqueBranches.size / totalBranches) * 100) : 0;
+        
+      const participationRate = data.totalInvited > 0 ?
+        Math.round((data.totalParticipated / data.totalInvited) * 100) : 0;
+      
+      return {
+        month: `${monthName} ${year}`,
+        branchCoverage,
+        participationRate
+      };
+    });
+    
+    // Sort by date
+    trendsData.sort((a, b) => {
+      const dateA = new Date(a.month);
+      const dateB = new Date(b.month);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    console.info("Trends data:", trendsData);
+    return trendsData;
+  } catch (error) {
+    console.error("Error fetching coverage and participation trends:", error);
+    toast({
+      variant: "destructive",
+      title: "Error fetching trends",
+      description: "Could not load coverage and participation data"
+    });
+    return [];
+  }
+};
+
+// Get performance trend data for Performance Trend chart
+export const getPerformanceTrends = async (timeRange = 'lastSixMonths') => {
+  console.info("Fetching performance trends...");
+  
+  try {
+    // Determine date range based on timeRange
+    let startDate = new Date();
+    const endDate = new Date();
+    
+    switch(timeRange) {
+      case 'lastMonth':
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      case 'lastThreeMonths':
+        startDate.setMonth(startDate.getMonth() - 3);
+        break;
+      case 'lastSixMonths':
+        startDate.setMonth(startDate.getMonth() - 6);
+        break;
+      case 'lastYear':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+      default:
+        startDate.setMonth(startDate.getMonth() - 6);
+    }
+    
+    // Format dates for query
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    
+    // Get all visits within the date range with metrics data
+    const { data: visits, error: visitError } = await supabase
+      .from('branch_visits')
+      .select(`
+        visit_date,
+        manning_percentage, 
+        attrition_percentage,
+        er_percentage,
+        non_vendor_percentage
+      `)
+      .gte('visit_date', startDateStr)
+      .lte('visit_date', endDateStr)
+      .in('status', ['submitted', 'approved']);
+    
+    if (visitError) throw visitError;
+    
+    if (!visits || visits.length === 0) {
+      return [];
+    }
+    
+    // Group visits by month
+    const metricsByMonth: Record<string, {
+      count: number,
+      manning: number,
+      attrition: number,
+      er: number,
+      nonVendor: number
+    }> = {};
+    
+    visits.forEach(visit => {
+      const visitDate = new Date(visit.visit_date);
+      const monthYear = `${visitDate.getFullYear()}-${String(visitDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!metricsByMonth[monthYear]) {
+        metricsByMonth[monthYear] = {
+          count: 0,
+          manning: 0,
+          attrition: 0,
+          er: 0,
+          nonVendor: 0
+        };
+      }
+      
+      metricsByMonth[monthYear].count++;
+      
+      if (typeof visit.manning_percentage === 'number') {
+        metricsByMonth[monthYear].manning += visit.manning_percentage;
+      }
+      
+      if (typeof visit.attrition_percentage === 'number') {
+        metricsByMonth[monthYear].attrition += visit.attrition_percentage;
+      }
+      
+      if (typeof visit.er_percentage === 'number') {
+        metricsByMonth[monthYear].er += visit.er_percentage;
+      }
+      
+      if (typeof visit.non_vendor_percentage === 'number') {
+        metricsByMonth[monthYear].nonVendor += visit.non_vendor_percentage;
+      }
+    });
+    
+    // Convert to array and format for chart
+    const trendsData = Object.entries(metricsByMonth).map(([monthYear, data]) => {
+      const [year, month] = monthYear.split('-').map(Number);
+      const date = new Date(year, month - 1);
+      const monthName = date.toLocaleString('default', { month: 'short' });
+      
+      // Calculate averages
+      const count = data.count || 1; // Prevent division by zero
+      
+      return {
+        month: `${monthName} ${year}`,
+        manning: Math.round(data.manning / count),
+        attrition: Math.round(data.attrition / count),
+        er: Math.round(data.er / count),
+        nonVendor: Math.round(data.nonVendor / count)
+      };
+    });
+    
+    // Sort by date
+    trendsData.sort((a, b) => {
+      const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const [monthA, yearA] = a.month.split(' ');
+      const [monthB, yearB] = b.month.split(' ');
+      
+      if (yearA !== yearB) {
+        return Number(yearA) - Number(yearB);
+      }
+      
+      return monthsOrder.indexOf(monthA) - monthsOrder.indexOf(monthB);
+    });
+    
+    console.info("Performance trends data:", trendsData);
+    return trendsData;
+  } catch (error) {
+    console.error("Error fetching performance trends:", error);
+    toast({
+      variant: "destructive",
+      title: "Error fetching performance data",
+      description: "Could not load performance trends"
+    });
+    return [];
   }
 };

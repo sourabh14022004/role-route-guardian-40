@@ -29,7 +29,8 @@ import {
   Radar,
 } from "recharts";
 import { BarList } from "@/components/ui/bar-list";
-import { fetchDashboardStats, fetchTopPerformers, fetchMonthlyTrends, fetchCategoryBreakdown, fetchQualitativeAssessments } from "@/services/analyticsService";
+import { fetchDashboardStats, fetchTopPerformers, fetchCategoryBreakdown, fetchQualitativeAssessments } from "@/services/analyticsService";
+import { getCoverageParticipationTrends } from "@/services/branchService";
 import { CircleCheck, Users, PieChart as PieChartIcon, Star, Briefcase, CheckCircle2, TrendingUp, Clock } from "lucide-react";
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
@@ -57,6 +58,7 @@ const CHDashboard = () => {
     count: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isTrendsLoading, setIsTrendsLoading] = useState(true);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -78,11 +80,6 @@ const CHDashboard = () => {
         const performers = await fetchTopPerformers();
         setTopPerformers(performers);
         
-        // Fetch monthly trends
-        console.info("Fetching monthly trends...");
-        const trendsData = await fetchMonthlyTrends();
-        setMonthlyTrends(trendsData);
-        
         // Fetch qualitative assessment data
         console.info("Fetching qualitative assessments...");
         const qualitativeStats = await fetchQualitativeAssessments();
@@ -94,7 +91,21 @@ const CHDashboard = () => {
       }
     };
 
+    const loadTrendsData = async () => {
+      setIsTrendsLoading(true);
+      try {
+        console.info("Fetching monthly trends from database...");
+        const trendsData = await getCoverageParticipationTrends('lastSixMonths');
+        setMonthlyTrends(trendsData);
+      } catch (error) {
+        console.error("Error loading trends data:", error);
+      } finally {
+        setIsTrendsLoading(false);
+      }
+    };
+
     loadDashboardData();
+    loadTrendsData();
   }, []);
 
   // Format rating text for display
@@ -256,11 +267,11 @@ const CHDashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isTrendsLoading ? (
               <div className="flex justify-center items-center h-80">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
               </div>
-            ) : (
+            ) : monthlyTrends.length > 0 ? (
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart
                   data={monthlyTrends}
@@ -293,6 +304,12 @@ const CHDashboard = () => {
                   />
                 </LineChart>
               </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col justify-center items-center h-80">
+                <TrendingUp className="h-16 w-16 text-slate-300 mb-2" />
+                <p className="text-slate-500 text-lg">No trend data available</p>
+                <p className="text-slate-400 text-sm mt-1">Data will appear as branch visits are recorded</p>
+              </div>
             )}
           </CardContent>
         </Card>

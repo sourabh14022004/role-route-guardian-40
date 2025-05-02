@@ -1,483 +1,257 @@
-
-import { useState, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { 
+  ResponsiveContainer, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
   Legend,
   BarChart,
   Bar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  PieChart,
+  Pie,
+  Cell
 } from "recharts";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { fetchMonthlyTrends } from "@/services/analyticsService";
-import { toast } from "@/components/ui/use-toast";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import { DateRange } from "react-day-picker";
-import { addMonths, format, startOfMonth } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
-import { getVisitMetrics } from "@/services/branchService";
+import { ChartContainer } from "@/components/ui/chart";
+import { getVisitMetrics, getPerformanceTrends } from "@/services/branchService";
+import { fetchZoneMetrics } from "@/services/analyticsService";
+import { QualitativeHeatmap } from "@/components/ch/QualitativeHeatmap";
 
-const timeRangeOptions = [
-  { value: "lastSevenDays", label: "Last 7 Days" },
-  { value: "lastMonth", label: "Last Month" },
-  { value: "lastThreeMonths", label: "Last 3 Months" },
-  { value: "lastSixMonths", label: "Last 6 Months" },
-  { value: "lastYear", label: "Last Year" },
-  { value: "lastThreeYears", label: "Last 3 Years" },
-];
-
-const metricOptions = [
-  { id: "branchCoverage", label: "Branch Coverage", color: "#3b82f6" },
-  { id: "participationRate", label: "Participation Rate", color: "#10b981" },
-  { id: "manningPercentage", label: "Manning %", color: "#f59e0b" },
-  { id: "attritionRate", label: "Attrition %", color: "#ef4444" },
-  { id: "erPercentage", label: "ER %", color: "#8b5cf6" },
-  { id: "nonVendorPercentage", label: "Non-Vendor %", color: "#ec4899" },
-];
+// Define date range type
+type DateRange = { from: Date; to: Date } | undefined;
 
 const CHAnalytics = () => {
-  const [monthlyTrends, setMonthlyTrends] = useState<any[]>([]);
-  const [qualitativeData, setQualitativeData] = useState({
-    discipline: 0,
-    hygiene: 0,
-    culture: 0,
-    overall: 0,
-    behavior: 0,
-    count: 0
-  });
+  // State for date range filter
+  const [dateRange, setDateRange] = useState<DateRange>(undefined);
+  const [selectedChart, setSelectedChart] = useState("monthly");
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [categoryMetrics, setCategoryMetrics] = useState<any[]>([]);
+  const [zoneMetrics, setZoneMetrics] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState("lastSixMonths");
-  const [selectedMetrics, setSelectedMetrics] = useState({
-    branchCoverage: true,
-    participationRate: true,
-    manningPercentage: false,
-    attritionRate: false,
-    erPercentage: false,
-    nonVendorPercentage: false,
-  });
-  const [categoryMetrics, setCategoryMetrics] = useState<Array<{
-    name: string;
-    manning: number;
-    attrition: number;
-    er: number;
-    cwt: number;
-  }>>([]);
-  
-  // Set default date range to current month
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  });
-  const [branchCategory, setBranchCategory] = useState<string | null>(null);
+  const [isPerformanceLoading, setIsPerformanceLoading] = useState(true);
 
   useEffect(() => {
-    const loadAnalyticsData = async () => {
-      console.info("Fetching analytics data...");
+    const loadData = async () => {
       setIsLoading(true);
-      
       try {
-        // Fetch monthly trends data with selected time range
-        console.info("Fetching monthly trends...");
-        const trendsData = await fetchMonthlyTrends(timeRange);
-        setMonthlyTrends(trendsData);
+        // Fetch category-wise metrics
+        const metricsData = await getVisitMetrics(dateRange);
+        setCategoryMetrics(metricsData);
         
-        // Fetch category metrics data directly from the branch_visits table
-        await fetchCategoryMetrics();
+        // Fetch zone-wise metrics
+        const zoneData = await fetchZoneMetrics();
+        setZoneMetrics(zoneData);
       } catch (error) {
         console.error("Error loading analytics data:", error);
-        toast({
-          title: "Error loading analytics data",
-          description: "There was a problem fetching analytics data.",
-          variant: "destructive"
-        });
       } finally {
         setIsLoading(false);
       }
     };
-
-    loadAnalyticsData();
-  }, [timeRange]);
+    
+    loadData();
+  }, [dateRange]);
 
   useEffect(() => {
-    // Fetch metrics when date range changes
-    fetchCategoryMetrics();
-  }, [date]);
-
-  const handleMetricToggle = (metricId: string) => {
-    setSelectedMetrics(prev => ({
-      ...prev,
-      [metricId]: !prev[metricId as keyof typeof prev]
-    }));
-  };
-
-  // At least one metric must be selected
-  const atLeastOneMetricSelected = Object.values(selectedMetrics).some(value => value);
-
-  // Fetch category metrics data
-  const fetchCategoryMetrics = async () => {
-    try {
-      // Format date range for the API call
-      const dateRangeParam = date && date.from ? {
-        from: date.from,
-        to: date.to || date.from
-      } : undefined;
-      
-      // Use the getVisitMetrics function from branchService with the date range
-      const metricsData = await getVisitMetrics(dateRangeParam);
-      
-      // Filter by category if selected
-      const filteredData = branchCategory 
-        ? metricsData.filter(item => 
-            item.name.toLowerCase() === branchCategory.toLowerCase())
-        : metricsData;
+    const loadPerformanceTrends = async () => {
+      setIsPerformanceLoading(true);
+      try {
+        // Determine the time range based on the selected chart tab
+        let timeRange = 'lastSixMonths';
+        switch (selectedChart) {
+          case 'monthly':
+            timeRange = 'lastSixMonths';
+            break;
+          case 'quarterly':
+            timeRange = 'lastYear';
+            break;
+          case 'yearly':
+            timeRange = 'lastThreeYears';
+            break;
+        }
         
-      setCategoryMetrics(filteredData);
-      
-    } catch (error) {
-      console.error("Error fetching category metrics:", error);
-      toast({
-        title: "Error loading category metrics",
-        description: "There was a problem fetching category metrics data.",
-        variant: "destructive"
-      });
-    }
+        // Fetch performance trends with the selected time range
+        const trendsData = await getPerformanceTrends(timeRange);
+        setPerformanceData(trendsData);
+      } catch (error) {
+        console.error("Error loading performance trends:", error);
+      } finally {
+        setIsPerformanceLoading(false);
+      }
+    };
+    
+    loadPerformanceTrends();
+  }, [selectedChart]);
+
+  const handleDateRangeChange = (range: DateRange) => {
+    setDateRange(range);
+  };
+  
+  const formatNumber = (value: number) => {
+    return isNaN(value) ? '0' : value.toString();
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Analytics Dashboard</h1>
-          <p className="text-slate-500 mt-1">Performance insights across all branches</p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          {/* Date Range Picker */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "justify-start text-left font-normal w-full sm:w-[240px]",
-                  !date && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date?.from ? (
-                  date.to ? (
-                    <>
-                      {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
-                    </>
-                  ) : (
-                    format(date.from, "LLL dd, y")
-                  )
-                ) : (
-                  <span>Pick a date range</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={date?.from}
-                selected={date}
-                onSelect={setDate}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
-
-          {/* Branch Category Filter */}
-          <Select onValueChange={value => {
-            setBranchCategory(value === "all" ? null : value);
-            // Refetch data with new category filter
-            setTimeout(() => fetchCategoryMetrics(), 100);
-          }}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Branch Categories</SelectLabel>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="platinum">Platinum</SelectItem>
-                <SelectItem value="diamond">Diamond</SelectItem>
-                <SelectItem value="gold">Gold</SelectItem>
-                <SelectItem value="silver">Silver</SelectItem>
-                <SelectItem value="bronze">Bronze</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Branch Analytics</h1>
+        <p className="text-lg text-slate-600">Branch performance and HR metrics analysis</p>
       </div>
-
-      <Tabs defaultValue="trends" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="trends">Coverage Trends</TabsTrigger>
-          <TabsTrigger value="metrics">Key Metrics</TabsTrigger>
-          <TabsTrigger value="qualitative">Qualitative Data</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="trends" className="space-y-4">
-          <Card className="w-full">
-            <CardHeader>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <CardTitle>Performance Trends</CardTitle>
-                  <CardDescription>
-                    Branch coverage and metrics over time
-                  </CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {timeRangeOptions.map(option => (
-                    <Button 
-                      key={option.value}
-                      variant={timeRange === option.value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setTimeRange(option.value)}
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
+      
+      <div className="mb-8">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <CardTitle className="text-2xl">Performance Trends</CardTitle>
+              <Tabs defaultValue="monthly" value={selectedChart} onValueChange={setSelectedChart} className="w-full md:w-auto mt-4 md:mt-0">
+                <TabsList>
+                  <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                  <TabsTrigger value="quarterly">Quarterly</TabsTrigger>
+                  <TabsTrigger value="yearly">Yearly</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            <CardDescription>Branch performance metrics over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isPerformanceLoading ? (
+              <div className="flex justify-center items-center h-80">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-6">
-                <h4 className="text-sm font-medium mb-2">Select Metrics to Display:</h4>
-                <div className="flex flex-wrap gap-4">
-                  {metricOptions.map(metric => (
-                    <div key={metric.id} className="flex items-center gap-2">
-                      <Switch 
-                        id={`metric-${metric.id}`} 
-                        checked={selectedMetrics[metric.id]}
-                        disabled={!selectedMetrics[metric.id] && !atLeastOneMetricSelected}
-                        onCheckedChange={() => handleMetricToggle(metric.id)}
-                      />
-                      <Label 
-                        htmlFor={`metric-${metric.id}`}
-                        className="flex items-center gap-2"
-                      >
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: metric.color }}
-                        ></div>
-                        {metric.label}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+            ) : performanceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart 
+                  data={performanceData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="manning" name="Manning %" stroke="#3b82f6" strokeWidth={2} />
+                  <Line type="monotone" dataKey="attrition" name="Attrition %" stroke="#ef4444" strokeWidth={2} />
+                  <Line type="monotone" dataKey="er" name="ER %" stroke="#10b981" strokeWidth={2} />
+                  <Line type="monotone" dataKey="nonVendor" name="Non-Vendor %" stroke="#8b5cf6" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-80">
+                <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
+                <p className="text-slate-500">No performance trend data available</p>
+                <p className="text-sm text-slate-400">Data will appear as branch visits are recorded</p>
               </div>
-              
-              {isLoading ? (
-                <div className="flex justify-center items-center h-80">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={500}>
-                  <LineChart
-                    data={monthlyTrends}
-                    margin={{
-                      top: 20,
-                      right: 30,
-                      left: 20,
-                      bottom: 20,
-                    }}
-                  >
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
+              <DateRangePicker onDateChange={handleDateRangeChange} />
+            </div>
+            <CardDescription>Metrics by branch category</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              </div>
+            ) : categoryMetrics.length > 0 ? (
+              <ChartContainer 
+                config={{
+                  platinum: { color: '#9333ea' },
+                  diamond: { color: '#2563eb' },
+                  gold: { color: '#eab308' },
+                  silver: { color: '#94a3b8' },
+                  bronze: { color: '#f97316' },
+                  unknown: { color: '#cbd5e1' }
+                }}
+              >
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={categoryMetrics}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
+                    <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    {selectedMetrics.branchCoverage && (
-                      <Line
-                        type="monotone"
-                        dataKey="branchCoverage"
-                        name="Branch Coverage %"
-                        stroke="#3b82f6"
-                        activeDot={{ r: 8 }}
-                        strokeWidth={2}
-                      />
-                    )}
-                    {selectedMetrics.participationRate && (
-                      <Line
-                        type="monotone"
-                        dataKey="participationRate"
-                        name="Participation Rate %"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                      />
-                    )}
-                    {selectedMetrics.manningPercentage && (
-                      <Line
-                        type="monotone"
-                        dataKey="manningPercentage"
-                        name="Manning %"
-                        stroke="#f59e0b"
-                        strokeWidth={2}
-                      />
-                    )}
-                    {selectedMetrics.attritionRate && (
-                      <Line
-                        type="monotone"
-                        dataKey="attritionRate"
-                        name="Attrition %"
-                        stroke="#ef4444"
-                        strokeWidth={2}
-                      />
-                    )}
-                    {selectedMetrics.erPercentage && (
-                      <Line
-                        type="monotone"
-                        dataKey="erPercentage"
-                        name="ER %"
-                        stroke="#8b5cf6"
-                        strokeWidth={2}
-                      />
-                    )}
-                    {selectedMetrics.nonVendorPercentage && (
-                      <Line
-                        type="monotone"
-                        dataKey="nonVendorPercentage"
-                        name="Non-Vendor %"
-                        stroke="#ec4899"
-                        strokeWidth={2}
-                      />
-                    )}
-                  </LineChart>
+                    <Bar dataKey="manning" name="Manning" fill="#3b82f6" />
+                    <Bar dataKey="attrition" name="Attrition" fill="#ef4444" />
+                    <Bar dataKey="er" name="ER" fill="#10b981" />
+                    <Bar dataKey="cwt" name="CWT" fill="#ca8a04" />
+                  </BarChart>
                 </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="metrics" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="col-span-1 md:col-span-2 lg:col-span-1">
-              <CardHeader>
-                <CardTitle>HR Metrics by Branch Category</CardTitle>
-                <CardDescription>
-                  Manning and attrition percentages by branch category
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-80">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  </div>
-                ) : categoryMetrics.length === 0 ? (
-                  <div className="flex justify-center items-center h-80 text-center text-muted-foreground">
-                    <p>No category data available for the selected filters</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart
-                      data={categoryMetrics}
-                      margin={{
-                        top: 20,
-                        right: 30,
-                        left: 20,
-                        bottom: 20,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="manning" name="Manning %" fill="#3b82f6" />
-                      <Bar dataKey="attrition" name="Attrition %" fill="#ef4444" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="col-span-1 md:col-span-2 lg:col-span-1">
-              <CardHeader>
-                <CardTitle>Performance Metrics Comparison</CardTitle>
-                <CardDescription>
-                  Comparing ER and CWT metrics across branch categories
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-80">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  </div>
-                ) : categoryMetrics.length === 0 ? (
-                  <div className="flex justify-center items-center h-80 text-center text-muted-foreground">
-                    <p>No category data available for the selected filters</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart
-                      data={categoryMetrics}
-                      margin={{
-                        top: 20,
-                        right: 30,
-                        left: 20,
-                        bottom: 20,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="er" name="ER %" fill="#8b5cf6" />
-                      <Bar dataKey="cwt" name="CWT Cases" fill="#f59e0b" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+              </ChartContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64">
+                <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
+                <p className="text-slate-500">No category metrics available</p>
+                <p className="text-sm text-slate-400">Select a date range to view data</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
         
-        <TabsContent value="qualitative" className="space-y-4">
-          <QualitativeHeatmap 
-            dateRange={date} 
-            branchCategory={branchCategory}
-          />
-        </TabsContent>
-      </Tabs>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-medium">Zone-wise Metrics</CardTitle>
+            <CardDescription>Metrics by zone</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              </div>
+            ) : zoneMetrics.length > 0 ? (
+              <ChartContainer>
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={zoneMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="zone" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="coverage" name="Coverage" fill="#3b82f6" />
+                    <Bar dataKey="participation" name="Participation" fill="#10b981" />
+                    <Bar dataKey="manning" name="Manning" fill="#f59e0b" />
+                    <Bar dataKey="attrition" name="Attrition" fill="#ef4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64">
+                <div className="h-16 w-16 text-slate-300 mb-2">🗺️</div>
+                <p className="text-slate-500">No zone metrics available</p>
+                <p className="text-sm text-slate-400">Data will appear as branch visits are recorded</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-medium">Qualitative Assessments Heatmap</CardTitle>
+          <CardDescription>Qualitative feedback across branches</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <QualitativeHeatmap />
+        </CardContent>
+      </Card>
     </div>
   );
 };
