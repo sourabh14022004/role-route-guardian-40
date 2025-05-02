@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,7 +40,6 @@ const ZHDashboard = () => {
       try {
         // Get active BHRs count - BHRs who submitted at least one report in the current month
         const activeBHRsCount = await getActiveBHRsCount();
-        // Fixed: Ensure we're setting a number, not an object
         setActiveBHRs(activeBHRsCount);
         
         // Get total BHRs under this ZH

@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, Clock, MapPin, User, X, AlertTriangle } from "lucide-react";
+import { Calendar, Clock, MapPin, User, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchBHRReportStats } from "@/services/reportService";
@@ -70,7 +70,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
         if (!item.branches) return null;
         
         // Handle the branches object
-        const branch = item.branches as any;
+        const branch = item.branches as unknown as Branch;
         return {
           id: branch.id,
           name: branch.name,
@@ -217,18 +217,11 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
         ) : (
           <>
             <div className="flex flex-col md:flex-row gap-4 md:items-start mb-6">
-              <div className={`h-16 w-16 rounded-full text-white flex items-center justify-center text-2xl font-bold shadow-md ${bhrProfile.is_active ? 'bg-gradient-to-br from-blue-500 to-purple-600' : 'bg-gradient-to-br from-gray-500 to-gray-600'}`}>
-                {bhrProfile.full_name?.charAt(0) || 'B'}
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-2xl font-bold shadow-md">
+                {bhrProfile.full_name.charAt(0)}
               </div>
               <div className="flex-1">
-                <div className="flex items-center">
-                  <h3 className="text-xl font-semibold">{bhrProfile.full_name}</h3>
-                  {bhrProfile.is_active ? (
-                    <Badge className="ml-2 bg-green-100 text-green-800">Active</Badge>
-                  ) : (
-                    <Badge className="ml-2 bg-gray-100 text-gray-800">Inactive</Badge>
-                  )}
-                </div>
+                <h3 className="text-xl font-semibold">{bhrProfile.full_name}</h3>
                 <p className="text-slate-500">{bhrProfile.e_code}</p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -287,10 +280,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                   </div>
                 ) : !assignedBranches || assignedBranches.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto mb-2" />
-                    <p className="text-slate-500">No branches assigned</p>
-                  </div>
+                  <div className="py-8 text-center text-slate-500">No branches assigned</div>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -318,10 +308,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                   </div>
                 ) : !recentReports || recentReports.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto mb-2" />
-                    <p className="text-slate-500">No reports submitted</p>
-                  </div>
+                  <div className="py-8 text-center text-slate-500">No reports submitted</div>
                 ) : (
                   <Table>
                     <TableHeader>

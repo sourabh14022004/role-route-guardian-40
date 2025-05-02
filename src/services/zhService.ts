@@ -4,7 +4,7 @@ import { Database } from "@/integrations/supabase/types";
 
 type Branch = Database['public']['Tables']['branches']['Row'];
 type BranchWithAssignments = Branch & { bh_count: number };
-type BHRUser = Database['public']['Tables']['profiles']['Row'] & { branches_assigned: number; is_active?: boolean };
+type BHRUser = Database['public']['Tables']['profiles']['Row'] & { branches_assigned: number };
 
 export async function fetchZoneBranches(userId: string): Promise<BranchWithAssignments[]> {
   try {
@@ -47,76 +47,54 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
 }
 
 export async function fetchZoneBHRs(userId: string): Promise<BHRUser[]> {
-  try {
-    // Get all BH users without location filter
-    const { data: bhUsers, error: bhError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'BH');
-
-    if (bhError) throw bhError;
-    
-    // Get branch assignments for these users in a separate query
-    const bhUserIds = bhUsers.map(user => user.id);
-    
-    // Only proceed if we have users
-    if (bhUserIds.length === 0) {
-      return [] as BHRUser[];
+    try {
+      // Get all BH users without location filter
+      const { data: bhUsers, error: bhError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'BH');
+  
+      if (bhError) throw bhError;
+      
+      // Get branch assignments for these users in a separate query
+      const bhUserIds = bhUsers.map(user => user.id);
+      
+      // Only proceed if we have users
+      if (bhUserIds.length === 0) {
+        return [] as BHRUser[];
+      }
+      
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('branch_assignments')
+        .select('user_id, branch_id')
+        .in('user_id', bhUserIds);
+        
+      if (assignmentsError) throw assignmentsError;
+      
+      // Group assignments by user
+      const assignmentsByUser: Record<string, string[]> = {};
+      assignments?.forEach(assignment => {
+        if (!assignmentsByUser[assignment.user_id]) {
+          assignmentsByUser[assignment.user_id] = [];
+        }
+        assignmentsByUser[assignment.user_id].push(assignment.branch_id);
+      });
+      
+      // Process the data to count branches per BH
+      const processedBHRs = bhUsers.map(user => {
+        const branchIds = assignmentsByUser[user.id] || [];
+        return {
+          ...user,
+          branches_assigned: branchIds.length
+        };
+      });
+  
+      return processedBHRs as BHRUser[];
+    } catch (error) {
+      console.error("Error fetching zone BHRs:", error);
+      throw error;
     }
-    
-    // Get branch assignments
-    const { data: assignments, error: assignmentsError } = await supabase
-      .from('branch_assignments')
-      .select('user_id, branch_id')
-      .in('user_id', bhUserIds);
-      
-    if (assignmentsError) throw assignmentsError;
-    
-    // Group assignments by user
-    const assignmentsByUser: Record<string, string[]> = {};
-    assignments?.forEach(assignment => {
-      if (!assignmentsByUser[assignment.user_id]) {
-        assignmentsByUser[assignment.user_id] = [];
-      }
-      assignmentsByUser[assignment.user_id].push(assignment.branch_id);
-    });
-    
-    // Get recent activity (last week) to determine active status
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    
-    const { data: recentVisits, error: visitsError } = await supabase
-      .from('branch_visits')
-      .select('user_id')
-      .gte('created_at', oneWeekAgo.toISOString())
-      .in('user_id', bhUserIds);
-      
-    if (visitsError) throw visitsError;
-    
-    // Create a set of active BHRs
-    const activeBHRs = new Set<string>();
-    recentVisits?.forEach(visit => {
-      if (visit.user_id) {
-        activeBHRs.add(visit.user_id);
-      }
-    });
-    
-    // Process the data to count branches per BH and check for active status
-    const processedBHRs = bhUsers.map(user => {
-      const branchIds = assignmentsByUser[user.id] || [];
-      return {
-        ...user,
-        branches_assigned: branchIds.length,
-        is_active: activeBHRs.has(user.id)
-      };
-    });
-
-    return processedBHRs as BHRUser[];
-  } catch (error) {
-    console.error("Error fetching zone BHRs:", error);
-    throw error;
   }
-}
 
 export async function fetchDashboardStats(userId: string) {
   try {
