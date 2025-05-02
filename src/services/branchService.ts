@@ -1,8 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
-import { fetchMonthlyTrends } from "@/services/analyticsService";
 
 type Branch = Database['public']['Tables']['branches']['Row'];
 
@@ -163,11 +161,11 @@ export const fetchAssignedBranchesWithDetails = async (userId: string) => {
     
     // Transform data structure for easier consumption
     const branchesWithDetails = data?.map(item => ({
-      id: item.branches?.id || '',
-      name: item.branches?.name || '',
-      location: item.branches?.location || '',
-      category: item.branches?.category || 'bronze',
-      zoneId: item.branches?.zone_id || ''
+      id: item.branches?.id,
+      name: item.branches?.name,
+      location: item.branches?.location,
+      category: item.branches?.category,
+      zoneId: item.branches?.zone_id
     })) || [];
     
     return branchesWithDetails;
@@ -424,7 +422,7 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | und
     // Format the data for the charts
     const metrics = Object.entries(categoryData).map(([name, data]) => {
       return {
-        name: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
+        name: name.charAt(0).toUpperCase() + name.slice(1),
         manning: Math.round(data.manningSum / data.count),
         attrition: Math.round(data.attritionSum / data.count),
         er: Math.round(data.erSum / data.count),
@@ -625,20 +623,137 @@ export const getCoverageParticipationTrends = async (timeRange = 'lastSixMonths'
 };
 
 // Get performance trend data for Performance Trend chart
-export const getPerformanceTrends = async (timeRange = 'lastThreeMonths') => {
-  console.log("Fetching performance trends with timeRange:", timeRange);
+export const getPerformanceTrends = async (timeRange = 'lastSixMonths') => {
+  console.info("Fetching performance trends...");
+  
   try {
-    // Use the analytics service to get monthly trends
-    const trendsData = await fetchMonthlyTrends(timeRange);
-    console.log("Performance trends data:", trendsData);
+    // Determine date range based on timeRange
+    let startDate = new Date();
+    const endDate = new Date();
+    
+    switch(timeRange) {
+      case 'lastMonth':
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      case 'lastThreeMonths':
+        startDate.setMonth(startDate.getMonth() - 3);
+        break;
+      case 'lastSixMonths':
+        startDate.setMonth(startDate.getMonth() - 6);
+        break;
+      case 'lastYear':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+      default:
+        startDate.setMonth(startDate.getMonth() - 6);
+    }
+    
+    // Format dates for query
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    
+    // Get all visits within the date range with metrics data
+    const { data: visits, error: visitError } = await supabase
+      .from('branch_visits')
+      .select(`
+        visit_date,
+        manning_percentage, 
+        attrition_percentage,
+        er_percentage,
+        non_vendor_percentage
+      `)
+      .gte('visit_date', startDateStr)
+      .lte('visit_date', endDateStr)
+      .in('status', ['submitted', 'approved']);
+    
+    if (visitError) throw visitError;
+    
+    if (!visits || visits.length === 0) {
+      return [];
+    }
+    
+    // Group visits by month
+    const metricsByMonth: Record<string, {
+      count: number,
+      manning: number,
+      attrition: number,
+      er: number,
+      nonVendor: number
+    }> = {};
+    
+    visits.forEach(visit => {
+      const visitDate = new Date(visit.visit_date);
+      const monthYear = `${visitDate.getFullYear()}-${String(visitDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!metricsByMonth[monthYear]) {
+        metricsByMonth[monthYear] = {
+          count: 0,
+          manning: 0,
+          attrition: 0,
+          er: 0,
+          nonVendor: 0
+        };
+      }
+      
+      metricsByMonth[monthYear].count++;
+      
+      if (typeof visit.manning_percentage === 'number') {
+        metricsByMonth[monthYear].manning += visit.manning_percentage;
+      }
+      
+      if (typeof visit.attrition_percentage === 'number') {
+        metricsByMonth[monthYear].attrition += visit.attrition_percentage;
+      }
+      
+      if (typeof visit.er_percentage === 'number') {
+        metricsByMonth[monthYear].er += visit.er_percentage;
+      }
+      
+      if (typeof visit.non_vendor_percentage === 'number') {
+        metricsByMonth[monthYear].nonVendor += visit.non_vendor_percentage;
+      }
+    });
+    
+    // Convert to array and format for chart
+    const trendsData = Object.entries(metricsByMonth).map(([monthYear, data]) => {
+      const [year, month] = monthYear.split('-').map(Number);
+      const date = new Date(year, month - 1);
+      const monthName = date.toLocaleString('default', { month: 'short' });
+      
+      // Calculate averages
+      const count = data.count || 1; // Prevent division by zero
+      
+      return {
+        month: `${monthName} ${year}`,
+        manning: Math.round(data.manning / count),
+        attrition: Math.round(data.attrition / count),
+        er: Math.round(data.er / count),
+        nonVendor: Math.round(data.nonVendor / count)
+      };
+    });
+    
+    // Sort by date
+    trendsData.sort((a, b) => {
+      const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const [monthA, yearA] = a.month.split(' ');
+      const [monthB, yearB] = b.month.split(' ');
+      
+      if (yearA !== yearB) {
+        return Number(yearA) - Number(yearB);
+      }
+      
+      return monthsOrder.indexOf(monthA) - monthsOrder.indexOf(monthB);
+    });
+    
+    console.info("Performance trends data:", trendsData);
     return trendsData;
   } catch (error) {
     console.error("Error fetching performance trends:", error);
     toast({
-      title: "Error",
-      description: "Failed to load performance trends data",
-      variant: "destructive"
+      variant: "destructive",
+      title: "Error fetching performance data",
+      description: "Could not load performance trends"
     });
-    return []; // Return empty array on error
+    return [];
   }
 };
