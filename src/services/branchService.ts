@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
@@ -162,11 +163,11 @@ export const fetchAssignedBranchesWithDetails = async (userId: string) => {
     
     // Transform data structure for easier consumption
     const branchesWithDetails = data?.map(item => ({
-      id: item.branches?.id,
-      name: item.branches?.name,
-      location: item.branches?.location,
-      category: item.branches?.category,
-      zoneId: item.branches?.zone_id
+      id: item.branches?.id || '',
+      name: item.branches?.name || '',
+      location: item.branches?.location || '',
+      category: item.branches?.category || 'bronze',
+      zoneId: item.branches?.zone_id || ''
     })) || [];
     
     return branchesWithDetails;
@@ -423,7 +424,7 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | und
     // Format the data for the charts
     const metrics = Object.entries(categoryData).map(([name, data]) => {
       return {
-        name: name.charAt(0).toUpperCase() + name.slice(1),
+        name: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
         manning: Math.round(data.manningSum / data.count),
         attrition: Math.round(data.attritionSum / data.count),
         er: Math.round(data.erSum / data.count),
@@ -624,7 +625,7 @@ export const getCoverageParticipationTrends = async (timeRange = 'lastSixMonths'
 };
 
 // Get performance trend data for Performance Trend chart
-export const getPerformanceTrends = async (timeRange = 'lastSevenDays') => {
+export const getPerformanceTrends = async (timeRange = 'lastThreeMonths') => {
   console.log("Fetching performance trends with timeRange:", timeRange);
   try {
     // Use the analytics service to get monthly trends

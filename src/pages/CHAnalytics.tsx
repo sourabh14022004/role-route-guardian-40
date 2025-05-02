@@ -31,7 +31,7 @@ type MetricKey = 'branchCoverage' | 'participationRate' | 'manning' | 'attrition
 const CHAnalytics = () => {
   // State for date range filter
   const [dateRange, setDateRange] = useState<DateRange>(undefined);
-  const [timeRange, setTimeRange] = useState<string>("lastSevenDays");
+  const [timeRange, setTimeRange] = useState<string>("lastThreeMonths"); // Default to lastThreeMonths
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [categoryMetrics, setCategoryMetrics] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
