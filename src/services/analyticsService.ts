@@ -476,10 +476,10 @@ export const fetchTopPerformers = async () => {
   }
 };
 
-export const fetchQualitativeAssessments = async () => {
+export const fetchQualitativeAssessments = async (dateRange = null) => {
   try {
     // Get qualitative assessments from branch visits
-    const { data, error } = await supabase
+    let query = supabase
       .from('branch_visits')
       .select(`
         overall_discipline,
@@ -490,6 +490,14 @@ export const fetchQualitativeAssessments = async () => {
       .in('status', ['submitted', 'approved'])
       .not('overall_discipline', 'is', null);
       
+    // Apply date filter if provided
+    if (dateRange && dateRange.from && dateRange.to) {
+      query = query.gte('visit_date', dateRange.from.toISOString())
+                   .lte('visit_date', dateRange.to.toISOString());
+    }
+    
+    const { data, error } = await query;
+      
     if (error) throw error;
     
     if (!data || data.length === 0) {
@@ -497,6 +505,7 @@ export const fetchQualitativeAssessments = async () => {
         discipline: 0,
         hygiene: 0,
         culture: 0,
+        behavior: 0,
         overall: 0,
         count: 0
       };

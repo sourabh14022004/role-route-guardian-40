@@ -624,18 +624,21 @@ export const getCoverageParticipationTrends = async (timeRange = 'lastSixMonths'
 
 // Get performance trend data for Performance Trend chart
 export const getPerformanceTrends = async (timeRange = 'lastSixMonths') => {
-  console.info("Fetching performance trends...");
-  
+  console.log("Fetching performance trends for", timeRange);
   try {
     // Determine date range based on timeRange
     let startDate = new Date();
     const endDate = new Date();
     
+    // Reset the startDate based on the selected time range
     switch(timeRange) {
+      case 'lastWeek':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
       case 'lastMonth':
         startDate.setMonth(startDate.getMonth() - 1);
         break;
-      case 'lastThreeMonths':
+      case 'lastQuarter':
         startDate.setMonth(startDate.getMonth() - 3);
         break;
       case 'lastSixMonths':
@@ -648,112 +651,159 @@ export const getPerformanceTrends = async (timeRange = 'lastSixMonths') => {
         startDate.setMonth(startDate.getMonth() - 6);
     }
     
-    // Format dates for query
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+    // Format for console debugging
+    console.log(`Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
     
-    // Get all visits within the date range with metrics data
-    const { data: visits, error: visitError } = await supabase
+    // Get appropriate periods based on timeRange
+    const timePeriods = getTimePeriods(timeRange, startDate, endDate);
+    console.log("Time periods:", timePeriods);
+    
+    // Get visits from the database within the date range
+    const { data: visits, error } = await supabase
       .from('branch_visits')
-      .select(`
-        visit_date,
-        manning_percentage, 
-        attrition_percentage,
-        er_percentage,
-        non_vendor_percentage
-      `)
-      .gte('visit_date', startDateStr)
-      .lte('visit_date', endDateStr)
-      .in('status', ['submitted', 'approved']);
+      .select('visit_date, manning_percentage, attrition_percentage, er_percentage, non_vendor_percentage')
+      .gte('visit_date', startDate.toISOString())
+      .lte('visit_date', endDate.toISOString())
+      .order('visit_date', { ascending: true });
     
-    if (visitError) throw visitError;
+    if (error) throw error;
+    console.log(`Found ${visits?.length || 0} visits within date range`);
     
-    if (!visits || visits.length === 0) {
-      return [];
-    }
-    
-    // Group visits by month
-    const metricsByMonth: Record<string, {
-      count: number,
-      manning: number,
-      attrition: number,
-      er: number,
-      nonVendor: number
-    }> = {};
-    
-    visits.forEach(visit => {
-      const visitDate = new Date(visit.visit_date);
-      const monthYear = `${visitDate.getFullYear()}-${String(visitDate.getMonth() + 1).padStart(2, '0')}`;
+    // Process data for each time period
+    const trendsData = timePeriods.map(period => {
+      // Filter visits for this period
+      const periodVisits = visits.filter(visit => {
+        const visitDate = new Date(visit.visit_date);
+        return visitDate >= period.start && visitDate <= period.end;
+      });
       
-      if (!metricsByMonth[monthYear]) {
-        metricsByMonth[monthYear] = {
-          count: 0,
-          manning: 0,
-          attrition: 0,
-          er: 0,
-          nonVendor: 0
-        };
-      }
+      // Calculate averages for this period
+      let manningSum = 0;
+      let attritionSum = 0;
+      let erSum = 0;
+      let nonVendorSum = 0;
+      let count = 0;
       
-      metricsByMonth[monthYear].count++;
+      periodVisits.forEach(visit => {
+        if (visit.manning_percentage !== null) {
+          manningSum += visit.manning_percentage;
+          count++;
+        }
+        if (visit.attrition_percentage !== null) attritionSum += visit.attrition_percentage;
+        if (visit.er_percentage !== null) erSum += visit.er_percentage;
+        if (visit.non_vendor_percentage !== null) nonVendorSum += visit.non_vendor_percentage;
+      });
       
-      if (typeof visit.manning_percentage === 'number') {
-        metricsByMonth[monthYear].manning += visit.manning_percentage;
-      }
-      
-      if (typeof visit.attrition_percentage === 'number') {
-        metricsByMonth[monthYear].attrition += visit.attrition_percentage;
-      }
-      
-      if (typeof visit.er_percentage === 'number') {
-        metricsByMonth[monthYear].er += visit.er_percentage;
-      }
-      
-      if (typeof visit.non_vendor_percentage === 'number') {
-        metricsByMonth[monthYear].nonVendor += visit.non_vendor_percentage;
-      }
-    });
-    
-    // Convert to array and format for chart
-    const trendsData = Object.entries(metricsByMonth).map(([monthYear, data]) => {
-      const [year, month] = monthYear.split('-').map(Number);
-      const date = new Date(year, month - 1);
-      const monthName = date.toLocaleString('default', { month: 'short' });
-      
-      // Calculate averages
-      const count = data.count || 1; // Prevent division by zero
+      // Avoid division by zero
+      count = Math.max(count, 1);
       
       return {
-        month: `${monthName} ${year}`,
-        manning: Math.round(data.manning / count),
-        attrition: Math.round(data.attrition / count),
-        er: Math.round(data.er / count),
-        nonVendor: Math.round(data.nonVendor / count)
+        month: period.label,
+        manning: Math.round(manningSum / count),
+        attrition: Math.round(attritionSum / count),
+        er: Math.round(erSum / count),
+        nonVendor: Math.round(nonVendorSum / count)
       };
     });
     
-    // Sort by date
-    trendsData.sort((a, b) => {
-      const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const [monthA, yearA] = a.month.split(' ');
-      const [monthB, yearB] = b.month.split(' ');
-      
-      if (yearA !== yearB) {
-        return Number(yearA) - Number(yearB);
-      }
-      
-      return monthsOrder.indexOf(monthA) - monthsOrder.indexOf(monthB);
-    });
-    
-    console.info("Performance trends data:", trendsData);
     return trendsData;
   } catch (error) {
     console.error("Error fetching performance trends:", error);
-    toast({
-      variant: "destructive",
-      title: "Error fetching performance data",
-      description: "Could not load performance trends"
-    });
+    // Return empty array or sample data as fallback
     return [];
   }
 };
+
+// Helper function to generate time periods based on selected range
+function getTimePeriods(timeRange, startDate, endDate) {
+  const periods = [];
+  let currentDate;
+  
+  switch(timeRange) {
+    case 'lastWeek':
+      // Daily periods for the last 7 days
+      for (let i = 6; i >= 0; i--) {
+        currentDate = new Date(endDate);
+        currentDate.setDate(currentDate.getDate() - i);
+        const dayStart = new Date(currentDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(currentDate);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const dayStr = `${currentDate.getDate()}/${currentDate.getMonth() + 1}`;
+        periods.push({
+          start: dayStart,
+          end: dayEnd,
+          label: dayStr
+        });
+      }
+      break;
+      
+    case 'lastMonth':
+      // Weekly periods for the last month
+      currentDate = new Date(startDate);
+      let weekNum = 1;
+      while (currentDate < endDate) {
+        const weekStart = new Date(currentDate);
+        const weekEnd = new Date(currentDate);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
+        
+        const weekStr = `W${weekNum}`;
+        periods.push({
+          start: weekStart,
+          end: weekEnd,
+          label: weekStr
+        });
+        
+        currentDate.setDate(currentDate.getDate() + 7);
+        weekNum++;
+      }
+      break;
+      
+    case 'lastQuarter':
+      // Monthly periods for the last quarter (3 months)
+      currentDate = new Date(startDate);
+      currentDate.setDate(1); // Start from the 1st of the month
+      
+      while (currentDate < endDate) {
+        const monthStart = new Date(currentDate);
+        const monthEnd = new Date(currentDate);
+        monthEnd.setMonth(monthEnd.getMonth() + 1, 0); // Last day of current month
+        
+        const monthStr = monthStart.toLocaleDateString('en-US', { month: 'short' });
+        periods.push({
+          start: monthStart,
+          end: monthEnd,
+          label: monthStr
+        });
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+      break;
+      
+    case 'lastSixMonths':
+    case 'lastYear':
+    default:
+      // Monthly periods
+      currentDate = new Date(startDate);
+      currentDate.setDate(1); // Start from the 1st of the month
+      
+      while (currentDate < endDate) {
+        const monthStart = new Date(currentDate);
+        const monthEnd = new Date(currentDate);
+        monthEnd.setMonth(monthEnd.getMonth() + 1, 0); // Last day of current month
+        
+        const monthStr = monthStart.toLocaleDateString('en-US', { month: 'short' });
+        periods.push({
+          start: monthStart,
+          end: monthEnd,
+          label: monthStr
+        });
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+  }
+  
+  return periods;
+}
