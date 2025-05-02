@@ -22,7 +22,8 @@ import {
   Cell,
 } from "recharts";
 import { BarList } from "@/components/ui/bar-list";
-import { fetchDashboardStats, fetchTopPerformers, fetchMonthlyTrends } from "@/services/analyticsService";
+import { fetchDashboardStats, fetchTopPerformers, fetchMonthlyTrends, fetchCategoryBreakdown } from "@/services/analyticsService";
+import { CircleCheck, AlertCircle, Users, PieChart as PieChartIcon } from "lucide-react";
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 
@@ -35,6 +36,9 @@ const CHDashboard = () => {
     currentManningAvg: 0,
     currentAttritionAvg: 0,
     currentErAvg: 0,
+    nonVendorAvg: 0,
+    cwTotalCases: 0,
+    riskAssessment: { low: 0, medium: 0, high: 0 }
   });
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [topPerformers, setTopPerformers] = useState([]);
@@ -51,16 +55,13 @@ const CHDashboard = () => {
         const dashboardStats = await fetchDashboardStats();
         setStats(dashboardStats);
         
-        // Fetch category breakdown
+        // Fetch category breakdown (real data from database)
         console.info("Fetching category breakdown...");
-        const breakdown = [
-          { name: "Platinum", value: 25 },
-          { name: "Diamond", value: 22 },
-          { name: "Gold", value: 20 },
-          { name: "Silver", value: 18 },
-          { name: "Bronze", value: 15 }
-        ];
-        setCategoryBreakdown(breakdown);
+        const breakdown = await fetchCategoryBreakdown();
+        setCategoryBreakdown(breakdown.map((item, index) => ({
+          name: item.name,
+          value: item.branches
+        })));
         
         // Fetch top performers
         console.info("Fetching top performers...");
@@ -130,6 +131,67 @@ const CHDashboard = () => {
               <div className="flex items-end justify-between">
                 <p className="text-3xl font-bold">{stats.currentAttritionAvg}%</p>
                 <p className="text-sm text-slate-500">Current month</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-purple-600">Non-Vendor %</p>
+              <div className="flex items-end justify-between">
+                <p className="text-3xl font-bold">{stats.nonVendorAvg}%</p>
+                <p className="text-sm text-slate-500">Current month</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-pink-50 to-pink-100 border-pink-200">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-pink-600">CWT Cases</p>
+              <div className="flex items-end justify-between">
+                <p className="text-3xl font-bold">{stats.cwTotalCases}</p>
+                <p className="text-sm text-slate-500">Current month</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-teal-600">Avg ER</p>
+              <div className="flex items-end justify-between">
+                <p className="text-3xl font-bold">{stats.currentErAvg}%</p>
+                <p className="text-sm text-slate-500">Current month</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-indigo-600">Branch Risk</p>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <div className="flex items-center gap-1">
+                  <CircleCheck className="h-4 w-4 text-green-500" />
+                  <span className="text-sm">{stats.riskAssessment.low}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <span className="text-sm">{stats.riskAssessment.medium}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  <span className="text-sm">{stats.riskAssessment.high}</span>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -219,7 +281,7 @@ const CHDashboard = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value, name) => [`${value}%`, name]}
+                    formatter={(value, name) => [`${value}`, name]}
                   />
                 </PieChart>
               </ResponsiveContainer>
