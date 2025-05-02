@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
@@ -66,6 +67,11 @@ const ChartContainer = React.forwardRef<
 ChartContainer.displayName = "Chart"
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
+  // Add null check for config before using Object.entries
+  if (!config) {
+    return null;
+  }
+  
   const colorConfig = Object.entries(config).filter(
     ([_, config]) => config.theme || config.color
   )

@@ -28,7 +28,6 @@ import {
 import { ChartContainer } from "@/components/ui/chart";
 import { getVisitMetrics, getPerformanceTrends } from "@/services/branchService";
 import { fetchZoneMetrics } from "@/services/analyticsService";
-// Fix: Import as default instead of named export
 import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
 
 // Define date range type
@@ -222,7 +221,15 @@ const CHAnalytics = () => {
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
             ) : zoneMetrics.length > 0 ? (
-              <ChartContainer>
+              <ChartContainer
+                config={{
+                  north: { color: '#3b82f6' },
+                  south: { color: '#10b981' },
+                  east: { color: '#f59e0b' },
+                  west: { color: '#ef4444' },
+                  central: { color: '#8b5cf6' }
+                }}
+              >
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={zoneMetrics}>
                     <CartesianGrid strokeDasharray="3 3" />
