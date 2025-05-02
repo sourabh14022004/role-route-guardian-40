@@ -84,8 +84,10 @@ const CHAnalytics = () => {
     const loadPerformanceTrends = async () => {
       setIsPerformanceLoading(true);
       try {        
+        console.log(`Fetching performance trends with timeRange: ${timeRange}`);
         // Fetch performance trends with the selected time range
         const trendsData = await getPerformanceTrends(timeRange);
+        console.log("Received trends data:", trendsData);
         setPerformanceData(trendsData);
       } catch (error) {
         console.error("Error loading performance trends:", error);
@@ -285,75 +287,77 @@ const CHAnalytics = () => {
                 <div className="flex justify-center items-center h-80">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                 </div>
-              ) : performanceData.length > 0 ? (
-                <ChartContainer config={metricColors}>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <LineChart 
-                      data={performanceData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis domain={[0, 100]} />
-                      <Tooltip />
-                      <Legend />
-                      {visiblePerformanceMetrics.includes('branchCoverage') && (
-                        <Line 
-                          type="monotone" 
-                          dataKey="branchCoverage" 
-                          name="Branch Coverage %" 
-                          stroke={metricColors.branchCoverage.color} 
-                          strokeWidth={2} 
-                        />
-                      )}
-                      {visiblePerformanceMetrics.includes('participationRate') && (
-                        <Line 
-                          type="monotone" 
-                          dataKey="participationRate" 
-                          name="Participation Rate %" 
-                          stroke={metricColors.participationRate.color} 
-                          strokeWidth={2} 
-                        />
-                      )}
-                      {visiblePerformanceMetrics.includes('manning') && (
-                        <Line 
-                          type="monotone" 
-                          dataKey="manningPercentage" 
-                          name="Manning %" 
-                          stroke={metricColors.manning.color} 
-                          strokeWidth={2} 
-                        />
-                      )}
-                      {visiblePerformanceMetrics.includes('attrition') && (
-                        <Line 
-                          type="monotone" 
-                          dataKey="attritionRate" 
-                          name="Attrition %" 
-                          stroke={metricColors.attrition.color} 
-                          strokeWidth={2} 
-                        />
-                      )}
-                      {visiblePerformanceMetrics.includes('er') && (
-                        <Line 
-                          type="monotone" 
-                          dataKey="erPercentage" 
-                          name="ER %" 
-                          stroke={metricColors.er.color} 
-                          strokeWidth={2} 
-                        />
-                      )}
-                      {visiblePerformanceMetrics.includes('nonVendor') && (
-                        <Line 
-                          type="monotone" 
-                          dataKey="nonVendorPercentage" 
-                          name="Non-Vendor %" 
-                          stroke={metricColors.nonVendor.color} 
-                          strokeWidth={2} 
-                        />
-                      )}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+              ) : performanceData && performanceData.length > 0 ? (
+                <div className="w-full">
+                  <ChartContainer config={metricColors}>
+                    <ResponsiveContainer width="100%" height={400}>
+                      <LineChart 
+                        data={performanceData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis domain={[0, 100]} />
+                        <Tooltip />
+                        <Legend />
+                        {visiblePerformanceMetrics.includes('branchCoverage') && (
+                          <Line 
+                            type="monotone" 
+                            dataKey="branchCoverage" 
+                            name="Branch Coverage %" 
+                            stroke={metricColors.branchCoverage.color} 
+                            strokeWidth={2} 
+                          />
+                        )}
+                        {visiblePerformanceMetrics.includes('participationRate') && (
+                          <Line 
+                            type="monotone" 
+                            dataKey="participationRate" 
+                            name="Participation Rate %" 
+                            stroke={metricColors.participationRate.color} 
+                            strokeWidth={2} 
+                          />
+                        )}
+                        {visiblePerformanceMetrics.includes('manning') && (
+                          <Line 
+                            type="monotone" 
+                            dataKey="manningPercentage" 
+                            name="Manning %" 
+                            stroke={metricColors.manning.color} 
+                            strokeWidth={2} 
+                          />
+                        )}
+                        {visiblePerformanceMetrics.includes('attrition') && (
+                          <Line 
+                            type="monotone" 
+                            dataKey="attritionRate" 
+                            name="Attrition %" 
+                            stroke={metricColors.attrition.color} 
+                            strokeWidth={2} 
+                          />
+                        )}
+                        {visiblePerformanceMetrics.includes('er') && (
+                          <Line 
+                            type="monotone" 
+                            dataKey="erPercentage" 
+                            name="ER %" 
+                            stroke={metricColors.er.color} 
+                            strokeWidth={2} 
+                          />
+                        )}
+                        {visiblePerformanceMetrics.includes('nonVendor') && (
+                          <Line 
+                            type="monotone" 
+                            dataKey="nonVendorPercentage" 
+                            name="Non-Vendor %" 
+                            stroke={metricColors.nonVendor.color} 
+                            strokeWidth={2} 
+                          />
+                        )}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-80">
                   <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
@@ -423,39 +427,41 @@ const CHAnalytics = () => {
                 <div className="flex justify-center items-center h-64">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                 </div>
-              ) : categoryMetrics.length > 0 ? (
-                <ChartContainer 
-                  config={{
-                    platinum: { color: '#9333ea' },
-                    diamond: { color: '#2563eb' },
-                    gold: { color: '#eab308' },
-                    silver: { color: '#94a3b8' },
-                    bronze: { color: '#f97316' },
-                    unknown: { color: '#cbd5e1' }
-                  }}
-                >
-                  <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={categoryMetrics}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      {visibleCategoryMetrics.includes('manning') && (
-                        <Bar dataKey="manning" name="Manning" fill="#3b82f6" />
-                      )}
-                      {visibleCategoryMetrics.includes('attrition') && (
-                        <Bar dataKey="attrition" name="Attrition" fill="#ef4444" />
-                      )}
-                      {visibleCategoryMetrics.includes('er') && (
-                        <Bar dataKey="er" name="ER" fill="#10b981" />
-                      )}
-                      {visibleCategoryMetrics.includes('cwt') && (
-                        <Bar dataKey="cwt" name="CWT" fill="#ca8a04" />
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+              ) : categoryMetrics && categoryMetrics.length > 0 ? (
+                <div className="w-full">
+                  <ChartContainer 
+                    config={{
+                      platinum: { color: '#9333ea' },
+                      diamond: { color: '#2563eb' },
+                      gold: { color: '#eab308' },
+                      silver: { color: '#94a3b8' },
+                      bronze: { color: '#f97316' },
+                      unknown: { color: '#cbd5e1' }
+                    }}
+                  >
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart data={categoryMetrics}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        {visibleCategoryMetrics.includes('manning') && (
+                          <Bar dataKey="manning" name="Manning" fill="#3b82f6" />
+                        )}
+                        {visibleCategoryMetrics.includes('attrition') && (
+                          <Bar dataKey="attrition" name="Attrition" fill="#ef4444" />
+                        )}
+                        {visibleCategoryMetrics.includes('er') && (
+                          <Bar dataKey="er" name="ER" fill="#10b981" />
+                        )}
+                        {visibleCategoryMetrics.includes('cwt') && (
+                          <Bar dataKey="cwt" name="CWT" fill="#ca8a04" />
+                        )}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64">
                   <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
