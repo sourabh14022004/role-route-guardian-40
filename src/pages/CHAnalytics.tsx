@@ -3,9 +3,9 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -38,20 +38,23 @@ const CHAnalytics = () => {
   const [isPerformanceLoading, setIsPerformanceLoading] = useState(true);
   
   // State for metric visibility toggles
-  const [visiblePerformanceMetrics, setVisiblePerformanceMetrics] = useState<MetricKey[]>(['branchCoverage', 'manning']);
+  const [visiblePerformanceMetrics, setVisiblePerformanceMetrics] = useState<MetricKey[]>([
+    'branchCoverage', 
+    'participationRate'
+  ]);
   const [visibleCategoryMetrics, setVisibleCategoryMetrics] = useState<string[]>(['manning', 'attrition']);
   
   // Colors for metrics
-  const metricColors = {
-    branchCoverage: "#3b82f6", // blue
-    participationRate: "#8b5cf6", // purple
-    manning: "#10b981", // green
-    attrition: "#ef4444", // red
-    er: "#f59e0b", // amber
-    nonVendor: "#6366f1" // indigo
+  const metricColors: Record<string, { color: string }> = {
+    branchCoverage: { color: "#3b82f6" }, // blue
+    participationRate: { color: "#10b981" }, // green
+    manning: { color: "#f59e0b" }, // amber
+    attrition: { color: "#ef4444" }, // red
+    er: { color: "#8b5cf6" }, // purple
+    nonVendor: { color: "#6366f1" } // indigo
   };
   
-  const metricLabels = {
+  const metricLabels: Record<string, string> = {
     branchCoverage: "Branch Coverage",
     participationRate: "Participation Rate",
     manning: "Manning %",
@@ -106,12 +109,24 @@ const CHAnalytics = () => {
     }
   };
   
-  const togglePerformanceMetric = (values: string[]) => {
-    setVisiblePerformanceMetrics(values as MetricKey[]);
+  const togglePerformanceMetric = (metric: MetricKey) => {
+    setVisiblePerformanceMetrics((current) => {
+      if (current.includes(metric)) {
+        return current.filter(m => m !== metric);
+      } else {
+        return [...current, metric];
+      }
+    });
   };
   
-  const toggleCategoryMetric = (values: string[]) => {
-    setVisibleCategoryMetrics(values);
+  const toggleCategoryMetric = (metric: string) => {
+    setVisibleCategoryMetrics((current) => {
+      if (current.includes(metric)) {
+        return current.filter(m => m !== metric);
+      } else {
+        return [...current, metric];
+      }
+    });
   };
 
   return (
@@ -131,39 +146,141 @@ const CHAnalytics = () => {
         {/* Performance Trends Tab */}
         <TabsContent value="performance">
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <CardTitle className="text-2xl">Performance Trends</CardTitle>
-                <div className="flex flex-col md:flex-row gap-4">
-                  <ToggleGroup type="multiple" value={visiblePerformanceMetrics} onValueChange={togglePerformanceMetric}>
-                    <ToggleGroupItem value="branchCoverage">Coverage</ToggleGroupItem>
-                    <ToggleGroupItem value="participationRate">Participation</ToggleGroupItem>
-                    <ToggleGroupItem value="manning">Manning</ToggleGroupItem>
-                    <ToggleGroupItem value="attrition">Attrition</ToggleGroupItem>
-                    <ToggleGroupItem value="er">ER</ToggleGroupItem>
-                    <ToggleGroupItem value="nonVendor">Non-Vendor</ToggleGroupItem>
-                  </ToggleGroup>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+                <div>
+                  <CardTitle className="text-2xl">Performance Trends</CardTitle>
+                  <CardDescription className="mt-2">Branch coverage and metrics over time</CardDescription>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant={timeRange === "lastSevenDays" ? "default" : "outline"} 
+                    onClick={() => handleTimeRangeChange("lastSevenDays")}
+                  >
+                    Last 7 Days
+                  </Button>
+                  <Button 
+                    variant={timeRange === "lastMonth" ? "default" : "outline"} 
+                    onClick={() => handleTimeRangeChange("lastMonth")}
+                  >
+                    Last Month
+                  </Button>
+                  <Button 
+                    variant={timeRange === "lastThreeMonths" ? "default" : "outline"} 
+                    onClick={() => handleTimeRangeChange("lastThreeMonths")}
+                  >
+                    Last 3 Months
+                  </Button>
+                  <Button 
+                    variant={timeRange === "lastSixMonths" ? "default" : "outline"} 
+                    onClick={() => handleTimeRangeChange("lastSixMonths")}
+                  >
+                    Last 6 Months
+                  </Button>
+                  <Button 
+                    variant={timeRange === "lastYear" ? "default" : "outline"} 
+                    onClick={() => handleTimeRangeChange("lastYear")}
+                  >
+                    Last Year
+                  </Button>
+                  <Button 
+                    variant={timeRange === "lastThreeYears" ? "default" : "outline"} 
+                    onClick={() => handleTimeRangeChange("lastThreeYears")}
+                  >
+                    Last 3 Years
+                  </Button>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-4 gap-4">
-                <CardDescription>Branch performance metrics over time</CardDescription>
-                <div className="flex items-center gap-2">
-                  <ToggleGroup type="single" value={timeRange} onValueChange={handleTimeRangeChange}>
-                    <ToggleGroupItem value="lastSevenDays">7 Days</ToggleGroupItem>
-                    <ToggleGroupItem value="lastMonth">Month</ToggleGroupItem>
-                    <ToggleGroupItem value="lastThreeMonths">3 Months</ToggleGroupItem>
-                    <ToggleGroupItem value="lastYear">Year</ToggleGroupItem>
-                  </ToggleGroup>
-                  {timeRange === "custom" && (
-                    <DateRangePicker 
-                      value={dateRange || { from: undefined, to: undefined }} 
-                      onChange={handleDateRangeChange} 
-                    />
-                  )}
+              
+              {timeRange === "custom" && (
+                <div className="mt-4">
+                  <DateRangePicker 
+                    value={dateRange || { from: undefined, to: undefined }} 
+                    onChange={handleDateRangeChange} 
+                  />
                 </div>
-              </div>
+              )}
             </CardHeader>
+            
             <CardContent>
+              <div className="mb-8">
+                <h3 className="text-lg font-medium mb-4">Select Metrics to Display:</h3>
+                <div className="flex flex-wrap gap-6">
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="branchCoverage" 
+                      checked={visiblePerformanceMetrics.includes('branchCoverage')}
+                      onCheckedChange={() => togglePerformanceMetric('branchCoverage')}
+                    />
+                    <div className="flex items-center space-x-2">
+                      <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                      <Label htmlFor="branchCoverage">Branch Coverage</Label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="participationRate" 
+                      checked={visiblePerformanceMetrics.includes('participationRate')}
+                      onCheckedChange={() => togglePerformanceMetric('participationRate')}
+                    />
+                    <div className="flex items-center space-x-2">
+                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                      <Label htmlFor="participationRate">Participation Rate</Label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="manning" 
+                      checked={visiblePerformanceMetrics.includes('manning')}
+                      onCheckedChange={() => togglePerformanceMetric('manning')}
+                    />
+                    <div className="flex items-center space-x-2">
+                      <div className="h-3 w-3 rounded-full bg-amber-500"></div>
+                      <Label htmlFor="manning">Manning %</Label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="attrition" 
+                      checked={visiblePerformanceMetrics.includes('attrition')}
+                      onCheckedChange={() => togglePerformanceMetric('attrition')}
+                    />
+                    <div className="flex items-center space-x-2">
+                      <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                      <Label htmlFor="attrition">Attrition %</Label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="er" 
+                      checked={visiblePerformanceMetrics.includes('er')}
+                      onCheckedChange={() => togglePerformanceMetric('er')}
+                    />
+                    <div className="flex items-center space-x-2">
+                      <div className="h-3 w-3 rounded-full bg-purple-500"></div>
+                      <Label htmlFor="er">ER %</Label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="nonVendor" 
+                      checked={visiblePerformanceMetrics.includes('nonVendor')}
+                      onCheckedChange={() => togglePerformanceMetric('nonVendor')}
+                    />
+                    <div className="flex items-center space-x-2">
+                      <div className="h-3 w-3 rounded-full bg-indigo-500"></div>
+                      <Label htmlFor="nonVendor">Non-Vendor %</Label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
               {isPerformanceLoading ? (
                 <div className="flex justify-center items-center h-80">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -185,7 +302,7 @@ const CHAnalytics = () => {
                           type="monotone" 
                           dataKey="branchCoverage" 
                           name="Branch Coverage %" 
-                          stroke={metricColors.branchCoverage} 
+                          stroke={metricColors.branchCoverage.color} 
                           strokeWidth={2} 
                         />
                       )}
@@ -194,7 +311,7 @@ const CHAnalytics = () => {
                           type="monotone" 
                           dataKey="participationRate" 
                           name="Participation Rate %" 
-                          stroke={metricColors.participationRate} 
+                          stroke={metricColors.participationRate.color} 
                           strokeWidth={2} 
                         />
                       )}
@@ -203,7 +320,7 @@ const CHAnalytics = () => {
                           type="monotone" 
                           dataKey="manningPercentage" 
                           name="Manning %" 
-                          stroke={metricColors.manning} 
+                          stroke={metricColors.manning.color} 
                           strokeWidth={2} 
                         />
                       )}
@@ -212,7 +329,7 @@ const CHAnalytics = () => {
                           type="monotone" 
                           dataKey="attritionRate" 
                           name="Attrition %" 
-                          stroke={metricColors.attrition} 
+                          stroke={metricColors.attrition.color} 
                           strokeWidth={2} 
                         />
                       )}
@@ -221,7 +338,7 @@ const CHAnalytics = () => {
                           type="monotone" 
                           dataKey="erPercentage" 
                           name="ER %" 
-                          stroke={metricColors.er} 
+                          stroke={metricColors.er.color} 
                           strokeWidth={2} 
                         />
                       )}
@@ -230,7 +347,7 @@ const CHAnalytics = () => {
                           type="monotone" 
                           dataKey="nonVendorPercentage" 
                           name="Non-Vendor %" 
-                          stroke={metricColors.nonVendor} 
+                          stroke={metricColors.nonVendor.color} 
                           strokeWidth={2} 
                         />
                       )}
@@ -251,18 +368,12 @@ const CHAnalytics = () => {
         {/* Key Metrics Tab */}
         <TabsContent value="keyMetrics">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
-                <ToggleGroup type="multiple" value={visibleCategoryMetrics} onValueChange={toggleCategoryMetric}>
-                  <ToggleGroupItem value="manning">Manning</ToggleGroupItem>
-                  <ToggleGroupItem value="attrition">Attrition</ToggleGroupItem>
-                  <ToggleGroupItem value="er">ER</ToggleGroupItem>
-                  <ToggleGroupItem value="cwt">CWT</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <CardDescription>Metrics by branch category</CardDescription>
+                <div>
+                  <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
+                  <CardDescription>Metrics by branch category</CardDescription>
+                </div>
                 <DateRangePicker 
                   value={dateRange || { from: undefined, to: undefined }} 
                   onChange={handleDateRangeChange} 
@@ -270,6 +381,44 @@ const CHAnalytics = () => {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-4">Select Metrics to Display:</h3>
+                <div className="flex flex-wrap gap-6">
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="manning-key" 
+                      checked={visibleCategoryMetrics.includes('manning')}
+                      onCheckedChange={() => toggleCategoryMetric('manning')}
+                    />
+                    <Label htmlFor="manning-key">Manning</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="attrition-key" 
+                      checked={visibleCategoryMetrics.includes('attrition')}
+                      onCheckedChange={() => toggleCategoryMetric('attrition')}
+                    />
+                    <Label htmlFor="attrition-key">Attrition</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="er-key" 
+                      checked={visibleCategoryMetrics.includes('er')}
+                      onCheckedChange={() => toggleCategoryMetric('er')}
+                    />
+                    <Label htmlFor="er-key">ER</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="cwt-key" 
+                      checked={visibleCategoryMetrics.includes('cwt')}
+                      onCheckedChange={() => toggleCategoryMetric('cwt')}
+                    />
+                    <Label htmlFor="cwt-key">CWT</Label>
+                  </div>
+                </div>
+              </div>
+              
               {isLoading ? (
                 <div className="flex justify-center items-center h-64">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -321,7 +470,7 @@ const CHAnalytics = () => {
         {/* Qualitative Assessment Tab */}
         <TabsContent value="qualitative">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardTitle className="text-lg font-medium">Qualitative Assessments Heatmap</CardTitle>
               <CardDescription>Qualitative feedback across branches</CardDescription>
             </CardHeader>
