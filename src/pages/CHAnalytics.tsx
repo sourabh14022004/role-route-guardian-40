@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -27,7 +28,8 @@ import {
 import { ChartContainer } from "@/components/ui/chart";
 import { getVisitMetrics, getPerformanceTrends } from "@/services/branchService";
 import { fetchZoneMetrics } from "@/services/analyticsService";
-import { QualitativeHeatmap } from "@/components/ch/QualitativeHeatmap";
+// Fix: Import as default instead of named export
+import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
 
 // Define date range type
 type DateRange = { from: Date; to: Date } | undefined;
@@ -162,7 +164,10 @@ const CHAnalytics = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
-              <DateRangePicker onDateChange={handleDateRangeChange} />
+              <DateRangePicker 
+                value={dateRange || { from: undefined, to: undefined }} 
+                onChange={handleDateRangeChange} 
+              />
             </div>
             <CardDescription>Metrics by branch category</CardDescription>
           </CardHeader>
