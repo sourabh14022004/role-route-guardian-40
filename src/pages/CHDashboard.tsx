@@ -58,10 +58,7 @@ const CHDashboard = () => {
         // Fetch category breakdown (real data from database)
         console.info("Fetching category breakdown...");
         const breakdown = await fetchCategoryBreakdown();
-        setCategoryBreakdown(breakdown.map((item, index) => ({
-          name: item.name,
-          value: item.branches
-        })));
+        setCategoryBreakdown(breakdown);
         
         // Fetch top performers
         console.info("Fetching top performers...");
@@ -255,7 +252,7 @@ const CHDashboard = () => {
           <CardHeader>
             <CardTitle>Branch Category Distribution</CardTitle>
             <CardDescription>
-              Distribution of branches by category
+              Distribution of branches by category from visit data
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -263,7 +260,7 @@ const CHDashboard = () => {
               <div className="flex justify-center items-center h-64">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
               </div>
-            ) : (
+            ) : categoryBreakdown && categoryBreakdown.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
@@ -271,7 +268,7 @@ const CHDashboard = () => {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, value }) => `${name}: ${value}`}
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
@@ -281,10 +278,15 @@ const CHDashboard = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value, name) => [`${value}`, name]}
+                    formatter={(value, name) => [`${value} branches`, name]}
                   />
                 </PieChart>
               </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-500">
+                <PieChartIcon className="h-12 w-12 mb-2 opacity-30" />
+                <p>No category data available</p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -302,7 +304,7 @@ const CHDashboard = () => {
               <div className="flex justify-center items-center h-64">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
               </div>
-            ) : (
+            ) : topPerformers && topPerformers.length > 0 ? (
               <div className="space-y-6">
                 <Tabs defaultValue="coverage">
                   <TabsList className="grid w-full grid-cols-2">
@@ -341,6 +343,11 @@ const CHDashboard = () => {
                     />
                   </TabsContent>
                 </Tabs>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-500">
+                <Users className="h-12 w-12 mb-2 opacity-30" />
+                <p>No performer data available</p>
               </div>
             )}
           </CardContent>

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
@@ -32,6 +31,8 @@ export const fetchDashboardStats = async () => {
       .select(`
         id,
         branch_id,
+        user_id,
+        status,
         manning_percentage,
         attrition_percentage,
         er_percentage,
@@ -497,53 +498,42 @@ export const fetchTopPerformers = async () => {
 
 export const fetchCategoryBreakdown = async () => {
   try {
-    console.log("Fetching category breakdown...");
+    console.log("Fetching category breakdown from branch visits...");
     
-    // Get all branches with categories
-    const { data: branches, error: branchError } = await supabase
-      .from('branches')
-      .select('id, category');
+    // Get all branch visits with branch information
+    const { data: visits, error: visitsError } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        branches:branch_id (
+          id,
+          name,
+          category
+        )
+      `)
+      .in('status', ['submitted', 'approved']);
     
-    if (branchError) throw branchError;
+    if (visitsError) throw visitsError;
     
-    if (!branches || branches.length === 0) {
+    if (!visits || visits.length === 0) {
       return [];
     }
     
-    // Get all branch visits
-    const { data: visits, error: visitError } = await supabase
-      .from('branch_visits')
-      .select('branch_id')
-      .in('status', ['submitted', 'approved']);
+    // Count branch categories from visit data
+    const categoryCounts: Record<string, number> = {};
     
-    if (visitError) throw visitError;
-    
-    // Create a set of visited branch IDs
-    const visitedBranchIds = new Set((visits || []).map(v => v.branch_id));
-    
-    // Count branches and visited branches by category
-    const categoryCounts = {};
-    
-    branches.forEach(branch => {
-      if (!branch.category) return;
+    visits.forEach(visit => {
+      const branch = visit.branches as any;
+      if (!branch || !branch.category) return;
       
       const category = branch.category.charAt(0).toUpperCase() + branch.category.slice(1).toLowerCase();
-      
-      if (!categoryCounts[category]) {
-        categoryCounts[category] = { branches: 0, visited: 0 };
-      }
-      
-      categoryCounts[category].branches++;
-      if (visitedBranchIds.has(branch.id)) {
-        categoryCounts[category].visited++;
-      }
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     });
     
     // Format the results
-    return Object.entries(categoryCounts).map(([name, data]) => ({
+    return Object.entries(categoryCounts).map(([name, count]) => ({
       name,
-      branches: data.branches,
-      coverage: data.branches > 0 ? Math.round((data.visited / data.branches) * 100) : 0
+      value: count
     }));
   } catch (error) {
     console.error("Error fetching category breakdown:", error);
@@ -563,43 +553,47 @@ export const fetchQualitativeAssessments = async () => {
     // Get qualitative assessments from branch visits
     const { data, error } = await supabase
       .from('branch_visits')
-      .select('quality_rating, employee_satisfaction, facilities_rating, management_effectiveness')
-      .not('quality_rating', 'is', null)
-      .limit(100);
+      .select(`
+        discipline_rating,
+        hygiene_rating,
+        culture_rating,
+        overall_rating
+      `)
+      .not('overall_rating', 'is', null);
       
     if (error) throw error;
     
     if (!data || data.length === 0) {
       return {
-        quality: 0,
-        satisfaction: 0,
-        facilities: 0,
-        management: 0,
+        discipline: 0,
+        hygiene: 0,
+        culture: 0,
+        overall: 0,
         count: 0
       };
     }
     
     // Calculate averages
     const count = data.length;
-    const qualitySum = data.reduce((sum, item) => sum + (item.quality_rating || 0), 0);
-    const satisfactionSum = data.reduce((sum, item) => sum + (item.employee_satisfaction || 0), 0);
-    const facilitiesSum = data.reduce((sum, item) => sum + (item.facilities_rating || 0), 0);
-    const managementSum = data.reduce((sum, item) => sum + (item.management_effectiveness || 0), 0);
+    const disciplineSum = data.reduce((sum, item) => sum + (item.discipline_rating || 0), 0);
+    const hygieneSum = data.reduce((sum, item) => sum + (item.hygiene_rating || 0), 0);
+    const cultureSum = data.reduce((sum, item) => sum + (item.culture_rating || 0), 0);
+    const overallSum = data.reduce((sum, item) => sum + (item.overall_rating || 0), 0);
     
     return {
-      quality: Math.round((qualitySum / count) * 10) / 10,
-      satisfaction: Math.round((satisfactionSum / count) * 10) / 10,
-      facilities: Math.round((facilitiesSum / count) * 10) / 10,
-      management: Math.round((managementSum / count) * 10) / 10,
+      discipline: Math.round((disciplineSum / count) * 10) / 10,
+      hygiene: Math.round((hygieneSum / count) * 10) / 10,
+      culture: Math.round((cultureSum / count) * 10) / 10,
+      overall: Math.round((overallSum / count) * 10) / 10,
       count
     };
   } catch (error) {
     console.error("Error fetching qualitative assessments:", error);
     return {
-      quality: 0,
-      satisfaction: 0,
-      facilities: 0,
-      management: 0,
+      discipline: 0,
+      hygiene: 0,
+      culture: 0,
+      overall: 0,
       count: 0
     };
   }

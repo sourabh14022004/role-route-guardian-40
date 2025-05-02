@@ -24,11 +24,16 @@ import {
   Legend,
   BarChart,
   Bar,
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { fetchZoneMetrics, fetchMonthlyTrends, fetchQualitativeAssessments } from "@/services/analyticsService";
+import { fetchMonthlyTrends, fetchQualitativeAssessments } from "@/services/analyticsService";
 
 const timeRangeOptions = [
   { value: "lastSevenDays", label: "Last 7 Days" },
@@ -50,12 +55,11 @@ const metricOptions = [
 
 const CHAnalytics = () => {
   const [monthlyTrends, setMonthlyTrends] = useState([]);
-  const [zoneMetrics, setZoneMetrics] = useState([]);
   const [qualitativeData, setQualitativeData] = useState({
-    quality: 0,
-    satisfaction: 0,
-    facilities: 0,
-    management: 0,
+    discipline: 0,
+    hygiene: 0,
+    culture: 0,
+    overall: 0,
     count: 0
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -80,10 +84,6 @@ const CHAnalytics = () => {
         const trendsData = await fetchMonthlyTrends(timeRange);
         setMonthlyTrends(trendsData);
         
-        // Fetch zone metrics data
-        const metricsData = await fetchZoneMetrics();
-        setZoneMetrics(metricsData);
-        
         // Fetch qualitative assessment data
         const qualData = await fetchQualitativeAssessments();
         setQualitativeData(qualData);
@@ -106,6 +106,30 @@ const CHAnalytics = () => {
 
   // At least one metric must be selected
   const atLeastOneMetricSelected = Object.values(selectedMetrics).some(value => value);
+
+  // Prepare radar data for the qualitative assessment
+  const radarData = [
+    {
+      subject: "Discipline",
+      value: qualitativeData.discipline,
+      fullMark: 5,
+    },
+    {
+      subject: "Hygiene",
+      value: qualitativeData.hygiene,
+      fullMark: 5,
+    },
+    {
+      subject: "Culture",
+      value: qualitativeData.culture,
+      fullMark: 5,
+    },
+    {
+      subject: "Overall",
+      value: qualitativeData.overall,
+      fullMark: 5,
+    },
+  ];
 
   return (
     <div className="p-6 space-y-6">
@@ -338,87 +362,15 @@ const CHAnalytics = () => {
                 )}
               </CardContent>
             </Card>
-            
-            <Card className="col-span-1 md:col-span-2 lg:col-span-1">
-              <CardHeader>
-                <CardTitle>Zone Performance Analysis</CardTitle>
-                <CardDescription>
-                  Comparative metrics across different zones
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-80">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart
-                      data={zoneMetrics}
-                      margin={{
-                        top: 20,
-                        right: 30,
-                        left: 20,
-                        bottom: 20,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="zone" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="coverage" name="Coverage %" fill="#3b82f6" />
-                      <Bar dataKey="participation" name="Participation %" fill="#10b981" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card className="col-span-1 md:col-span-2 lg:col-span-1">
-              <CardHeader>
-                <CardTitle>Zone HR Metrics</CardTitle>
-                <CardDescription>
-                  HR metrics by zone
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-80">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart
-                      data={zoneMetrics}
-                      margin={{
-                        top: 20,
-                        right: 30,
-                        left: 20,
-                        bottom: 20,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="zone" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="manning" name="Manning %" fill="#f59e0b" />
-                      <Bar dataKey="attrition" name="Attrition %" fill="#ef4444" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
         
         <TabsContent value="qualitative" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Qualitative Branch Assessments</CardTitle>
+              <CardTitle>Branch Qualitative Assessment</CardTitle>
               <CardDescription>
-                Aggregated qualitative metrics from branch visits (based on {qualitativeData.count} assessments)
+                Aggregated branch assessment ratings from {qualitativeData.count} branch visits
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -427,60 +379,61 @@ const CHAnalytics = () => {
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    {[
-                      { name: 'Quality Rating', value: qualitativeData.quality, color: '#3b82f6', max: 5 },
-                      { name: 'Employee Satisfaction', value: qualitativeData.satisfaction, color: '#10b981', max: 5 },
-                      { name: 'Facilities Rating', value: qualitativeData.facilities, color: '#8b5cf6', max: 5 },
-                      { name: 'Management Effectiveness', value: qualitativeData.management, color: '#f59e0b', max: 5 },
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex flex-col">
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm font-medium">{item.name}</span>
-                          <span className="text-sm font-bold">{item.value} / {item.max}</span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${(item.value / item.max) * 100}%`,
-                              backgroundColor: item.color,
-                            }}
-                          />
-                        </div>
-                        <div className="flex justify-between mt-1">
-                          <span className="text-xs text-muted-foreground">Poor</span>
-                          <span className="text-xs text-muted-foreground">Excellent</span>
-                        </div>
-                      </div>
-                    ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Radar Chart for Qualitative Assessment */}
+                  <div className="col-span-1 md:col-span-1">
+                    <h3 className="text-lg font-medium mb-4 text-center">Assessment Heat Map</h3>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <RadarChart outerRadius={120} width={400} height={350} data={radarData}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="subject" />
+                        <PolarRadiusAxis angle={30} domain={[0, 5]} />
+                        <Radar
+                          name="Branch Quality Score"
+                          dataKey="value"
+                          stroke="#8884d8"
+                          fill="#8884d8"
+                          fillOpacity={0.6}
+                        />
+                        <Tooltip formatter={(value) => [`${value}/5`, 'Rating']} />
+                        <Legend />
+                      </RadarChart>
+                    </ResponsiveContainer>
                   </div>
 
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart
-                      data={[
-                        { name: 'Quality', value: qualitativeData.quality },
-                        { name: 'Satisfaction', value: qualitativeData.satisfaction },
-                        { name: 'Facilities', value: qualitativeData.facilities },
-                        { name: 'Management', value: qualitativeData.management },
-                      ]}
-                      margin={{
-                        top: 20,
-                        right: 30,
-                        left: 20,
-                        bottom: 20,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis domain={[0, 5]} />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="value" name="Rating (out of 5)" fill="#3b82f6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </>
+                  {/* Bar Chart for Qualitative Values */}
+                  <div className="col-span-1 md:col-span-1">
+                    <h3 className="text-lg font-medium mb-4 text-center">Assessment Metrics</h3>
+                    <div className="space-y-6">
+                      {[
+                        { name: 'Discipline Rating', value: qualitativeData.discipline, color: '#3b82f6', max: 5 },
+                        { name: 'Hygiene Rating', value: qualitativeData.hygiene, color: '#10b981', max: 5 },
+                        { name: 'Culture Rating', value: qualitativeData.culture, color: '#8b5cf6', max: 5 },
+                        { name: 'Overall Rating', value: qualitativeData.overall, color: '#f59e0b', max: 5 },
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex flex-col">
+                          <div className="flex justify-between mb-2">
+                            <span className="text-sm font-medium">{item.name}</span>
+                            <span className="text-sm font-bold">{item.value.toFixed(1)} / {item.max}</span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${(item.value / item.max) * 100}%`,
+                                backgroundColor: item.color,
+                              }}
+                            />
+                          </div>
+                          <div className="flex justify-between mt-1">
+                            <span className="text-xs text-muted-foreground">Poor</span>
+                            <span className="text-xs text-muted-foreground">Excellent</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
