@@ -18,19 +18,25 @@ import {
   Bar,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar
 } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
-import { getVisitMetrics, getPerformanceTrends } from "@/services/branchService";
+import { getVisitMetrics, getPerformanceTrends, getCoverageParticipationTrends } from "@/services/branchService";
 import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { ChevronDown, ChevronUp, Calendar, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, Calendar, Check, Star } from "lucide-react";
+import { fetchQualitativeAssessments } from "@/services/analyticsService";
 
 // Define date range type
-type DateRange = { from: Date; to: Date } | undefined;
+type DateRange = { from: Date; to: Date } | null;
 
 const PERIOD_OPTIONS = [
   { label: "Last 7 Days", value: "lastWeek" },
@@ -42,13 +48,21 @@ const PERIOD_OPTIONS = [
 
 const CHAnalytics = () => {
   // State for date range filter
-  const [dateRange, setDateRange] = useState<DateRange>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange>(null);
   const [selectedChart, setSelectedChart] = useState("monthly");
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [categoryMetrics, setCategoryMetrics] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPerformanceLoading, setIsPerformanceLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState("lastSixMonths");
+  const [qualitativeData, setQualitativeData] = useState({
+    discipline: 0,
+    hygiene: 0,
+    culture: 0,
+    overall: 0,
+    count: 0
+  });
+  const [isQualitativeLoading, setIsQualitativeLoading] = useState(true);
   
   // Toggle states for performance metrics
   const [showManning, setShowManning] = useState(true);
@@ -80,6 +94,23 @@ const CHAnalytics = () => {
   }, [dateRange]);
 
   useEffect(() => {
+    const loadQualitativeData = async () => {
+      setIsQualitativeLoading(true);
+      try {
+        // Fetch qualitative assessment data with dateRange
+        const qualitativeStats = await fetchQualitativeAssessments(dateRange);
+        setQualitativeData(qualitativeStats);
+      } catch (error) {
+        console.error("Error loading qualitative data:", error);
+      } finally {
+        setIsQualitativeLoading(false);
+      }
+    };
+    
+    loadQualitativeData();
+  }, [dateRange]);
+
+  useEffect(() => {
     const loadPerformanceTrends = async () => {
       setIsPerformanceLoading(true);
       try {
@@ -104,12 +135,39 @@ const CHAnalytics = () => {
     setSelectedPeriod(period);
   };
 
+  // Format x-axis labels to prevent overlapping
   const formatXAxis = (tickItem: string) => {
-    // If the label is too long, truncate it to first 3 characters
-    if (tickItem && tickItem.length > 10) {
+    if (!tickItem) return '';
+    
+    // For monthly data, show abbreviated month names
+    if (selectedPeriod === 'lastSixMonths' || selectedPeriod === 'lastYear') {
       return tickItem.substring(0, 3);
     }
+    
+    // For weekly data, show date in a more compact format
+    if (selectedPeriod === 'lastWeek' || selectedPeriod === 'lastMonth') {
+      const parts = tickItem.split('-');
+      if (parts.length >= 2) {
+        return `${parts[1]}/${parts[0].substring(2)}`;
+      }
+    }
+    
+    // For quarterly data
+    if (selectedPeriod === 'lastQuarter') {
+      return tickItem.substring(0, 5);
+    }
+    
     return tickItem;
+  };
+
+  // Prepare qualitative data for radar visualization
+  const prepareQualitativeData = () => {
+    return [
+      { subject: 'Branch Culture', value: qualitativeData.culture },
+      { subject: 'Branch Hygiene', value: qualitativeData.hygiene },
+      { subject: 'Overall Discipline', value: qualitativeData.discipline },
+      { subject: 'Overall Rating', value: qualitativeData.overall }
+    ];
   };
 
   return (
@@ -206,7 +264,7 @@ const CHAnalytics = () => {
                     dataKey="month" 
                     angle={-45} 
                     textAnchor="end"
-                    height={60}
+                    height={70}
                     tickFormatter={formatXAxis} 
                     interval={0}
                   />
@@ -244,7 +302,7 @@ const CHAnalytics = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
               <DateRangePicker 
-                value={dateRange || { from: undefined, to: undefined }} 
+                value={dateRange ? dateRange : { from: undefined, to: undefined }} 
                 onChange={handleDateRangeChange} 
               />
             </div>
@@ -310,7 +368,7 @@ const CHAnalytics = () => {
                       dataKey="name" 
                       angle={-45} 
                       textAnchor="end" 
-                      height={60}
+                      height={70}
                       interval={0}
                     />
                     <YAxis />
@@ -341,89 +399,45 @@ const CHAnalytics = () => {
           </CardContent>
         </Card>
         
-        <Card className="h-full">
+        <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-medium">Metrics Overview</CardTitle>
-            <CardDescription>Summary of key performance indicators</CardDescription>
+            <CardTitle className="text-lg font-medium">Qualitative Assessment</CardTitle>
+            <CardDescription>
+              Branch quality metrics from {qualitativeData.count} branch visits
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Metric</TableHead>
-                  <TableHead className="text-right">Current</TableHead>
-                  <TableHead className="text-right">Previous</TableHead>
-                  <TableHead className="text-right">Change</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
-                      <div className="flex justify-center">
-                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <>
-                    <TableRow>
-                      <TableCell className="font-medium">Manning %</TableCell>
-                      <TableCell className="text-right">85%</TableCell>
-                      <TableCell className="text-right">82%</TableCell>
-                      <TableCell className="text-right text-green-500 flex justify-end items-center">
-                        <ChevronUp className="h-4 w-4" /> 3%
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Attrition %</TableCell>
-                      <TableCell className="text-right">12%</TableCell>
-                      <TableCell className="text-right">15%</TableCell>
-                      <TableCell className="text-right text-green-500 flex justify-end items-center">
-                        <ChevronDown className="h-4 w-4" /> 3%
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">ER %</TableCell>
-                      <TableCell className="text-right">92%</TableCell>
-                      <TableCell className="text-right">89%</TableCell>
-                      <TableCell className="text-right text-green-500 flex justify-end items-center">
-                        <ChevronUp className="h-4 w-4" /> 3%
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Non-Vendor %</TableCell>
-                      <TableCell className="text-right">65%</TableCell>
-                      <TableCell className="text-right">62%</TableCell>
-                      <TableCell className="text-right text-green-500 flex justify-end items-center">
-                        <ChevronUp className="h-4 w-4" /> 3%
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">CWT Cases</TableCell>
-                      <TableCell className="text-right">54</TableCell>
-                      <TableCell className="text-right">58</TableCell>
-                      <TableCell className="text-right text-green-500 flex justify-end items-center">
-                        <ChevronDown className="h-4 w-4" /> 4
-                      </TableCell>
-                    </TableRow>
-                  </>
-                )}
-              </TableBody>
-            </Table>
+            {isQualitativeLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              </div>
+            ) : qualitativeData.count > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <RadarChart outerRadius={90} data={prepareQualitativeData()}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="subject" />
+                  <PolarRadiusAxis domain={[0, 5]} />
+                  <Radar
+                    name="Quality Rating"
+                    dataKey="value"
+                    stroke="#8884d8"
+                    fill="#8884d8"
+                    fillOpacity={0.6}
+                  />
+                  <Tooltip formatter={(value) => {
+                    return typeof value === 'number' ? [`${value.toFixed(1)}/5`, 'Rating'] : [`${value}/5`, 'Rating'];
+                  }} />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-500">
+                <Star className="h-12 w-12 mb-2 opacity-30" />
+                <p>No qualitative assessment data available</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-      
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-medium">Qualitative Assessments Heatmap</CardTitle>
-          <CardDescription>Qualitative feedback across branches</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <QualitativeHeatmap dateRange={dateRange} />
-        </CardContent>
-      </Card>
     </div>
   );
 };
