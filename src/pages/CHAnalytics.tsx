@@ -28,7 +28,7 @@ import {
 import { ChartContainer } from "@/components/ui/chart";
 import { getVisitMetrics, getPerformanceTrends } from "@/services/branchService";
 import { fetchZoneMetrics } from "@/services/analyticsService";
-// Fix 1: Import QualitativeHeatmap as a default export instead of named export
+// Import QualitativeHeatmap as a default export
 import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
 
 // Define date range type
@@ -96,7 +96,7 @@ const CHAnalytics = () => {
     loadPerformanceTrends();
   }, [selectedChart]);
 
-  // Fix 2: Update the function to match the interface expected by DateRangePicker
+  // Update the function to match the interface expected by DateRangePicker
   const handleDateRangeChange = (range: DateRange) => {
     setDateRange(range);
   };
@@ -165,7 +165,7 @@ const CHAnalytics = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
-              {/* Fix 3: Update the DateRangePicker component to use the correct props */}
+              {/* Update the DateRangePicker component to use the correct props */}
               <DateRangePicker 
                 value={dateRange || { from: undefined, to: undefined }} 
                 onChange={handleDateRangeChange} 
@@ -179,7 +179,6 @@ const CHAnalytics = () => {
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
             ) : categoryMetrics.length > 0 ? (
-              {/* Fix 4: Add the required config prop to ChartContainer */}
               <ChartContainer 
                 config={{
                   platinum: { color: '#9333ea' },
@@ -265,7 +264,6 @@ const CHAnalytics = () => {
           <CardDescription>Qualitative feedback across branches</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Fix 5: Update the import and usage of QualitativeHeatmap */}
           <QualitativeHeatmap />
         </CardContent>
       </Card>
