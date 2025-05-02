@@ -65,11 +65,11 @@ const CHDashboardLayout = () => {
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-64 bg-gradient-to-b from-white to-slate-50">
+              <SheetContent side="left" className="p-0 w-64">
                 <div className="flex flex-col h-full">
                   {/* Mobile menu header */}
-                  <div className="h-14 px-4 border-b flex items-center bg-gradient-to-r from-blue-600 to-indigo-600">
-                    <h2 className="text-lg font-semibold flex-1 text-white">HDFC App</h2>
+                  <div className="h-14 px-4 border-b flex items-center">
+                    <h2 className="text-lg font-semibold flex-1">HDFC App</h2>
                   </div>
                   
                   {/* Mobile menu items */}
@@ -80,9 +80,9 @@ const CHDashboardLayout = () => {
                           key={item.path}
                           to={item.path}
                           className={({ isActive }) => cn(
-                            "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-300",
+                            "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                             isActive 
-                              ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm" 
+                              ? "bg-blue-50 text-blue-700" 
                               : "text-gray-700 hover:bg-gray-100"
                           )}
                           onClick={() => setMobileMenuOpen(false)}
@@ -98,7 +98,7 @@ const CHDashboardLayout = () => {
                   <div className="border-t p-4">
                     <Button 
                       variant="outline" 
-                      className="w-full justify-start hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors duration-300"
+                      className="w-full justify-start"
                       onClick={handleLogout}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
@@ -108,11 +108,11 @@ const CHDashboardLayout = () => {
                 </div>
               </SheetContent>
             </Sheet>
-            <h1 className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">HDFC App</h1>
+            <h1 className="text-lg font-semibold">HDFC App</h1>
           </div>
           
           <div className="flex items-center gap-2">
-            <Avatar className="h-8 w-8 bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md">
+            <Avatar className="h-8 w-8 bg-blue-600 text-white">
               <span>{profile?.full_name?.charAt(0) || 'C'}</span>
             </Avatar>
           </div>
@@ -132,13 +132,13 @@ const CHDashboardLayout = () => {
       {/* Sidebar */}
       <aside 
         className={cn(
-          "h-screen bg-white shadow-lg transition-all duration-300 flex flex-col relative z-20", 
+          "h-screen bg-white shadow-md transition-all duration-300 flex flex-col relative z-20", 
           expanded ? "w-64" : "w-20"
         )}
         onMouseEnter={() => setExpanded(true)}
         onMouseLeave={() => setExpanded(false)}
       >
-        <div className="flex items-center justify-center h-16 border-b bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+        <div className="flex items-center justify-center h-16 border-b">
           {expanded ? (
             <h2 className="text-xl font-bold">HDFC App</h2>
           ) : (
@@ -153,10 +153,8 @@ const CHDashboardLayout = () => {
                 <NavLink 
                   to={item.path}
                   className={({ isActive }) => cn(
-                    "flex items-center rounded-md transition-all duration-300 hover:bg-blue-50 hover:text-blue-700",
-                    isActive ? 
-                      "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-medium border-r-4 border-blue-600" : 
-                      "text-slate-700",
+                    "flex items-center rounded-md transition-all duration-200 hover:bg-blue-50 hover:text-blue-700",
+                    isActive ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700",
                     expanded ? "py-2.5 px-4" : "py-2.5 justify-center"
                   )}
                 >
@@ -168,11 +166,11 @@ const CHDashboardLayout = () => {
           </ul>
         </nav>
         
-        <div className="p-4 border-t bg-gradient-to-b from-transparent to-slate-50">
+        <div className="p-4 border-t">
           <Button 
             variant="outline" 
             className={cn(
-              "w-full hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors duration-300",
+              "w-full",
               expanded ? "justify-start" : "justify-center"
             )}
             onClick={handleLogout}
