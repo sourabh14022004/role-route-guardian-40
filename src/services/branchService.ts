@@ -3,6 +3,11 @@ import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
 
 type Branch = Database['public']['Tables']['branches']['Row'];
+type BranchWithoutTimestamps = Omit<Branch, 'created_at' | 'updated_at'> & {
+  created_at?: string;
+  updated_at?: string;
+  zoneId?: string;
+};
 
 // Fetch all branches
 export const getAllBranches = async () => {
@@ -139,7 +144,7 @@ export const fetchUserBranchVisits = async (userId: string) => {
 };
 
 // Fetch assigned branches with details (for New Visit page)
-export const fetchAssignedBranchesWithDetails = async (userId: string) => {
+export const fetchAssignedBranchesWithDetails = async (userId: string): Promise<BranchWithoutTimestamps[]> => {
   try {
     const { data, error } = await supabase
       .from('branch_assignments')
@@ -161,11 +166,11 @@ export const fetchAssignedBranchesWithDetails = async (userId: string) => {
     
     // Transform data structure for easier consumption
     const branchesWithDetails = data?.map(item => ({
-      id: item.branches?.id,
-      name: item.branches?.name,
-      location: item.branches?.location,
-      category: item.branches?.category,
-      zoneId: item.branches?.zone_id
+      id: item.branches?.id || "",
+      name: item.branches?.name || "",
+      location: item.branches?.location || "",
+      category: item.branches?.category || "bronze", // Default to "bronze" if missing
+      zoneId: item.branches?.zone_id || ""
     })) || [];
     
     return branchesWithDetails;

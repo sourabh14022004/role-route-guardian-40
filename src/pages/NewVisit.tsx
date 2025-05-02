@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -40,7 +39,14 @@ import { fetchAssignedBranchesWithDetails, createBranchVisit } from "@/services/
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
 
-type Branch = Database["public"]["Tables"]["branches"]["Row"];
+// Updated Branch type to match the return from fetchAssignedBranchesWithDetails
+type Branch = {
+  id: string;
+  name: string;
+  location: string;
+  category: "platinum" | "diamond" | "gold" | "silver" | "bronze";
+  zoneId?: string;
+};
 
 const formSchema = z.object({
   branchId: z.string({
@@ -108,7 +114,7 @@ const NewVisit = () => {
         console.log("Fetching branches for user:", user.id);
         const assignedBranches = await fetchAssignedBranchesWithDetails(user.id);
         console.log("Branches loaded:", assignedBranches);
-        setBranches(assignedBranches);
+        setBranches(assignedBranches as Branch[]);
         
         // Set default branch category based on first branch if available
         if (assignedBranches.length > 0 && form.getValues('branchId')) {
