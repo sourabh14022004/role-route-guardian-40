@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
@@ -104,6 +103,240 @@ export const getBranchById = async (branchId: string) => {
       description: error.message || "Unable to fetch branch details"
     });
     return null;
+  }
+};
+
+// Fetch user branch visits (for My Visits page)
+export const fetchUserBranchVisits = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        *,
+        branches (
+          name,
+          location,
+          category
+        )
+      `)
+      .eq('user_id', userId)
+      .order('visit_date', { ascending: false });
+      
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error: any) {
+    console.error("Error fetching user branch visits:", error);
+    toast({
+      variant: "destructive",
+      title: "Error fetching visits",
+      description: error.message || "Unable to fetch your branch visits"
+    });
+    return [];
+  }
+};
+
+// Fetch assigned branches with details (for New Visit page)
+export const fetchAssignedBranchesWithDetails = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('branch_assignments')
+      .select(`
+        branch_id,
+        branches (
+          id,
+          name,
+          location,
+          category,
+          zone_id
+        )
+      `)
+      .eq('user_id', userId);
+    
+    if (error) {
+      throw error;
+    }
+    
+    // Transform data structure for easier consumption
+    const branchesWithDetails = data?.map(item => ({
+      id: item.branches.id,
+      name: item.branches.name,
+      location: item.branches.location,
+      category: item.branches.category,
+      zoneId: item.branches.zone_id
+    })) || [];
+    
+    return branchesWithDetails;
+  } catch (error: any) {
+    console.error("Error fetching assigned branches:", error);
+    toast({
+      variant: "destructive",
+      title: "Error fetching branches",
+      description: error.message || "Unable to fetch your assigned branches"
+    });
+    return [];
+  }
+};
+
+// Create a new branch visit
+export const createBranchVisit = async (visitData: any) => {
+  try {
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .insert(visitData)
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("Error creating branch visit:", error);
+    toast({
+      variant: "destructive",
+      title: "Error saving visit",
+      description: error.message || "Unable to save branch visit data"
+    });
+    return { success: false, error };
+  }
+};
+
+// Get branch visit stats for BH Dashboard
+export const getBranchVisitStats = async (userId: string) => {
+  try {
+    // Get total assigned branches
+    const { data: assignedData, error: assignedError } = await supabase
+      .from('branch_assignments')
+      .select('branch_id')
+      .eq('user_id', userId);
+      
+    if (assignedError) throw assignedError;
+    
+    const assignedBranches = assignedData?.length || 0;
+    
+    // Get branches visited this month
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    const { data: visitData, error: visitError } = await supabase
+      .from('branch_visits')
+      .select('branch_id')
+      .eq('user_id', userId)
+      .gte('visit_date', firstDay)
+      .lte('visit_date', lastDay);
+      
+    if (visitError) throw visitError;
+    
+    // Count unique branches visited
+    const uniqueBranchesVisited = new Set(visitData?.map(v => v.branch_id)).size;
+    
+    // Calculate completion rate
+    const completionRate = assignedBranches > 0 
+      ? Math.round((uniqueBranchesVisited / assignedBranches) * 100)
+      : 0;
+    
+    // Get pending visits (branches not visited yet this month)
+    const pendingVisits = assignedBranches - uniqueBranchesVisited;
+    
+    return {
+      assignedBranches,
+      branchesVisited: uniqueBranchesVisited,
+      pendingVisits: pendingVisits > 0 ? pendingVisits : 0,
+      completionRate
+    };
+  } catch (error) {
+    console.error("Error getting branch visit stats:", error);
+    return {
+      assignedBranches: 0,
+      branchesVisited: 0,
+      pendingVisits: 0,
+      completionRate: 0
+    };
+  }
+};
+
+// Get coverage by branch category for BH Dashboard
+export const getBranchCategoryCoverage = async (userId: string) => {
+  try {
+    // Get all assigned branches by category
+    const { data: assignedBranches, error: assignedError } = await supabase
+      .from('branch_assignments')
+      .select(`
+        branch_id,
+        branches (
+          id,
+          category
+        )
+      `)
+      .eq('user_id', userId);
+      
+    if (assignedError) throw assignedError;
+    
+    // Group assigned branches by category
+    const assignedByCategory: Record<string, string[]> = {};
+    assignedBranches?.forEach(item => {
+      const category = item.branches.category || 'unknown';
+      if (!assignedByCategory[category]) {
+        assignedByCategory[category] = [];
+      }
+      assignedByCategory[category].push(item.branches.id);
+    });
+    
+    // Get current month's visits
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    const { data: visits, error: visitsError } = await supabase
+      .from('branch_visits')
+      .select('branch_id, branch_category')
+      .eq('user_id', userId)
+      .gte('visit_date', firstDay)
+      .lte('visit_date', lastDay);
+      
+    if (visitsError) throw visitsError;
+    
+    // Count visits by category
+    const visitsByCategory: Record<string, Set<string>> = {};
+    visits?.forEach(visit => {
+      const category = visit.branch_category;
+      if (!visitsByCategory[category]) {
+        visitsByCategory[category] = new Set();
+      }
+      visitsByCategory[category].add(visit.branch_id);
+    });
+    
+    // Calculate completion percentage for each category
+    const categoryCoverage = [
+      { category: 'platinum', completion: 0, color: 'bg-violet-500' },
+      { category: 'diamond', completion: 0, color: 'bg-blue-500' },
+      { category: 'gold', completion: 0, color: 'bg-amber-500' },
+      { category: 'silver', completion: 0, color: 'bg-slate-400' },
+      { category: 'bronze', completion: 0, color: 'bg-orange-700' }
+    ];
+    
+    categoryCoverage.forEach(cat => {
+      const assigned = assignedByCategory[cat.category]?.length || 0;
+      const visited = visitsByCategory[cat.category]?.size || 0;
+      
+      cat.completion = assigned > 0 ? Math.round((visited / assigned) * 100) : 0;
+    });
+    
+    return categoryCoverage;
+  } catch (error) {
+    console.error("Error getting branch category coverage:", error);
+    return [
+      { category: 'platinum', completion: 0, color: 'bg-violet-500' },
+      { category: 'diamond', completion: 0, color: 'bg-blue-500' },
+      { category: 'gold', completion: 0, color: 'bg-amber-500' },
+      { category: 'silver', completion: 0, color: 'bg-slate-400' },
+      { category: 'bronze', completion: 0, color: 'bg-orange-700' }
+    ];
   }
 };
 
