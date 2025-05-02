@@ -1,300 +1,289 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CalendarIcon, Check, X, Filter } from "lucide-react";
-import { 
-  BranchVisitReport, 
-  fetchRecentReports, 
-  fetchReportById, 
-  updateReportStatus 
-} from "@/services/reportService";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { getBranchVisitsByRole } from "@/services/reportService";
+import { ClipboardCheck } from "lucide-react";
 
-const getStatusBadge = (status: string | null) => {
-  switch(status) {
-    case "approved":
-      return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
-    case "submitted":
-      return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>;
-    case "rejected":
-      return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
-    default:
-      return <Badge className="bg-gray-100 text-gray-800">Draft</Badge>;
-  }
-};
+const ZHReviewReports = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [reports, setReports] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [processingReports, setProcessingReports] = useState<string[]>([]);
 
-interface ReportDetailsModalProps {
-  reportId: string | null;
-  open: boolean;
-  onClose: () => void;
-  onStatusUpdate: (reportId: string, status: "approved" | "rejected") => void;
-}
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (!user) return;
 
-const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportDetailsModalProps) => {
-  const { data: report, isLoading } = useQuery({
-    queryKey: ['report-details', reportId],
-    queryFn: () => reportId ? fetchReportById(reportId) : null,
-    enabled: !!reportId && open
-  });
+      setIsLoading(true);
+      try {
+        const data = await getBranchVisitsByRole(user.id, "zh");
+        setReports(data);
+      } catch (error) {
+        console.error("Error fetching reports:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load reports.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  if (isLoading) {
-    return (
-      <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-[700px]">
-          <DialogHeader>
-            <DialogTitle>Loading report details...</DialogTitle>
-          </DialogHeader>
-          <div className="flex justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  if (!report) return null;
+    fetchReports();
+  }, [user]);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
+    return new Date(dateString).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Branch Visit Report</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Branch</h3>
-              <p className="text-lg font-medium">{report.branch_name}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Location</h3>
-              <p className="text-lg font-medium">{report.branch_location}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Category</h3>
-              <p className="text-lg font-medium capitalize">{report.branch_category}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Visit Date</h3>
-              <p className="text-lg font-medium">{formatDate(report.visit_date)}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">BHR Name</h3>
-              <p className="text-lg font-medium">{report.bh_name}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Employee Code</h3>
-              <p className="text-lg font-medium">{report.bh_code}</p>
-            </div>
-          </div>
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "bg-green-100 text-green-800";
+      case "submitted":
+        return "bg-blue-100 text-blue-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
 
-          <div className="space-y-4">
-            <h3 className="font-medium text-lg border-b pb-2">Visit Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-3 bg-slate-50 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">HR Connect Session</h4>
-                <p className="font-medium">{report.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Manning Percentage</h4>
-                <p className="font-medium">{report.manning_percentage}%</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Attrition Percentage</h4>
-                <p className="font-medium">{report.attrition_percentage}%</p>
-              </div>
-              {report.status && (
-                <div className="p-3 bg-slate-50 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-500">Status</h4>
-                  <div className="mt-1">{getStatusBadge(report.status)}</div>
-                </div>
-              )}
-            </div>
-          </div>
+  const handleApprove = async (reportId: string) => {
+    try {
+      // Add loading state for this specific report
+      setProcessingReports(prev => [...prev, reportId]);
+      
+      const { data, error } = await supabase
+        .from("branch_visits")
+        .update({ status: "approved" })
+        .eq("id", reportId)
+        .select();
+      
+      if (error) throw error;
+      
+      // Update the report in the UI
+      setReports(prevReports => prevReports.map(report => 
+        report.id === reportId ? { ...report, status: "approved" } : report
+      ));
+      
+      toast({
+        title: "Report approved",
+        description: "The branch visit report has been approved."
+      });
+    } catch (error) {
+      console.error("Error approving report:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to approve report."
+      });
+    } finally {
+      // Remove loading state for this report
+      setProcessingReports(prev => prev.filter(id => id !== reportId));
+    }
+  };
 
-          {report.feedback && (
-            <div>
-              <h3 className="font-medium text-lg border-b pb-2">Feedback</h3>
-              <div className="mt-2 p-4 bg-slate-50 rounded-md">
-                <p>{report.feedback}</p>
-              </div>
-            </div>
-          )}
-
-          {report.status === "submitted" && (
-            <div className="sticky bottom-0 py-4 bg-white border-t mt-6 flex justify-end gap-3">
-              <Button
-                variant="outline"
-                className="bg-white border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={() => onStatusUpdate(report.id, "rejected")}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Reject Report
-              </Button>
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => onStatusUpdate(report.id, "approved")}
-              >
-                <Check className="mr-2 h-4 w-4" />
-                Approve Report
-              </Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-const ZHReviewReports = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-
-  const { data: reports = [], isLoading, refetch } = useQuery({
-    queryKey: ['zh-all-reports'],
-    queryFn: () => fetchRecentReports(100) // Fetch more reports for this page
-  });
-
-  const handleStatusUpdate = async (reportId: string, status: "approved" | "rejected") => {
-    await updateReportStatus(reportId, status);
-    refetch();
-    setSelectedReportId(null);
+  const handleReject = async (reportId: string) => {
+    try {
+      // Add loading state for this specific report
+      setProcessingReports(prev => [...prev, reportId]);
+      
+      const { data, error } = await supabase
+        .from("branch_visits")
+        .update({ status: "rejected" })
+        .eq("id", reportId)
+        .select();
+      
+      if (error) throw error;
+      
+      // Update the report in the UI
+      setReports(prevReports => prevReports.map(report => 
+        report.id === reportId ? { ...report, status: "rejected" } : report
+      ));
+      
+      toast({
+        title: "Report rejected",
+        description: "The branch visit report has been rejected."
+      });
+    } catch (error) {
+      console.error("Error rejecting report:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to reject report."
+      });
+    } finally {
+      // Remove loading state for this report
+      setProcessingReports(prev => prev.filter(id => id !== reportId));
+    }
   };
 
   const filteredReports = reports.filter((report) => {
-    const matchesSearch = 
-      (report.branch_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      report.bh_name?.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesStatus = 
-      statusFilter === "all" || 
-      report.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
+    const searchTerm = searchQuery.toLowerCase();
+    return (
+      report.branch_name?.toLowerCase().includes(searchTerm) ||
+      report.branch_location?.toLowerCase().includes(searchTerm) ||
+      report.bhr_name?.toLowerCase().includes(searchTerm) ||
+      report.status?.toLowerCase().includes(searchTerm)
+    );
   });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
-
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Review Branch Visit Reports</h1>
-        <p className="text-slate-600 mt-1">
-          Manage and review branch visit reports submitted by BHRs
+    <div className="p-5 md:p-8 max-w-7xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-800 mb-2">
+          Review Branch Visit Reports
+        </h1>
+        <p className="text-lg text-slate-600">
+          Approve or reject branch visit reports submitted by BHRs.
         </p>
       </div>
 
-      <Card className="mb-6 hover:shadow-md transition-shadow">
-        <CardContent className="p-5">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-              <Input
-                placeholder="Search by branch name or BHR name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="w-full md:w-48">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="flex items-center">
-                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <Card className="shadow-sm hover:shadow-md transition-shadow">
+        <CardHeader className="border-b pb-3">
+          <CardTitle className="text-lg font-medium">
+            Branch Visit Reports
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-5">
+          <div className="mb-4">
+            <Input
+              type="text"
+              placeholder="Search reports..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className="hover:shadow-md transition-shadow">
-        <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-              <span className="sr-only">Loading...</span>
+            <div className="flex justify-center py-16">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             </div>
           ) : filteredReports.length === 0 ? (
-            <div className="py-12 text-center text-slate-500">
-              <div className="flex justify-center mb-3">
-                <CalendarIcon className="h-12 w-12 text-slate-300" />
-              </div>
-              <h3 className="text-lg font-medium mb-1">No reports found</h3>
-              <p>No branch visit reports match your current filters.</p>
+            <div className="text-center py-8">
+              <ClipboardCheck className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+              <p className="text-slate-600">No reports found</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Reports will appear here as they are submitted
+              </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader className="bg-slate-50">
-                <TableRow>
-                  <TableHead className="font-medium">Branch</TableHead>
-                  <TableHead className="font-medium">BHR Name</TableHead>
-                  <TableHead className="font-medium">Visit Date</TableHead>
-                  <TableHead className="font-medium">Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredReports.map((report) => (
-                  <TableRow key={report.id} className="hover:bg-slate-50">
-                    <TableCell className="font-medium">{report.branch_name}</TableCell>
-                    <TableCell>{report.bh_name}</TableCell>
-                    <TableCell>{formatDate(report.visit_date)}</TableCell>
-                    <TableCell>{getStatusBadge(report.status)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setSelectedReportId(report.id)}
-                        className={`
-                          bg-slate-100 hover:bg-slate-200 text-slate-700 
-                          ${report.status === "submitted" ? "border-blue-200 hover:border-blue-300" : ""}
-                        `}
-                      >
-                        {report.status === "submitted" ? "Review" : "View Details"}
-                      </Button>
-                    </TableCell>
+            <ScrollArea>
+              <Table>
+                <TableCaption>
+                  A list of all branch visit reports.
+                </TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[150px]">Branch</TableHead>
+                    <TableHead>BHR</TableHead>
+                    <TableHead>Visit Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredReports.map((report) => (
+                    <TableRow key={report.id}>
+                      <TableCell className="font-medium">
+                        <div className="font-medium text-slate-800">
+                          {report.branch_name || "Unknown"}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {report.branch_location}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium text-slate-800">
+                          {report.bhr_name || "Unknown"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {formatDate(report.visit_date)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusClass(report.status)}>
+                          {report.status?.charAt(0).toUpperCase() +
+                            report.status?.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleApprove(report.id)}
+                          disabled={
+                            report.status === "approved" ||
+                            processingReports.includes(report.id)
+                          }
+                          className="mr-2"
+                        >
+                          {processingReports.includes(report.id)
+                            ? "Approving..."
+                            : "Approve"}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleReject(report.id)}
+                          disabled={
+                            report.status === "rejected" ||
+                            processingReports.includes(report.id)
+                          }
+                        >
+                          {processingReports.includes(report.id)
+                            ? "Rejecting..."
+                            : "Reject"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
           )}
         </CardContent>
+        <CardFooter className="border-t pt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto hover:bg-slate-100"
+            onClick={() => navigate("/zh/dashboard")}
+          >
+            Back to Dashboard
+          </Button>
+        </CardFooter>
       </Card>
-
-      <ReportDetailsModal
-        reportId={selectedReportId}
-        open={!!selectedReportId}
-        onClose={() => setSelectedReportId(null)}
-        onStatusUpdate={handleStatusUpdate}
-      />
     </div>
   );
 };

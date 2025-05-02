@@ -708,3 +708,137 @@ export interface BranchVisitReport {} // Empty interface to satisfy imports
 export const fetchRecentReports = async () => [];
 export const fetchReportById = async (id: string) => null;
 export const updateReportStatus = async () => false;
+
+// Fix for functions with TypeScript errors
+export async function getBranchVisitsByRole(userId: string, role: string) {
+  try {
+    // Query options based on role
+    const options = {
+      bh: {
+        query: supabase
+          .from("branch_visits")
+          .select(`
+            id, 
+            visit_date, 
+            status, 
+            branch_id,
+            branches:branch_id (name, location, category, zone_id),
+            user_id
+          `)
+          .eq("user_id", userId)
+          .order("visit_date", { ascending: false }),
+      },
+      zh: {
+        query: supabase
+          .from("branch_visits")
+          .select(`
+            id, 
+            visit_date, 
+            status, 
+            branch_id,
+            branches:branch_id (name, location, category, zone_id),
+            user_id,
+            profiles:user_id (full_name, e_code)
+          `)
+          .order("visit_date", { ascending: false }),
+      },
+      ch: {
+        query: supabase
+          .from("branch_visits")
+          .select(`
+            id, 
+            visit_date, 
+            status, 
+            branch_id,
+            branches:branch_id (name, location, category, zone_id),
+            user_id,
+            profiles:user_id (full_name, employee_code)
+          `)
+          .order("visit_date", { ascending: false }),
+      },
+    };
+
+    // Default to BH if invalid role provided
+    const queryOption = options[role as keyof typeof options] || options.bh;
+    const { data, error } = await queryOption.query;
+
+    if (error) throw error;
+
+    // Process data for consistency across roles
+    const processedData = data?.map((visit) => {
+      const formattedVisit = {
+        ...visit,
+        bhr_name: "",
+        branch_name: "",
+        branch_location: "",
+        branch_category: "",
+      };
+
+      // Handle role-specific fields
+      if (role === "zh" || role === "ch") {
+        if (visit.profiles) {
+          const profiles = visit.profiles as any;
+          formattedVisit.bhr_name = profiles.full_name || "Unknown";
+        }
+      }
+
+      // Process branch data
+      if (visit.branches) {
+        const branches = visit.branches as any;
+        formattedVisit.branch_name = branches.name || "Unknown";
+        formattedVisit.branch_location = branches.location || "";
+        formattedVisit.branch_category = branches.category || "";
+      }
+
+      return formattedVisit;
+    });
+
+    return processedData || [];
+  } catch (error) {
+    console.error("Error fetching branch visits:", error);
+    throw error;
+  }
+}
+
+// Fix for fetchReportById function
+export async function fetchReportById(reportId: string) {
+  try {
+    const { data, error } = await supabase
+      .from("branch_visits")
+      .select(`
+        *,
+        profiles:user_id (full_name, employee_code),
+        branches:branch_id (name, location, category, zone_id)
+      `)
+      .eq("id", reportId)
+      .single();
+
+    if (error) throw error;
+    
+    // Process the data for consistency
+    const processedReport = {
+      ...data,
+      bhr_name: "",
+      branch_name: "",
+      branch_location: "",
+      branch_category: ""
+    };
+    
+    if (data.profiles) {
+      const profiles = data.profiles as any;
+      processedReport.bhr_name = profiles.full_name || "Unknown";
+    }
+    
+    if (data.branches) {
+      const branches = data.branches as any;
+      processedReport.branch_name = branches.name || "Unknown";
+      processedReport.branch_location = branches.location || "";
+      processedReport.branch_category = branches.category || "";
+    }
+    
+    return processedReport;
+  } catch (error) {
+    console.error("Error fetching report details:", error);
+    throw error;
+  }
+}
