@@ -255,11 +255,11 @@ export const fetchMonthlySummaryReport = async (month: string, year: string) => 
     // Count visits by BHR
     const bhrVisits = new Map();
     topPerformerData?.forEach(visit => {
-      if (!visit.user_id || !visit.profiles) return;
+      if (!visit.user_id) return;
       
       const currentCount = bhrVisits.get(visit.user_id) || {
         count: 0,
-        name: visit.profiles.full_name || 'Unknown'
+        name: visit.profiles?.full_name || 'Unknown'
       };
       
       bhrVisits.set(visit.user_id, {
@@ -678,31 +678,18 @@ export const exportBranchAssignments = async () => {
       zoneLookup.set(zone.id, zone.name);
     });
     
-    // Transform data structure for export
-    const exportData = data?.map(assignment => {
-      if (!assignment.profiles || !assignment.branches) {
-        return {
-          BHR_Name: 'N/A',
-          BHR_Code: 'N/A',
-          Branch_Name: 'N/A',
-          Branch_Location: 'N/A',
-          Branch_Category: 'Unknown',
-          Zone: 'N/A'
-        };
-      }
-      
-      return {
-        BHR_Name: assignment.profiles.full_name || 'N/A',
-        BHR_Code: assignment.profiles.employee_code || 'N/A',
-        Branch_Name: assignment.branches.name || 'N/A',
-        Branch_Location: assignment.branches.location || 'N/A',
-        Branch_Category: (assignment.branches.category || 'unknown').charAt(0).toUpperCase() + 
-          (assignment.branches.category || 'unknown').slice(1),
-        Zone: zoneLookup.get(assignment.branches.zone_id) || 'N/A'
-      };
-    }) || [];
+    // Transform data for export
+    const exportData = data?.map(assignment => ({
+      BHR_Name: assignment.profiles?.full_name || 'N/A',
+      BHR_Code: assignment.profiles?.employee_code || 'N/A',
+      Branch_Name: assignment.branches?.name || 'N/A',
+      Branch_Location: assignment.branches?.location || 'N/A',
+      Branch_Category: (assignment.branches?.category || 'unknown').charAt(0).toUpperCase() + 
+        (assignment.branches?.category || 'unknown').slice(1),
+      Zone: zoneLookup.get(assignment.branches?.zone_id) || 'N/A'
+    }));
     
-    return exportData;
+    return exportData || [];
   } catch (error: any) {
     console.error("Error exporting branch assignments:", error);
     toast({

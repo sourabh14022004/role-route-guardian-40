@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -28,7 +27,7 @@ import {
 import { ChartContainer } from "@/components/ui/chart";
 import { getVisitMetrics, getPerformanceTrends } from "@/services/branchService";
 import { fetchZoneMetrics } from "@/services/analyticsService";
-import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
+import { QualitativeHeatmap } from "@/components/ch/QualitativeHeatmap";
 
 // Define date range type
 type DateRange = { from: Date; to: Date } | undefined;
@@ -163,10 +162,7 @@ const CHAnalytics = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
-              <DateRangePicker 
-                value={dateRange || { from: undefined, to: undefined }} 
-                onChange={handleDateRangeChange} 
-              />
+              <DateRangePicker onDateChange={handleDateRangeChange} />
             </div>
             <CardDescription>Metrics by branch category</CardDescription>
           </CardHeader>
@@ -221,15 +217,7 @@ const CHAnalytics = () => {
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
             ) : zoneMetrics.length > 0 ? (
-              <ChartContainer
-                config={{
-                  north: { color: '#3b82f6' },
-                  south: { color: '#10b981' },
-                  east: { color: '#f59e0b' },
-                  west: { color: '#ef4444' },
-                  central: { color: '#8b5cf6' }
-                }}
-              >
+              <ChartContainer>
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={zoneMetrics}>
                     <CartesianGrid strokeDasharray="3 3" />
