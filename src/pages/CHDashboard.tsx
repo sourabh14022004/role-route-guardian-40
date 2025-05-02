@@ -20,10 +20,17 @@ import {
   PieChart,
   Pie,
   Cell,
+  BarChart,
+  Bar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
 } from "recharts";
 import { BarList } from "@/components/ui/bar-list";
-import { fetchDashboardStats, fetchTopPerformers, fetchMonthlyTrends, fetchCategoryBreakdown } from "@/services/analyticsService";
-import { CircleCheck, AlertCircle, Users, PieChart as PieChartIcon } from "lucide-react";
+import { fetchDashboardStats, fetchTopPerformers, fetchMonthlyTrends, fetchCategoryBreakdown, fetchQualitativeAssessments } from "@/services/analyticsService";
+import { CircleCheck, Users, PieChart as PieChartIcon, Star, Briefcase, CheckCircle2, TrendingUp, Clock } from "lucide-react";
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 
@@ -37,12 +44,18 @@ const CHDashboard = () => {
     currentAttritionAvg: 0,
     currentErAvg: 0,
     nonVendorAvg: 0,
-    cwTotalCases: 0,
-    riskAssessment: { low: 0, medium: 0, high: 0 }
+    cwTotalCases: 0
   });
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [topPerformers, setTopPerformers] = useState([]);
   const [monthlyTrends, setMonthlyTrends] = useState([]);
+  const [qualitativeData, setQualitativeData] = useState({
+    discipline: 0,
+    hygiene: 0,
+    culture: 0,
+    overall: 0,
+    count: 0
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -69,6 +82,11 @@ const CHDashboard = () => {
         console.info("Fetching monthly trends...");
         const trendsData = await fetchMonthlyTrends();
         setMonthlyTrends(trendsData);
+        
+        // Fetch qualitative assessment data
+        console.info("Fetching qualitative assessments...");
+        const qualitativeStats = await fetchQualitativeAssessments();
+        setQualitativeData(qualitativeStats);
       } catch (error) {
         console.error("Error loading dashboard data:", error);
       } finally {
@@ -78,6 +96,40 @@ const CHDashboard = () => {
 
     loadDashboardData();
   }, []);
+
+  // Format rating text for display
+  const formatRatingText = (rating) => {
+    const ratingMap = {
+      'very_poor': 'Very Poor',
+      'poor': 'Poor',
+      'neutral': 'Neutral',
+      'good': 'Good',
+      'excellent': 'Excellent'
+    };
+    return ratingMap[rating] || rating;
+  };
+
+  // Map ratings to numbers for the radar chart
+  const mapRatingToNumber = (rating) => {
+    const ratingValues = {
+      'very_poor': 1,
+      'poor': 2,
+      'neutral': 3,
+      'good': 4,
+      'excellent': 5
+    };
+    return ratingValues[rating] || 3;
+  };
+
+  // Prepare qualitative data for visualization
+  const prepareQualitativeData = () => {
+    return [
+      { subject: 'Branch Culture', value: qualitativeData.culture },
+      { subject: 'Branch Hygiene', value: qualitativeData.hygiene },
+      { subject: 'Overall Discipline', value: qualitativeData.discipline },
+      { subject: 'Overall Rating', value: qualitativeData.overall }
+    ];
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -175,20 +227,10 @@ const CHDashboard = () => {
         <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
           <CardContent className="p-6">
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium text-indigo-600">Branch Risk</p>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <div className="flex items-center gap-1">
-                  <CircleCheck className="h-4 w-4 text-green-500" />
-                  <span className="text-sm">{stats.riskAssessment.low}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4 text-amber-500" />
-                  <span className="text-sm">{stats.riskAssessment.medium}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4 text-red-500" />
-                  <span className="text-sm">{stats.riskAssessment.high}</span>
-                </div>
+              <p className="text-sm font-medium text-indigo-600">Branch Quality</p>
+              <div className="flex items-end justify-between">
+                <p className="text-3xl font-bold">{qualitativeData.overall.toFixed(1)}</p>
+                <p className="text-sm text-slate-500">/5 rating</p>
               </div>
             </div>
           </CardContent>
@@ -291,8 +333,46 @@ const CHDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Qualitative Assessment */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Qualitative Assessment</CardTitle>
+            <CardDescription>
+              Branch quality metrics from {qualitativeData.count} branch visits
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              </div>
+            ) : qualitativeData.count > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <RadarChart outerRadius={90} data={prepareQualitativeData()}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="subject" />
+                  <PolarRadiusAxis domain={[0, 5]} />
+                  <Radar
+                    name="Quality Rating"
+                    dataKey="value"
+                    stroke="#8884d8"
+                    fill="#8884d8"
+                    fillOpacity={0.6}
+                  />
+                  <Tooltip formatter={(value) => [`${value.toFixed(1)}/5`, 'Rating']} />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-500">
+                <Star className="h-12 w-12 mb-2 opacity-30" />
+                <p>No qualitative assessment data available</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Top performers */}
-        <Card className="col-span-1 lg:col-span-2">
+        <Card>
           <CardHeader>
             <CardTitle>Top Performing BHRs</CardTitle>
             <CardDescription>

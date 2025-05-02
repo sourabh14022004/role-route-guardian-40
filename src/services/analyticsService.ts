@@ -18,7 +18,7 @@ export const fetchDashboardStats = async () => {
     const { data: bhrs, error: bhrsError } = await supabase
       .from('branch_visits')
       .select('user_id', { count: 'exact', head: true })
-      .eq('status', 'approved');
+      .in('status', ['submitted', 'approved']);
     
     if (bhrsError) throw bhrsError;
     
@@ -37,9 +37,9 @@ export const fetchDashboardStats = async () => {
         attrition_percentage,
         er_percentage,
         non_vendor_percentage,
-        cwt_cases,
-        risk_level
-      `);
+        cwt_cases
+      `)
+      .in('status', ['submitted', 'approved']);
     
     if (visitsError) throw visitsError;
     
@@ -63,11 +63,6 @@ export const fetchDashboardStats = async () => {
     let nonVendorSum = 0;
     let cwTotalCases = 0;
     let count = 0;
-    
-    // Risk assessment counters
-    let lowRisk = 0;
-    let mediumRisk = 0;
-    let highRisk = 0;
     
     visits.forEach(visit => {
       // Manning percentage
@@ -95,15 +90,6 @@ export const fetchDashboardStats = async () => {
       if (visit.cwt_cases !== null) {
         cwTotalCases += visit.cwt_cases;
       }
-      
-      // Risk level
-      if (visit.risk_level === 'low') {
-        lowRisk++;
-      } else if (visit.risk_level === 'medium') {
-        mediumRisk++;
-      } else if (visit.risk_level === 'high') {
-        highRisk++;
-      }
     });
     
     const currentManningAvg = count > 0 ? Math.round(manningSum / count) : 0;
@@ -122,12 +108,7 @@ export const fetchDashboardStats = async () => {
       currentAttritionAvg,
       currentErAvg,
       nonVendorAvg,
-      cwTotalCases,
-      riskAssessment: {
-        low: lowRisk,
-        medium: mediumRisk,
-        high: highRisk
-      }
+      cwTotalCases
     };
     
     console.info(stats);
@@ -150,8 +131,7 @@ export const fetchDashboardStats = async () => {
       currentAttritionAvg: 0,
       currentErAvg: 0,
       nonVendorAvg: 0,
-      cwTotalCases: 0,
-      riskAssessment: { low: 0, medium: 0, high: 0 }
+      cwTotalCases: 0
     };
   }
 };
@@ -496,6 +476,98 @@ export const fetchTopPerformers = async () => {
   }
 };
 
+export const fetchQualitativeAssessments = async () => {
+  try {
+    // Get qualitative assessments from branch visits
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        overall_discipline,
+        branch_hygiene,
+        culture_branch,
+        line_manager_behavior
+      `)
+      .in('status', ['submitted', 'approved'])
+      .not('overall_discipline', 'is', null);
+      
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      return {
+        discipline: 0,
+        hygiene: 0,
+        culture: 0,
+        overall: 0,
+        count: 0
+      };
+    }
+    
+    // Convert text ratings to numeric values for calculation
+    const ratingValue = {
+      'very_poor': 1,
+      'poor': 2,
+      'neutral': 3,
+      'good': 4,
+      'excellent': 5
+    };
+
+    // Calculate the count of valid records
+    const count = data.length;
+    
+    // Calculate averages based on the rating values
+    let disciplineSum = 0;
+    let hygieneSum = 0;
+    let cultureSum = 0;
+    let behaviorSum = 0;
+    
+    data.forEach(item => {
+      if (item.overall_discipline) {
+        disciplineSum += ratingValue[item.overall_discipline] || 0;
+      }
+      
+      if (item.branch_hygiene) {
+        hygieneSum += ratingValue[item.branch_hygiene] || 0;
+      }
+      
+      if (item.culture_branch) {
+        cultureSum += ratingValue[item.culture_branch] || 0;
+      }
+      
+      if (item.line_manager_behavior) {
+        behaviorSum += ratingValue[item.line_manager_behavior] || 0;
+      }
+    });
+    
+    // Calculate average ratings
+    const discipline = count > 0 ? disciplineSum / count : 0;
+    const hygiene = count > 0 ? hygieneSum / count : 0;
+    const culture = count > 0 ? cultureSum / count : 0;
+    const behavior = count > 0 ? behaviorSum / count : 0;
+    
+    // Overall average of all ratings
+    const overall = (discipline + hygiene + culture + behavior) / 4;
+    
+    return {
+      discipline,
+      hygiene,
+      culture,
+      behavior,
+      overall,
+      count
+    };
+  } catch (error) {
+    console.error("Error fetching qualitative assessments:", error);
+    return {
+      discipline: 0,
+      hygiene: 0,
+      culture: 0,
+      behavior: 0,
+      overall: 0,
+      count: 0
+    };
+  }
+};
+
 export const fetchCategoryBreakdown = async () => {
   try {
     console.log("Fetching category breakdown from branch visits...");
@@ -505,11 +577,7 @@ export const fetchCategoryBreakdown = async () => {
       .from('branch_visits')
       .select(`
         id,
-        branches:branch_id (
-          id,
-          name,
-          category
-        )
+        branch_category
       `)
       .in('status', ['submitted', 'approved']);
     
@@ -520,13 +588,12 @@ export const fetchCategoryBreakdown = async () => {
     }
     
     // Count branch categories from visit data
-    const categoryCounts: Record<string, number> = {};
+    const categoryCounts = {};
     
     visits.forEach(visit => {
-      const branch = visit.branches as any;
-      if (!branch || !branch.category) return;
+      if (!visit.branch_category) return;
       
-      const category = branch.category.charAt(0).toUpperCase() + branch.category.slice(1).toLowerCase();
+      const category = visit.branch_category.charAt(0).toUpperCase() + visit.branch_category.slice(1).toLowerCase();
       categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     });
     
@@ -545,56 +612,5 @@ export const fetchCategoryBreakdown = async () => {
     
     // Return empty array on error
     return [];
-  }
-};
-
-export const fetchQualitativeAssessments = async () => {
-  try {
-    // Get qualitative assessments from branch visits
-    const { data, error } = await supabase
-      .from('branch_visits')
-      .select(`
-        discipline_rating,
-        hygiene_rating,
-        culture_rating,
-        overall_rating
-      `)
-      .not('overall_rating', 'is', null);
-      
-    if (error) throw error;
-    
-    if (!data || data.length === 0) {
-      return {
-        discipline: 0,
-        hygiene: 0,
-        culture: 0,
-        overall: 0,
-        count: 0
-      };
-    }
-    
-    // Calculate averages
-    const count = data.length;
-    const disciplineSum = data.reduce((sum, item) => sum + (item.discipline_rating || 0), 0);
-    const hygieneSum = data.reduce((sum, item) => sum + (item.hygiene_rating || 0), 0);
-    const cultureSum = data.reduce((sum, item) => sum + (item.culture_rating || 0), 0);
-    const overallSum = data.reduce((sum, item) => sum + (item.overall_rating || 0), 0);
-    
-    return {
-      discipline: Math.round((disciplineSum / count) * 10) / 10,
-      hygiene: Math.round((hygieneSum / count) * 10) / 10,
-      culture: Math.round((cultureSum / count) * 10) / 10,
-      overall: Math.round((overallSum / count) * 10) / 10,
-      count
-    };
-  } catch (error) {
-    console.error("Error fetching qualitative assessments:", error);
-    return {
-      discipline: 0,
-      hygiene: 0,
-      culture: 0,
-      overall: 0,
-      count: 0
-    };
   }
 };
