@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -15,7 +14,8 @@ import { FilePlus, Users, Calendar, ClipboardCheck, TrendingUp } from "lucide-re
 import { 
   getBranchVisitStats, 
   getBranchCategoryCoverage,
-  getVisitMetrics 
+  getVisitMetrics, 
+  getBHVisitMetrics 
 } from "@/services/branchService";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,14 +59,12 @@ const BHDashboard = () => {
     hrConnectSessions: { completed: 0, total: 0 },
     avgParticipation: 0,
     employeeCoverage: 0,
-    newEmployeeCoverage: 0,
+    newEmployeeCoverage: 0
   });
   
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!user) {
-        return;
-      }
+      if (!user?.id) return;
       
       setIsLoading(true);
       try {
@@ -89,12 +87,12 @@ const BHDashboard = () => {
         const categoryCoverage = await getBranchCategoryCoverage(user.id);
         setBranchCategories(categoryCoverage);
         
-        // Fetch visit metrics
-        const metrics = await getVisitMetrics(user.id);
+        // Get visit metrics for this BH user
+        const metrics = await getBHVisitMetrics(user.id);
         setVisitMetrics(metrics);
         
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+        console.error("Error fetching BH dashboard data:", error);
         toast({
           variant: "destructive",
           title: "Error",
@@ -106,7 +104,7 @@ const BHDashboard = () => {
     };
     
     fetchDashboardData();
-  }, [user]);
+  }, [user?.id]);
   
   // Format category names for display
   const formatCategoryName = (category: string) => {

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -89,7 +90,14 @@ const CHAnalytics = () => {
     erPercentage: false,
     nonVendorPercentage: false,
   });
-  const [categoryMetrics, setCategoryMetrics] = useState<any[]>([]);
+  const [categoryMetrics, setCategoryMetrics] = useState<Array<{
+    name: string;
+    manning: number;
+    attrition: number;
+    er: number;
+    cwt: number;
+  }>>([]);
+  
   // Set default date range to current month
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -125,6 +133,11 @@ const CHAnalytics = () => {
     loadAnalyticsData();
   }, [timeRange]);
 
+  useEffect(() => {
+    // Fetch metrics when date range changes
+    fetchCategoryMetrics();
+  }, [date]);
+
   const handleMetricToggle = (metricId: string) => {
     setSelectedMetrics(prev => ({
       ...prev,
@@ -138,9 +151,22 @@ const CHAnalytics = () => {
   // Fetch category metrics data
   const fetchCategoryMetrics = async () => {
     try {
-      // Use the getVisitMetrics function from branchService
-      const metricsData = await getVisitMetrics();
-      setCategoryMetrics(metricsData);
+      // Format date range for the API call
+      const dateRangeParam = date && date.from ? {
+        from: date.from,
+        to: date.to || date.from
+      } : undefined;
+      
+      // Use the getVisitMetrics function from branchService with the date range
+      const metricsData = await getVisitMetrics(dateRangeParam);
+      
+      // Filter by category if selected
+      const filteredData = branchCategory 
+        ? metricsData.filter(item => 
+            item.name.toLowerCase() === branchCategory.toLowerCase())
+        : metricsData;
+        
+      setCategoryMetrics(filteredData);
       
     } catch (error) {
       console.error("Error fetching category metrics:", error);
@@ -198,7 +224,11 @@ const CHAnalytics = () => {
           </Popover>
 
           {/* Branch Category Filter */}
-          <Select onValueChange={value => setBranchCategory(value === "all" ? null : value)}>
+          <Select onValueChange={value => {
+            setBranchCategory(value === "all" ? null : value);
+            // Refetch data with new category filter
+            setTimeout(() => fetchCategoryMetrics(), 100);
+          }}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
@@ -373,7 +403,7 @@ const CHAnalytics = () => {
                   </div>
                 ) : categoryMetrics.length === 0 ? (
                   <div className="flex justify-center items-center h-80 text-center text-muted-foreground">
-                    <p>No category data available</p>
+                    <p>No category data available for the selected filters</p>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={400}>
@@ -413,7 +443,7 @@ const CHAnalytics = () => {
                   </div>
                 ) : categoryMetrics.length === 0 ? (
                   <div className="flex justify-center items-center h-80 text-center text-muted-foreground">
-                    <p>No category data available</p>
+                    <p>No category data available for the selected filters</p>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={400}>
