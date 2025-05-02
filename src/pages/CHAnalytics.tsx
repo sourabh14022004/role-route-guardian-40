@@ -28,7 +28,6 @@ import {
 import { ChartContainer } from "@/components/ui/chart";
 import { getVisitMetrics, getPerformanceTrends } from "@/services/branchService";
 import { fetchZoneMetrics } from "@/services/analyticsService";
-// Import QualitativeHeatmap as a default export
 import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
 
 // Define date range type
@@ -96,7 +95,6 @@ const CHAnalytics = () => {
     loadPerformanceTrends();
   }, [selectedChart]);
 
-  // Update the function to match the interface expected by DateRangePicker
   const handleDateRangeChange = (range: DateRange) => {
     setDateRange(range);
   };
@@ -165,7 +163,6 @@ const CHAnalytics = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
-              {/* Update the DateRangePicker component to use the correct props */}
               <DateRangePicker 
                 value={dateRange || { from: undefined, to: undefined }} 
                 onChange={handleDateRangeChange} 
