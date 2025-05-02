@@ -26,6 +26,13 @@ type BranchCategoryStats = {
   color: string;
 };
 
+type VisitMetricsType = {
+  hrConnectSessions: { completed: number; total: number };
+  avgParticipation: number;
+  employeeCoverage: number;
+  newEmployeeCoverage: number;
+};
+
 const BHDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -48,7 +55,7 @@ const BHDashboard = () => {
     { category: "bronze", completion: 0, color: "bg-orange-700" },
   ]);
   
-  const [visitMetrics, setVisitMetrics] = useState({
+  const [visitMetrics, setVisitMetrics] = useState<VisitMetricsType>({
     hrConnectSessions: { completed: 0, total: 0 },
     avgParticipation: 0,
     employeeCoverage: 0,

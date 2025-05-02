@@ -3,10 +3,11 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { getQualitativeMetricsForHeatmap, HeatmapData, QualitativeMetric } from "@/services/reportService";
+import { DateRange } from "react-day-picker";
 
 interface QualitativeHeatmapProps {
   title?: string;
-  dateRange?: { from: Date; to: Date | undefined } | null;
+  dateRange?: DateRange | null;
   branchCategory?: string | null;
 }
 
@@ -47,8 +48,16 @@ const QualitativeHeatmap = ({
       setError(null);
 
       try {
+        // Create a properly formatted date range object if dateRange exists
+        const formattedDateRange = dateRange && dateRange.from 
+          ? {
+              from: dateRange.from,
+              to: dateRange.to || dateRange.from // If to is undefined, use from as the end date
+            }
+          : undefined;
+
         // Use our service function to get the data
-        const processedData = await getQualitativeMetricsForHeatmap(dateRange, branchCategory);
+        const processedData = await getQualitativeMetricsForHeatmap(formattedDateRange, branchCategory);
         setData(processedData);
       } catch (error) {
         console.error("Error fetching qualitative data:", error);

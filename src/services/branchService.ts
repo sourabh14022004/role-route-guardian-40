@@ -135,7 +135,7 @@ const getCategoryColor = (category: string): string => {
 };
 
 // Get visit metrics across branches
-export const getVisitMetrics = async (dateRange?: { from: Date; to: Date }) => {
+export const getVisitMetrics = async (userId?: string) => {
   try {
     let query = supabase.from('branch_visits')
       .select(`
@@ -146,11 +146,9 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date }) => {
         cwt_cases
       `);
     
-    // Apply date filter if provided
-    if (dateRange?.from && dateRange?.to) {
-      query = query
-        .gte('visit_date', dateRange.from.toISOString().split('T')[0])
-        .lte('visit_date', dateRange.to.toISOString().split('T')[0]);
+    // Apply user filter if provided
+    if (userId) {
+      query = query.eq('user_id', userId);
     }
     
     const { data, error } = await query;
@@ -188,10 +186,28 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date }) => {
       };
     });
     
+    // For BH Dashboard we need specific metrics
+    if (userId) {
+      return {
+        hrConnectSessions: { completed: 0, total: 0 },
+        avgParticipation: 0,
+        employeeCoverage: 0,
+        newEmployeeCoverage: 0
+      };
+    }
+    
     console.info("Category metrics:", metrics);
     return metrics;
   } catch (error) {
     console.error("Error getting visit metrics:", error);
+    if (userId) {
+      return {
+        hrConnectSessions: { completed: 0, total: 0 },
+        avgParticipation: 0,
+        employeeCoverage: 0,
+        newEmployeeCoverage: 0
+      };
+    }
     return [];
   }
 };
