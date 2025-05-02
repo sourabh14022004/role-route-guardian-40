@@ -34,6 +34,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { fetchMonthlyTrends, fetchQualitativeAssessments } from "@/services/analyticsService";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 const timeRangeOptions = [
   { value: "lastSevenDays", label: "Last 7 Days" },
@@ -60,6 +62,7 @@ const CHAnalytics = () => {
     hygiene: 0,
     culture: 0,
     overall: 0,
+    behavior: 0,
     count: 0
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -72,6 +75,7 @@ const CHAnalytics = () => {
     erPercentage: false,
     nonVendorPercentage: false,
   });
+  const [categoryMetrics, setCategoryMetrics] = useState([]);
 
   useEffect(() => {
     const loadAnalyticsData = async () => {
@@ -87,8 +91,16 @@ const CHAnalytics = () => {
         // Fetch qualitative assessment data
         const qualData = await fetchQualitativeAssessments();
         setQualitativeData(qualData);
+
+        // Fetch category metrics data directly from the branch_visits table
+        await fetchCategoryMetrics();
       } catch (error) {
         console.error("Error loading analytics data:", error);
+        toast({
+          title: "Error loading analytics data",
+          description: "There was a problem fetching analytics data.",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
@@ -107,6 +119,95 @@ const CHAnalytics = () => {
   // At least one metric must be selected
   const atLeastOneMetricSelected = Object.values(selectedMetrics).some(value => value);
 
+  // Fetch real category metrics data from branch_visits
+  const fetchCategoryMetrics = async () => {
+    try {
+      // Get total branches count
+      const { count: totalBranches, error: branchError } = await supabase
+        .from('branches')
+        .select('*', { count: 'exact', head: true });
+      
+      if (branchError) throw branchError;
+      
+      // Get all branch visits with their categories
+      const { data: visits, error: visitsError } = await supabase
+        .from('branch_visits')
+        .select('branch_category, manning_percentage, attrition_percentage, er_percentage, cwt_cases')
+        .in('status', ['submitted', 'approved']);
+        
+      if (visitsError) throw visitsError;
+      
+      if (!visits || visits.length === 0) {
+        console.warn("No branch visits found");
+        return;
+      }
+      
+      // Group by category and calculate averages
+      const categoryStats = {};
+      
+      visits.forEach(visit => {
+        const category = visit.branch_category ? 
+          visit.branch_category.charAt(0).toUpperCase() + visit.branch_category.slice(1) : 'Unknown';
+        
+        if (!categoryStats[category]) {
+          categoryStats[category] = {
+            count: 0,
+            manning: 0,
+            attrition: 0,
+            er: 0,
+            cwt: 0
+          };
+        }
+        
+        categoryStats[category].count++;
+        
+        if (typeof visit.manning_percentage === 'number') {
+          categoryStats[category].manning += visit.manning_percentage;
+        }
+        
+        if (typeof visit.attrition_percentage === 'number') {
+          categoryStats[category].attrition += visit.attrition_percentage;
+        }
+        
+        if (typeof visit.er_percentage === 'number') {
+          categoryStats[category].er += visit.er_percentage;
+        }
+        
+        if (typeof visit.cwt_cases === 'number') {
+          categoryStats[category].cwt += visit.cwt_cases;
+        }
+      });
+      
+      // Calculate averages and format data
+      const formattedData = Object.entries(categoryStats).map(([category, stats]) => ({
+        name: category,
+        manning: Math.round(stats.manning / stats.count) || 0,
+        attrition: Math.round(stats.attrition / stats.count) || 0,
+        er: Math.round(stats.er / stats.count) || 0,
+        cwt: Math.round(stats.cwt / stats.count) || 0
+      }));
+      
+      console.log("Category metrics:", formattedData);
+      setCategoryMetrics(formattedData);
+      
+    } catch (error) {
+      console.error("Error fetching category metrics:", error);
+      toast({
+        title: "Error loading category metrics",
+        description: "There was a problem fetching category metrics data.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Format tooltip value with proper type checking
+  const formatTooltipValue = (value) => {
+    if (typeof value === 'number') {
+      return `${value.toFixed(1)}/5`;
+    }
+    return `${value}/5`;
+  };
+
   // Prepare radar data for the qualitative assessment
   const radarData = [
     {
@@ -122,6 +223,11 @@ const CHAnalytics = () => {
     {
       subject: "Culture",
       value: qualitativeData.culture,
+      fullMark: 5,
+    },
+    {
+      subject: "Behavior",
+      value: qualitativeData.behavior,
       fullMark: 5,
     },
     {
@@ -291,16 +397,14 @@ const CHAnalytics = () => {
                   <div className="flex justify-center items-center h-80">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                   </div>
+                ) : categoryMetrics.length === 0 ? (
+                  <div className="flex justify-center items-center h-80 text-center text-muted-foreground">
+                    <p>No category data available</p>
+                  </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={400}>
                     <BarChart
-                      data={[
-                        { name: 'Platinum', manning: 85, attrition: 5 },
-                        { name: 'Diamond', manning: 82, attrition: 7 },
-                        { name: 'Gold', manning: 78, attrition: 12 },
-                        { name: 'Silver', manning: 75, attrition: 15 },
-                        { name: 'Bronze', manning: 70, attrition: 18 },
-                      ]}
+                      data={categoryMetrics}
                       margin={{
                         top: 20,
                         right: 30,
@@ -333,16 +437,14 @@ const CHAnalytics = () => {
                   <div className="flex justify-center items-center h-80">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                   </div>
+                ) : categoryMetrics.length === 0 ? (
+                  <div className="flex justify-center items-center h-80 text-center text-muted-foreground">
+                    <p>No category data available</p>
+                  </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={400}>
                     <BarChart
-                      data={[
-                        { name: 'Platinum', er: 2, cwt: 1 },
-                        { name: 'Diamond', er: 3, cwt: 2 },
-                        { name: 'Gold', er: 5, cwt: 4 },
-                        { name: 'Silver', er: 8, cwt: 6 },
-                        { name: 'Bronze', er: 12, cwt: 8 },
-                      ]}
+                      data={categoryMetrics}
                       margin={{
                         top: 20,
                         right: 30,
@@ -395,7 +497,9 @@ const CHAnalytics = () => {
                           fill="#8884d8"
                           fillOpacity={0.6}
                         />
-                        <Tooltip formatter={(value) => [`${value}/5`, 'Rating']} />
+                        <Tooltip formatter={(value) => {
+                          return typeof value === 'number' ? [`${value.toFixed(1)}/5`, 'Rating'] : [`${value}/5`, 'Rating'];
+                        }} />
                         <Legend />
                       </RadarChart>
                     </ResponsiveContainer>
@@ -409,18 +513,21 @@ const CHAnalytics = () => {
                         { name: 'Discipline Rating', value: qualitativeData.discipline, color: '#3b82f6', max: 5 },
                         { name: 'Hygiene Rating', value: qualitativeData.hygiene, color: '#10b981', max: 5 },
                         { name: 'Culture Rating', value: qualitativeData.culture, color: '#8b5cf6', max: 5 },
+                        { name: 'Manager Behavior', value: qualitativeData.behavior, color: '#ec4899', max: 5 },
                         { name: 'Overall Rating', value: qualitativeData.overall, color: '#f59e0b', max: 5 },
                       ].map((item, idx) => (
                         <div key={idx} className="flex flex-col">
                           <div className="flex justify-between mb-2">
                             <span className="text-sm font-medium">{item.name}</span>
-                            <span className="text-sm font-bold">{item.value.toFixed(1)} / {item.max}</span>
+                            <span className="text-sm font-bold">
+                              {typeof item.value === 'number' ? item.value.toFixed(1) : item.value} / {item.max}
+                            </span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                             <div
                               className="h-full rounded-full"
                               style={{
-                                width: `${(item.value / item.max) * 100}%`,
+                                width: `${((typeof item.value === 'number' ? item.value : 0) / item.max) * 100}%`,
                                 backgroundColor: item.color,
                               }}
                             />
