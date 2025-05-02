@@ -102,6 +102,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
           id,
           visit_date,
           status,
+          branch_id,
           branches:branch_id (
             name,
             location,
@@ -119,7 +120,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
     enabled: !!bhId && open
   });
 
-  // Fixed: Now properly waits for reportDetails data
+  // Fixed report details query to properly retrieve branch information
   const { data: reportDetails, isLoading: reportDetailsLoading } = useQuery({
     queryKey: ['bhr-report-details', selectedReportId],
     queryFn: async () => {
@@ -127,7 +128,14 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
       
       const { data, error } = await supabase
         .from('branch_visits')
-        .select('*, branches:branch_id(name, location)')
+        .select(`
+          *,
+          branches:branch_id (
+            name, 
+            location,
+            category
+          )
+        `)
         .eq('id', selectedReportId)
         .single();
       
@@ -135,6 +143,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
         console.error("Error fetching report details:", error);
         throw error;
       }
+      
       return data;
     },
     enabled: !!selectedReportId
@@ -174,6 +183,22 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
       month: 'short',
       year: 'numeric'
     });
+  };
+
+  // Helper function to safely get branch name
+  const getBranchName = (report: any) => {
+    if (report.branches && typeof report.branches === 'object' && report.branches.name) {
+      return report.branches.name;
+    }
+    return 'Unknown';
+  };
+
+  // Helper function to safely get branch location
+  const getBranchLocation = (report: any) => {
+    if (report.branches && typeof report.branches === 'object' && report.branches.location) {
+      return report.branches.location;
+    }
+    return 'Unknown';
   };
 
   return (
@@ -297,8 +322,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                     <TableBody>
                       {recentReports.map(report => (
                         <TableRow key={report.id} className="hover:bg-slate-50">
-                          <TableCell className="font-medium">{report.branches && typeof report.branches === 'object' ? 
-                            (report.branches as any).name : 'Unknown'}</TableCell>
+                          <TableCell className="font-medium">{getBranchName(report)}</TableCell>
                           <TableCell>{formatDate(report.visit_date)}</TableCell>
                           <TableCell>{getStatusBadge(report.status)}</TableCell>
                           <TableCell>
@@ -348,11 +372,11 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-md">
                         <div>
                           <p className="text-sm font-medium text-slate-500">Branch</p>
-                          <p className="font-medium">{reportDetails.branches ? reportDetails.branches.name : 'Unknown'}</p>
+                          <p className="font-medium">{getBranchName(reportDetails)}</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-slate-500">Location</p>
-                          <p className="font-medium">{reportDetails.branches ? reportDetails.branches.location : 'Unknown'}</p>
+                          <p className="font-medium">{getBranchLocation(reportDetails)}</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-slate-500">Visit Date</p>
