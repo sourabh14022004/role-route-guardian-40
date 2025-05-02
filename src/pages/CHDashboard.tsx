@@ -131,6 +131,14 @@ const CHDashboard = () => {
     ];
   };
 
+  // Fixed tooltip formatter function to handle different value types
+  const formatTooltipValue = (value) => {
+    if (typeof value === 'number') {
+      return value.toFixed(1);
+    }
+    return value;
+  };
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Channel Head Dashboard</h1>
@@ -359,7 +367,9 @@ const CHDashboard = () => {
                     fill="#8884d8"
                     fillOpacity={0.6}
                   />
-                  <Tooltip formatter={(value) => [`${value.toFixed(1)}/5`, 'Rating']} />
+                  <Tooltip formatter={(value) => {
+                    return typeof value === 'number' ? [`${value.toFixed(1)}/5`, 'Rating'] : [`${value}/5`, 'Rating'];
+                  }} />
                 </RadarChart>
               </ResponsiveContainer>
             ) : (
