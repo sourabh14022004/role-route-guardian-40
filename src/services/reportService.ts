@@ -3,6 +3,42 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
 
+// Create a new branch visit
+export async function createBranchVisit(visitData: {
+  user_id: string;
+  branch_id: string;
+  visit_date: string;
+  customer_traffic?: string;
+  queue_management?: string;
+  cleanliness?: string;
+  staff_efficiency?: string;
+  service_quality?: string;
+  overall_impression?: string;
+  additional_notes?: string;
+}) {
+  try {
+    // Set the initial status to 'submitted'
+    const dataWithStatus = {
+      ...visitData,
+      status: 'submitted',
+      created_at: new Date().toISOString()
+    };
+    
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .insert(dataWithStatus)
+      .select('id')
+      .single();
+    
+    if (error) throw error;
+    
+    return { success: true, id: data.id };
+  } catch (error: any) {
+    console.error("Error creating branch visit:", error);
+    throw new Error(error.message || "Failed to create branch visit");
+  }
+}
+
 // Get stats for a BHR's reports
 export const fetchBHRReportStats = async (bhId: string) => {
   try {
@@ -808,7 +844,7 @@ export async function getBranchVisitsByRole(userId: string, role: string) {
   }
 }
 
-// The implementation of fetchReportById (removed the stub declaration above)
+// The implementation of fetchReportById
 export async function fetchReportById(reportId: string) {
   try {
     const { data, error } = await supabase

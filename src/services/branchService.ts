@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 
@@ -137,7 +136,36 @@ export const fetchUserBranchVisits = async () => {
   return [];
 };
 
-export const getUserAssignedBranches = async () => {
-  // Return placeholder data for user assigned branches
-  return [];
+export const getUserAssignedBranches = async (userId: string) => {
+  try {
+    // Get branch assignments for this user
+    const { data: assignments, error: assignmentError } = await supabase
+      .from('branch_assignments')
+      .select('branch_id')
+      .eq('user_id', userId);
+      
+    if (assignmentError) throw assignmentError;
+    
+    // If no assignments, return empty array
+    if (!assignments || assignments.length === 0) {
+      return [];
+    }
+    
+    // Get branch details for the assigned branches
+    const branchIds = assignments.map(assignment => assignment.branch_id);
+    
+    const { data: branches, error: branchError } = await supabase
+      .from('branches')
+      .select('id, name, location, category')
+      .in('id', branchIds);
+      
+    if (branchError) throw branchError;
+    
+    // Return the branch details
+    return branches || [];
+  } catch (error) {
+    console.error("Error fetching user assigned branches:", error);
+    // Return an empty array on error
+    return [];
+  }
 };
