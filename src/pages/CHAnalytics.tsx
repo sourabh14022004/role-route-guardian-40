@@ -200,368 +200,367 @@ const CHAnalytics = () => {
       
       <Card className="mb-8">
         <CardHeader className="border-b">
-          <Tabs defaultValue="performance" value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-3 w-full md:w-auto">
+          <CardTitle className="text-2xl">Analytics Dashboard</CardTitle>
+        </CardHeader>
+        
+        <CardContent className="p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-3 w-full md:w-auto mb-6">
               <TabsTrigger value="performance">Performance Trends</TabsTrigger>
               <TabsTrigger value="categories">Category Analysis</TabsTrigger>
               <TabsTrigger value="quality">Quality Assessment</TabsTrigger>
             </TabsList>
-          </Tabs>
-        </CardHeader>
-        
-        <TabsContent value="performance" className="mt-0">
-          <CardHeader className="pb-3">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle className="text-2xl">Performance Trends</CardTitle>
-              
-              <div className="flex flex-col sm:flex-row gap-4 items-center">
-                <ToggleGroup 
-                  type="single" 
-                  value={selectedPeriod}
-                  onValueChange={(value) => value && handlePeriodChange(value)}
-                  className="justify-start"
-                >
-                  {PERIOD_OPTIONS.map((option) => (
-                    <ToggleGroupItem 
-                      key={option.value} 
-                      value={option.value}
-                      aria-label={option.label}
-                      className="text-xs sm:text-sm"
-                    >
-                      {option.label}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              </div>
-            </div>
-            <CardDescription>Branch performance metrics over time</CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            <div className="mb-4 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2">
-                <Switch id="manning-toggle" checked={showManning} onCheckedChange={setShowManning} />
-                <Label htmlFor="manning-toggle" className="text-sm cursor-pointer">
-                  <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-1"></span>
-                  Manning %
-                </Label>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Switch id="attrition-toggle" checked={showAttrition} onCheckedChange={setShowAttrition} />
-                <Label htmlFor="attrition-toggle" className="text-sm cursor-pointer">
-                  <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
-                  Attrition %
-                </Label>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Switch id="er-toggle" checked={showEr} onCheckedChange={setShowEr} />
-                <Label htmlFor="er-toggle" className="text-sm cursor-pointer">
-                  <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
-                  ER %
-                </Label>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Switch id="non-vendor-toggle" checked={showNonVendor} onCheckedChange={setShowNonVendor} />
-                <Label htmlFor="non-vendor-toggle" className="text-sm cursor-pointer">
-                  <span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-1"></span>
-                  Non-Vendor %
-                </Label>
-              </div>
-            </div>
             
-            {isPerformanceLoading ? (
-              <div className="flex justify-center items-center h-80">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              </div>
-            ) : performanceData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart 
-                  data={performanceData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="month" 
-                    angle={-45} 
-                    textAnchor="end"
-                    height={70}
-                    tickFormatter={formatXAxis} 
-                    interval={0}
-                  />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Legend />
-                  {showManning && (
-                    <Line type="monotone" dataKey="manning" name="Manning %" stroke="#3b82f6" strokeWidth={2} />
-                  )}
-                  {showAttrition && (
-                    <Line type="monotone" dataKey="attrition" name="Attrition %" stroke="#ef4444" strokeWidth={2} />
-                  )}
-                  {showEr && (
-                    <Line type="monotone" dataKey="er" name="ER %" stroke="#10b981" strokeWidth={2} />
-                  )}
-                  {showNonVendor && (
-                    <Line type="monotone" dataKey="nonVendor" name="Non-Vendor %" stroke="#8b5cf6" strokeWidth={2} />
-                  )}
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-80">
-                <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
-                <p className="text-slate-500">No performance trend data available</p>
-                <p className="text-sm text-slate-400">Data will appear as branch visits are recorded</p>
-              </div>
-            )}
-          </CardContent>
-        </TabsContent>
-        
-        <TabsContent value="categories" className="mt-0">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
-              <DateRangePicker 
-                value={dateRange ? dateRange : { from: undefined, to: undefined }} 
-                onChange={handleDateRangeChange} 
-              />
-            </div>
-            <CardDescription>Metrics by branch category</CardDescription>
-          </CardHeader>
-          
-          <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div>
-              <div className="mb-4 flex flex-wrap gap-4">
-                <div className="flex items-center gap-2">
-                  <Switch id="manning-category-toggle" checked={showManningCategory} onCheckedChange={setShowManningCategory} />
-                  <Label htmlFor="manning-category-toggle" className="text-sm cursor-pointer">
-                    <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-1"></span>
-                    Manning
-                  </Label>
+            <TabsContent value="performance">
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <h3 className="text-xl font-medium">Performance Trends</h3>
+                  
+                  <div className="flex flex-col sm:flex-row gap-4 items-center">
+                    <ToggleGroup 
+                      type="single" 
+                      value={selectedPeriod}
+                      onValueChange={(value) => value && handlePeriodChange(value)}
+                      className="justify-start"
+                    >
+                      {PERIOD_OPTIONS.map((option) => (
+                        <ToggleGroupItem 
+                          key={option.value} 
+                          value={option.value}
+                          aria-label={option.label}
+                          className="text-xs sm:text-sm"
+                        >
+                          {option.label}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                  </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <Switch id="attrition-category-toggle" checked={showAttritionCategory} onCheckedChange={setShowAttritionCategory} />
-                  <Label htmlFor="attrition-category-toggle" className="text-sm cursor-pointer">
-                    <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
-                    Attrition
-                  </Label>
+                <div className="mb-4 flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <Switch id="manning-toggle" checked={showManning} onCheckedChange={setShowManning} />
+                    <Label htmlFor="manning-toggle" className="text-sm cursor-pointer">
+                      <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-1"></span>
+                      Manning %
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Switch id="attrition-toggle" checked={showAttrition} onCheckedChange={setShowAttrition} />
+                    <Label htmlFor="attrition-toggle" className="text-sm cursor-pointer">
+                      <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
+                      Attrition %
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Switch id="er-toggle" checked={showEr} onCheckedChange={setShowEr} />
+                    <Label htmlFor="er-toggle" className="text-sm cursor-pointer">
+                      <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+                      ER %
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Switch id="non-vendor-toggle" checked={showNonVendor} onCheckedChange={setShowNonVendor} />
+                    <Label htmlFor="non-vendor-toggle" className="text-sm cursor-pointer">
+                      <span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-1"></span>
+                      Non-Vendor %
+                    </Label>
+                  </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <Switch id="er-category-toggle" checked={showErCategory} onCheckedChange={setShowErCategory} />
-                  <Label htmlFor="er-category-toggle" className="text-sm cursor-pointer">
-                    <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
-                    ER
-                  </Label>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Switch id="cwt-category-toggle" checked={showCwtCategory} onCheckedChange={setShowCwtCategory} />
-                  <Label htmlFor="cwt-category-toggle" className="text-sm cursor-pointer">
-                    <span className="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-1"></span>
-                    CWT
-                  </Label>
-                </div>
-              </div>
-              
-              {isLoading ? (
-                <div className="flex justify-center items-center h-64">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                </div>
-              ) : categoryMetrics.length > 0 ? (
-                <ChartContainer 
-                  config={{
-                    platinum: { color: '#9333ea' },
-                    diamond: { color: '#2563eb' },
-                    gold: { color: '#eab308' },
-                    silver: { color: '#94a3b8' },
-                    bronze: { color: '#f97316' },
-                    unknown: { color: '#cbd5e1' }
-                  }}
-                >
-                  <ResponsiveContainer width="100%" height={350}>
-                    <BarChart 
-                      data={categoryMetrics}
+                {isPerformanceLoading ? (
+                  <div className="flex justify-center items-center h-80">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                  </div>
+                ) : performanceData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart 
+                      data={performanceData}
                       margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis 
-                        dataKey="name" 
+                        dataKey="month" 
                         angle={-45} 
-                        textAnchor="end" 
+                        textAnchor="end"
                         height={70}
+                        tickFormatter={formatXAxis} 
                         interval={0}
                       />
-                      <YAxis />
+                      <YAxis domain={[0, 100]} />
                       <Tooltip />
                       <Legend />
-                      {showManningCategory && (
-                        <Bar dataKey="manning" name="Manning" fill="#3b82f6" />
+                      {showManning && (
+                        <Line type="monotone" dataKey="manning" name="Manning %" stroke="#3b82f6" strokeWidth={2} />
                       )}
-                      {showAttritionCategory && (
-                        <Bar dataKey="attrition" name="Attrition" fill="#ef4444" />
+                      {showAttrition && (
+                        <Line type="monotone" dataKey="attrition" name="Attrition %" stroke="#ef4444" strokeWidth={2} />
                       )}
-                      {showErCategory && (
-                        <Bar dataKey="er" name="ER" fill="#10b981" />
+                      {showEr && (
+                        <Line type="monotone" dataKey="er" name="ER %" stroke="#10b981" strokeWidth={2} />
                       )}
-                      {showCwtCategory && (
-                        <Bar dataKey="cwt" name="CWT" fill="#ca8a04" />
+                      {showNonVendor && (
+                        <Line type="monotone" dataKey="nonVendor" name="Non-Vendor %" stroke="#8b5cf6" strokeWidth={2} />
                       )}
-                    </BarChart>
+                    </LineChart>
                   </ResponsiveContainer>
-                </ChartContainer>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-64">
-                  <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
-                  <p className="text-slate-500">No category metrics available</p>
-                  <p className="text-sm text-slate-400">Select a date range to view data</p>
-                </div>
-              )}
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium mb-4">Branch Category Distribution</h3>
-              {isCategoryLoading ? (
-                <div className="flex justify-center items-center h-64">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                </div>
-              ) : categoryBreakdown && categoryBreakdown.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={categoryBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, value }) => `${name}: ${value}`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {categoryBreakdown.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value, name) => [`${value} branches`, name]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-500">
-                  <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
-                  <p>No category breakdown available</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </TabsContent>
-        
-        <TabsContent value="quality" className="mt-0">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-medium">Qualitative Assessment</CardTitle>
-              <DateRangePicker 
-                value={dateRange ? dateRange : { from: undefined, to: undefined }} 
-                onChange={handleDateRangeChange} 
-              />
-            </div>
-            <CardDescription>
-              Branch quality metrics from {qualitativeData.count} branch visits
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isQualitativeLoading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-80">
+                    <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
+                    <p className="text-slate-500">No performance trend data available</p>
+                    <p className="text-sm text-slate-400">Data will appear as branch visits are recorded</p>
+                  </div>
+                )}
               </div>
-            ) : qualitativeData.count > 0 ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <RadarChart outerRadius={90} data={prepareQualitativeData()}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="subject" />
-                      <PolarRadiusAxis domain={[0, 5]} />
-                      <Radar
-                        name="Quality Rating"
-                        dataKey="value"
-                        stroke="#8884d8"
-                        fill="#8884d8"
-                        fillOpacity={0.6}
-                      />
-                      <Tooltip formatter={(value) => {
-                        return typeof value === 'number' ? [`${value.toFixed(1)}/5`, 'Rating'] : [`${value}/5`, 'Rating'];
-                      }} />
-                    </RadarChart>
-                  </ResponsiveContainer>
+            </TabsContent>
+            
+            <TabsContent value="categories">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-medium">Category-wise Metrics</h3>
+                  <DateRangePicker 
+                    value={dateRange ? dateRange : { from: undefined, to: undefined }} 
+                    onChange={handleDateRangeChange} 
+                  />
                 </div>
-                <div>
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-sm font-medium mb-2">Branch Culture</h3>
-                      <div className="flex items-center">
-                        <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
-                          <div 
-                            className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: `${(qualitativeData.culture / 5) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">{qualitativeData.culture.toFixed(1)}</span>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div>
+                    <div className="mb-4 flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2">
+                        <Switch id="manning-category-toggle" checked={showManningCategory} onCheckedChange={setShowManningCategory} />
+                        <Label htmlFor="manning-category-toggle" className="text-sm cursor-pointer">
+                          <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-1"></span>
+                          Manning
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Switch id="attrition-category-toggle" checked={showAttritionCategory} onCheckedChange={setShowAttritionCategory} />
+                        <Label htmlFor="attrition-category-toggle" className="text-sm cursor-pointer">
+                          <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
+                          Attrition
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Switch id="er-category-toggle" checked={showErCategory} onCheckedChange={setShowErCategory} />
+                        <Label htmlFor="er-category-toggle" className="text-sm cursor-pointer">
+                          <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+                          ER
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Switch id="cwt-category-toggle" checked={showCwtCategory} onCheckedChange={setShowCwtCategory} />
+                        <Label htmlFor="cwt-category-toggle" className="text-sm cursor-pointer">
+                          <span className="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-1"></span>
+                          CWT
+                        </Label>
                       </div>
                     </div>
                     
-                    <div>
-                      <h3 className="text-sm font-medium mb-2">Branch Hygiene</h3>
-                      <div className="flex items-center">
-                        <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
-                          <div 
-                            className="bg-green-500 h-2 rounded-full"
-                            style={{ width: `${(qualitativeData.hygiene / 5) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">{qualitativeData.hygiene.toFixed(1)}</span>
+                    {isLoading ? (
+                      <div className="flex justify-center items-center h-64">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                       </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium mb-2">Overall Discipline</h3>
-                      <div className="flex items-center">
-                        <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
-                          <div 
-                            className="bg-purple-500 h-2 rounded-full"
-                            style={{ width: `${(qualitativeData.discipline / 5) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">{qualitativeData.discipline.toFixed(1)}</span>
+                    ) : categoryMetrics.length > 0 ? (
+                      <ChartContainer 
+                        config={{
+                          platinum: { color: '#9333ea' },
+                          diamond: { color: '#2563eb' },
+                          gold: { color: '#eab308' },
+                          silver: { color: '#94a3b8' },
+                          bronze: { color: '#f97316' },
+                          unknown: { color: '#cbd5e1' }
+                        }}
+                      >
+                        <ResponsiveContainer width="100%" height={350}>
+                          <BarChart 
+                            data={categoryMetrics}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                              dataKey="name" 
+                              angle={-45} 
+                              textAnchor="end" 
+                              height={70}
+                              interval={0}
+                            />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            {showManningCategory && (
+                              <Bar dataKey="manning" name="Manning" fill="#3b82f6" />
+                            )}
+                            {showAttritionCategory && (
+                              <Bar dataKey="attrition" name="Attrition" fill="#ef4444" />
+                            )}
+                            {showErCategory && (
+                              <Bar dataKey="er" name="ER" fill="#10b981" />
+                            )}
+                            {showCwtCategory && (
+                              <Bar dataKey="cwt" name="CWT" fill="#ca8a04" />
+                            )}
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-64">
+                        <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
+                        <p className="text-slate-500">No category metrics available</p>
+                        <p className="text-sm text-slate-400">Select a date range to view data</p>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium mb-2">Overall Rating</h3>
-                      <div className="flex items-center">
-                        <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
-                          <div 
-                            className="bg-amber-500 h-2 rounded-full"
-                            style={{ width: `${(qualitativeData.overall / 5) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">{qualitativeData.overall.toFixed(1)}</span>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Branch Category Distribution</h3>
+                    {isCategoryLoading ? (
+                      <div className="flex justify-center items-center h-64">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                       </div>
-                    </div>
+                    ) : categoryBreakdown && categoryBreakdown.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={categoryBreakdown}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, value }) => `${name}: ${value}`}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {categoryBreakdown.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value, name) => [`${value} branches`, name]}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-64 text-slate-500">
+                        <div className="h-16 w-16 text-slate-300 mb-2">📊</div>
+                        <p>No category breakdown available</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-64 text-slate-500">
-                <Star className="h-12 w-12 mb-2 opacity-30" />
-                <p>No qualitative assessment data available</p>
+            </TabsContent>
+            
+            <TabsContent value="quality">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-medium">Qualitative Assessment</h3>
+                  <DateRangePicker 
+                    value={dateRange ? dateRange : { from: undefined, to: undefined }} 
+                    onChange={handleDateRangeChange} 
+                  />
+                </div>
+                <p className="text-sm text-slate-600 mb-6">
+                  Branch quality metrics from {qualitativeData.count} branch visits
+                </p>
+                
+                {isQualitativeLoading ? (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  </div>
+                ) : qualitativeData.count > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <RadarChart outerRadius={90} data={prepareQualitativeData()}>
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="subject" />
+                          <PolarRadiusAxis domain={[0, 5]} />
+                          <Radar
+                            name="Quality Rating"
+                            dataKey="value"
+                            stroke="#8884d8"
+                            fill="#8884d8"
+                            fillOpacity={0.6}
+                          />
+                          <Tooltip formatter={(value) => {
+                            return typeof value === 'number' ? [`${value.toFixed(1)}/5`, 'Rating'] : [`${value}/5`, 'Rating'];
+                          }} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div>
+                      <div className="space-y-6">
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Branch Culture</h3>
+                          <div className="flex items-center">
+                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
+                              <div 
+                                className="bg-blue-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.culture / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{qualitativeData.culture.toFixed(1)}</span>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Branch Hygiene</h3>
+                          <div className="flex items-center">
+                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
+                              <div 
+                                className="bg-green-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.hygiene / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{qualitativeData.hygiene.toFixed(1)}</span>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Overall Discipline</h3>
+                          <div className="flex items-center">
+                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
+                              <div 
+                                className="bg-purple-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.discipline / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{qualitativeData.discipline.toFixed(1)}</span>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Overall Rating</h3>
+                          <div className="flex items-center">
+                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
+                              <div 
+                                className="bg-amber-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.overall / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{qualitativeData.overall.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 text-slate-500">
+                    <Star className="h-12 w-12 mb-2 opacity-30" />
+                    <p>No qualitative assessment data available</p>
+                  </div>
+                )}
               </div>
-            )}
-          </CardContent>
-        </TabsContent>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
       </Card>
     </div>
   );
