@@ -29,6 +29,7 @@ import { fetchZoneMetrics, fetchMonthlyTrends } from "@/services/analyticsServic
 
 const CHAnalytics = () => {
   const [monthlyTrends, setMonthlyTrends] = useState([]);
+  const [zoneMetrics, setZoneMetrics] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +42,10 @@ const CHAnalytics = () => {
         const trendsData = await fetchMonthlyTrends();
         console.info("Fetching monthly trends...");
         setMonthlyTrends(trendsData);
+        
+        // Fetch zone metrics data
+        const metricsData = await fetchZoneMetrics();
+        setZoneMetrics(metricsData);
       } catch (error) {
         console.error("Error loading analytics data:", error);
       } finally {
@@ -64,7 +69,7 @@ const CHAnalytics = () => {
         </TabsList>
 
         <TabsContent value="trends" className="space-y-4">
-          <Card>
+          <Card className="w-full">
             <CardHeader>
               <CardTitle>Monthly Branch Coverage & Participation Trends</CardTitle>
               <CardDescription>
@@ -77,7 +82,7 @@ const CHAnalytics = () => {
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={400}>
+                <ResponsiveContainer width="100%" height={500}>
                   <LineChart
                     data={monthlyTrends}
                     margin={{
@@ -116,7 +121,7 @@ const CHAnalytics = () => {
 
         <TabsContent value="metrics" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
+            <Card className="col-span-1 md:col-span-2 lg:col-span-1">
               <CardHeader>
                 <CardTitle>HR Metrics by Branch Category</CardTitle>
                 <CardDescription>
@@ -158,7 +163,7 @@ const CHAnalytics = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="col-span-1 md:col-span-2 lg:col-span-1">
               <CardHeader>
                 <CardTitle>Performance Metrics Comparison</CardTitle>
                 <CardDescription>
