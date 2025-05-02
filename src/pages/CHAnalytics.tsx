@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -27,7 +28,8 @@ import {
 import { ChartContainer } from "@/components/ui/chart";
 import { getVisitMetrics, getPerformanceTrends } from "@/services/branchService";
 import { fetchZoneMetrics } from "@/services/analyticsService";
-import { QualitativeHeatmap } from "@/components/ch/QualitativeHeatmap";
+// Fix 1: Import QualitativeHeatmap as a default export instead of named export
+import QualitativeHeatmap from "@/components/ch/QualitativeHeatmap";
 
 // Define date range type
 type DateRange = { from: Date; to: Date } | undefined;
@@ -94,6 +96,7 @@ const CHAnalytics = () => {
     loadPerformanceTrends();
   }, [selectedChart]);
 
+  // Fix 2: Update the function to match the interface expected by DateRangePicker
   const handleDateRangeChange = (range: DateRange) => {
     setDateRange(range);
   };
@@ -162,7 +165,11 @@ const CHAnalytics = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-medium">Category-wise Metrics</CardTitle>
-              <DateRangePicker onDateChange={handleDateRangeChange} />
+              {/* Fix 3: Update the DateRangePicker component to use the correct props */}
+              <DateRangePicker 
+                value={dateRange || { from: undefined, to: undefined }} 
+                onChange={handleDateRangeChange} 
+              />
             </div>
             <CardDescription>Metrics by branch category</CardDescription>
           </CardHeader>
@@ -172,6 +179,7 @@ const CHAnalytics = () => {
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
             ) : categoryMetrics.length > 0 ? (
+              {/* Fix 4: Add the required config prop to ChartContainer */}
               <ChartContainer 
                 config={{
                   platinum: { color: '#9333ea' },
@@ -217,7 +225,15 @@ const CHAnalytics = () => {
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
             ) : zoneMetrics.length > 0 ? (
-              <ChartContainer>
+              <ChartContainer
+                config={{
+                  north: { color: '#3b82f6' },
+                  south: { color: '#10b981' },
+                  east: { color: '#f59e0b' },
+                  west: { color: '#ef4444' },
+                  central: { color: '#8b5cf6' }
+                }}
+              >
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={zoneMetrics}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -249,6 +265,7 @@ const CHAnalytics = () => {
           <CardDescription>Qualitative feedback across branches</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Fix 5: Update the import and usage of QualitativeHeatmap */}
           <QualitativeHeatmap />
         </CardContent>
       </Card>
