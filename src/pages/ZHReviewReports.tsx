@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CalendarIcon, Check, X, Filter, Trash2, Clock } from "lucide-react";
+import { Search, CalendarIcon, Check, X, Trash2, Clock, MapPin } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import { 
@@ -394,6 +394,7 @@ const ZHReviewReports = () => {
   const filteredReports = reports.filter((report) => {
     const matchesSearch = 
       (report.branch_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      report.branch_location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       report.bh_name?.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesStatus = 
@@ -426,26 +427,22 @@ const ZHReviewReports = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
               <Input
-                placeholder="Search by branch name or BHR name..."
+                placeholder="Search by branch name, location or BHR name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <div className="w-full md:w-48">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="flex items-center">
-                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="submitted">submitted</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="w-full md:w-auto">
+              <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="all" className="text-xs md:text-sm">All</TabsTrigger>
+                  <TabsTrigger value="submitted" className="text-xs md:text-sm">submitted</TabsTrigger>
+                  <TabsTrigger value="approved" className="text-xs md:text-sm">Approved</TabsTrigger>
+                  <TabsTrigger value="rejected" className="text-xs md:text-sm">Rejected</TabsTrigger>
+                  <TabsTrigger value="draft" className="text-xs md:text-sm">Draft</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
           </div>
         </CardContent>
@@ -471,6 +468,7 @@ const ZHReviewReports = () => {
               <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead className="font-medium">Branch</TableHead>
+                  <TableHead className="font-medium">Location</TableHead>
                   <TableHead className="font-medium">BHR Name</TableHead>
                   <TableHead className="font-medium">Visit Date</TableHead>
                   <TableHead className="font-medium">Status</TableHead>
@@ -481,6 +479,12 @@ const ZHReviewReports = () => {
                 {filteredReports.map((report) => (
                   <TableRow key={report.id} className="hover:bg-slate-50">
                     <TableCell className="font-medium">{report.branch_name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <MapPin size={14} className="text-slate-400 mr-1" />
+                        {report.branch_location}
+                      </div>
+                    </TableCell>
                     <TableCell>{report.bh_name}</TableCell>
                     <TableCell>{formatDate(report.visit_date)}</TableCell>
                     <TableCell>{getStatusBadge(report.status)}</TableCell>
