@@ -122,11 +122,16 @@ const QualitativeHeatmap = ({
               {data.map((row, index) => (
                 <tr key={index} className="border-t border-gray-200">
                   <td className="p-3 font-medium">
-                    {metricLabels[row.metric]}
+                    {metricLabels[row.metric as QualitativeMetric]}
                   </td>
                   {ratingColumns.map(rating => {
-                    const count = row[rating as keyof HeatmapData] as number;
-                    const percentage = row.total > 0 ? count / row.total : 0;
+                    // Fix: Access the count value correctly and ensure it's a number
+                    const count = typeof row[rating as keyof HeatmapData] === 'number' 
+                      ? row[rating as keyof HeatmapData] as number 
+                      : 0;
+                    
+                    const total = typeof row.total === 'number' ? row.total : 0;
+                    const percentage = total > 0 ? count / total : 0;
                     const backgroundColor = getColorForPercentage(percentage);
                     
                     return (
@@ -137,7 +142,7 @@ const QualitativeHeatmap = ({
                       >
                         <div className="font-medium text-sm">{count}</div>
                         <div className="text-xs text-gray-500">
-                          {row.total > 0 ? `${Math.round(percentage * 100)}%` : '0%'}
+                          {total > 0 ? `${Math.round(percentage * 100)}%` : '0%'}
                         </div>
                       </td>
                     );
