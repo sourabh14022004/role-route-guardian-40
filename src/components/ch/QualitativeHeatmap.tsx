@@ -12,10 +12,12 @@ interface QualitativeHeatmapProps {
 }
 
 const metricLabels: Record<QualitativeMetric, string> = {
-  culture_branch: "Branch Culture",
-  line_manager_behavior: "Line Manager Behavior",
-  branch_hygiene: "Branch Hygiene",
-  overall_discipline: "Overall Discipline"
+  leaders_aligned_with_code: "Leaders Aligned with Code",
+  employees_feel_safe: "Employees Feel Safe",
+  employees_feel_motivated: "Employees Feel Motivated",
+  leaders_abusive_language: "Leaders Using Abusive Language",
+  employees_comfort_escalation: "Comfort with Escalation",
+  inclusive_culture: "Inclusive Culture"
 };
 
 const QualitativeHeatmap = ({ 
@@ -122,10 +124,9 @@ const QualitativeHeatmap = ({
               {data.map((row, index) => (
                 <tr key={index} className="border-t border-gray-200">
                   <td className="p-3 font-medium">
-                    {metricLabels[row.metric as QualitativeMetric]}
+                    {metricLabels[row.metric]}
                   </td>
                   {ratingColumns.map(rating => {
-                    // Fix: Access the count value correctly and ensure it's a number
                     const count = typeof row[rating as keyof HeatmapData] === 'number' 
                       ? row[rating as keyof HeatmapData] as number 
                       : 0;
