@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CalendarIcon, Check, X, Filter, Trash2, Clock, MapPin } from "lucide-react";
+import { Search, CalendarIcon, Check, X, Filter, Trash2, Clock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import { 
@@ -352,7 +352,7 @@ const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate, onDeleteR
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </Dialog>
+      </AlertDialog>
     </>
   );
 };
@@ -394,7 +394,6 @@ const ZHReviewReports = () => {
   const filteredReports = reports.filter((report) => {
     const matchesSearch = 
       (report.branch_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      report.branch_location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       report.bh_name?.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesStatus = 
@@ -427,7 +426,7 @@ const ZHReviewReports = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
               <Input
-                placeholder="Search by branch name, location or BHR name..."
+                placeholder="Search by branch name or BHR name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -472,7 +471,6 @@ const ZHReviewReports = () => {
               <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead className="font-medium">Branch</TableHead>
-                  <TableHead className="font-medium">Location</TableHead>
                   <TableHead className="font-medium">BHR Name</TableHead>
                   <TableHead className="font-medium">Visit Date</TableHead>
                   <TableHead className="font-medium">Status</TableHead>
@@ -483,12 +481,6 @@ const ZHReviewReports = () => {
                 {filteredReports.map((report) => (
                   <TableRow key={report.id} className="hover:bg-slate-50">
                     <TableCell className="font-medium">{report.branch_name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <MapPin size={14} className="text-slate-400 mr-1" />
-                        {report.branch_location}
-                      </div>
-                    </TableCell>
                     <TableCell>{report.bh_name}</TableCell>
                     <TableCell>{formatDate(report.visit_date)}</TableCell>
                     <TableCell>{getStatusBadge(report.status)}</TableCell>
