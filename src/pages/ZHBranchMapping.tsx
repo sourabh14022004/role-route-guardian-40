@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -44,6 +45,7 @@ import {
   fetchBranchAssignments 
 } from "@/services/zhService";
 import { toast } from "@/components/ui/use-toast";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Branch = {
   id: string;
@@ -320,6 +322,24 @@ const ZHBranchMapping = () => {
     return category.charAt(0).toUpperCase() + category.slice(1);
   };
   
+  // Get category color class based on the category
+  const getCategoryColorClass = (category: string) => {
+    switch(category) {
+      case 'platinum':
+        return 'bg-violet-100 text-violet-700 border-violet-200';
+      case 'diamond':
+        return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'gold':
+        return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'silver':
+        return 'bg-slate-100 text-slate-700 border-slate-200';
+      case 'bronze':
+        return 'bg-orange-100 text-orange-700 border-orange-200';
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+  
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-full p-8">
@@ -343,7 +363,7 @@ const ZHBranchMapping = () => {
           <CardTitle>Branches</CardTitle>
           <CardDescription>Manage branch assignments for your zone</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <div className="flex flex-col md:flex-row gap-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 h-4 w-4" />
@@ -354,21 +374,56 @@ const ZHBranchMapping = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="w-full md:w-48">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="platinum">Platinum</SelectItem>
-                  <SelectItem value="diamond">Diamond</SelectItem>
-                  <SelectItem value="gold">Gold</SelectItem>
-                  <SelectItem value="silver">Silver</SelectItem>
-                  <SelectItem value="bronze">Bronze</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            
+            <Tabs 
+              value={categoryFilter} 
+              onValueChange={setCategoryFilter}
+              className="w-full"
+            >
+              <TabsList className="w-full justify-start overflow-x-auto mb-2 p-1 bg-slate-100">
+                <TabsTrigger 
+                  value="all" 
+                  className="px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
+                  All Categories
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="platinum" 
+                  className={`px-4 ${categoryFilter === 'platinum' ? 'bg-violet-100 text-violet-700 shadow-sm' : ''}`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-violet-500 mr-2 inline-block"></span>
+                  Platinum
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="diamond" 
+                  className={`px-4 ${categoryFilter === 'diamond' ? 'bg-blue-100 text-blue-700 shadow-sm' : ''}`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-500 mr-2 inline-block"></span>
+                  Diamond
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="gold" 
+                  className={`px-4 ${categoryFilter === 'gold' ? 'bg-amber-100 text-amber-700 shadow-sm' : ''}`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500 mr-2 inline-block"></span>
+                  Gold
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="silver" 
+                  className={`px-4 ${categoryFilter === 'silver' ? 'bg-slate-100 text-slate-700 shadow-sm' : ''}`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-slate-500 mr-2 inline-block"></span>
+                  Silver
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="bronze" 
+                  className={`px-4 ${categoryFilter === 'bronze' ? 'bg-orange-100 text-orange-700 shadow-sm' : ''}`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-orange-500 mr-2 inline-block"></span>
+                  Bronze
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
           
           <div className="border rounded-md overflow-hidden">
@@ -389,13 +444,7 @@ const ZHBranchMapping = () => {
                       <TableCell className="font-medium">{branch.name}</TableCell>
                       <TableCell>{branch.location}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          branch.category === 'platinum' ? 'bg-violet-100 text-violet-700' : 
-                          branch.category === 'diamond' ? 'bg-blue-100 text-blue-700' :
-                          branch.category === 'gold' ? 'bg-amber-100 text-amber-700' :
-                          branch.category === 'silver' ? 'bg-slate-100 text-slate-700' :
-                          'bg-orange-100 text-orange-700'
-                        }`}>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColorClass(branch.category)}`}>
                           {formatCategoryName(branch.category)}
                         </span>
                       </TableCell>
