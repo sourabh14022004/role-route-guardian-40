@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,9 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, CalendarIcon, Check, X, Filter, Trash2, Clock } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { toast } from "@/components/ui/use-toast";
+import { Search, CalendarIcon, Check, X, Filter } from "lucide-react";
 import { 
   BranchVisitSummary, 
   fetchRecentReports, 
@@ -36,12 +33,9 @@ interface ReportDetailsModalProps {
   open: boolean;
   onClose: () => void;
   onStatusUpdate: (reportId: string, status: "approved" | "rejected") => void;
-  onDeleteReport?: (reportId: string) => void;
 }
 
-const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate, onDeleteReport }: ReportDetailsModalProps) => {
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  
+const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate }: ReportDetailsModalProps) => {
   const { data: report, isLoading } = useQuery({
     queryKey: ['report-details', reportId],
     queryFn: () => reportId ? fetchReportById(reportId) : null,
@@ -73,287 +67,95 @@ const ReportDetailsModal = ({ reportId, open, onClose, onStatusUpdate, onDeleteR
     });
   };
 
-  const getCategoryName = (category: string | undefined) => {
-    if (!category) return "Unknown";
-    return category.charAt(0).toUpperCase() + category.slice(1);
-  };
-
-  const getQualitativeLabel = (value: string | null) => {
-    if (!value) return "Not rated";
-    
-    switch (value) {
-      case 'very_poor': return 'Very Poor';
-      case 'poor': return 'Poor';
-      case 'neutral': return 'Neutral';
-      case 'good': return 'Good';
-      case 'excellent': return 'Excellent';
-      default: return 'Not rated';
-    }
-  };
-
-  const handleDelete = () => {
-    if (onDeleteReport && reportId) {
-      onDeleteReport(reportId);
-      setConfirmDelete(false);
-      onClose();
-    }
-  };
-
   return (
-    <>
-      <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex justify-between items-center">
-              <span>Branch Visit Report</span>
-              <div>{getStatusBadge(report.status)}</div>
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Branch</h3>
-                <p className="text-lg font-medium">{report.branch_name}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Location</h3>
-                <p className="text-lg font-medium">{report.branch_location}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Category</h3>
-                <p className="text-lg font-medium capitalize">{report.branch_category}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Visit Date</h3>
-                <p className="text-lg font-medium">{formatDate(report.visit_date)}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">BHR Name</h3>
-                <p className="text-lg font-medium">{report.bh_name}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Employee Code</h3>
-                <p className="text-lg font-medium">{report.bh_code}</p>
-              </div>
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold">Branch Visit Report</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Branch</h3>
+              <p className="text-lg font-medium">{report.branch_name}</p>
             </div>
-
-            <div className="space-y-4">
-              <h3 className="font-medium text-lg border-b pb-2">Visit Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-3 bg-slate-50 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-500">HR Connect Session</h4>
-                  <p className="font-medium">{report.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-500">Manning Percentage</h4>
-                  <p className="font-medium">{report.manning_percentage}%</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-500">Attrition Percentage</h4>
-                  <p className="font-medium">{report.attrition_percentage}%</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-500">Non-Vendor Percentage</h4>
-                  <p className="font-medium">{report.non_vendor_percentage || 0}%</p>
-                </div>
-              </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Location</h3>
+              <p className="text-lg font-medium">{report.branch_location}</p>
             </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Category</h3>
+              <p className="text-lg font-medium capitalize">{report.branch_category}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Visit Date</h3>
+              <p className="text-lg font-medium">{formatDate(report.visit_date)}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">BHR Name</h3>
+              <p className="text-lg font-medium">{report.bh_name}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Employee Code</h3>
+              <p className="text-lg font-medium">{report.bh_code}</p>
+            </div>
+          </div>
 
-            {report.total_employees_invited > 0 && (
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg border-b pb-2">HR Connect Coverage</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-3 bg-slate-50 rounded-md">
-                    <h4 className="text-sm font-medium text-gray-500">Employees Invited</h4>
-                    <p className="font-medium">{report.total_employees_invited}</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-md">
-                    <h4 className="text-sm font-medium text-gray-500">Participants</h4>
-                    <p className="font-medium">{report.total_participants}</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-md">
-                    <h4 className="text-sm font-medium text-gray-500">Coverage</h4>
-                    <p className="font-medium">
-                      {report.total_employees_invited > 0 
-                        ? Math.round((report.total_participants / report.total_employees_invited) * 100)
-                        : 0}%
-                    </p>
-                  </div>
-                </div>
+          <div className="space-y-4">
+            <h3 className="font-medium text-lg border-b pb-2">Visit Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-3 bg-slate-50 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500">HR Connect Session</h4>
+                <p className="font-medium">{report.hr_connect_session ? "Conducted" : "Not Conducted"}</p>
               </div>
-            )}
-
-            {(report.new_employees_total > 0 || report.star_employees_total > 0) && (
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg border-b pb-2">Employee Coverage</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {report.new_employees_total > 0 && (
-                    <div className="p-3 bg-slate-50 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500">New Employees (0-6 months)</h4>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div>
-                          <p className="text-xs text-gray-500">Total</p>
-                          <p className="font-medium">{report.new_employees_total}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Covered</p>
-                          <p className="font-medium">{report.new_employees_covered}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {report.star_employees_total > 0 && (
-                    <div className="p-3 bg-slate-50 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500">STAR Employees</h4>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div>
-                          <p className="text-xs text-gray-500">Total</p>
-                          <p className="font-medium">{report.star_employees_total}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Covered</p>
-                          <p className="font-medium">{report.star_employees_covered}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              <div className="p-3 bg-slate-50 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500">Manning Percentage</h4>
+                <p className="font-medium">{report.manning_percentage}%</p>
               </div>
-            )}
-
-            {report.leaders_aligned_with_code || report.employees_feel_safe || report.employees_feel_motivated || report.leaders_abusive_language || report.employees_comfort_escalation || report.inclusive_culture ? (
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg border-b pb-2">Qualitative Assessment</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {report.leaders_aligned_with_code && (
-                    <div className="p-3 bg-slate-50 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500">Leaders Aligned with Code</h4>
-                      <p className="font-medium">{getQualitativeLabel(report.leaders_aligned_with_code)}</p>
-                    </div>
-                  )}
-                  
-                  {report.employees_feel_safe && (
-                    <div className="p-3 bg-slate-50 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500">Employees Feel Safe</h4>
-                      <p className="font-medium">{getQualitativeLabel(report.employees_feel_safe)}</p>
-                    </div>
-                  )}
-                  
-                  {report.employees_feel_motivated && (
-                    <div className="p-3 bg-slate-50 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500">Employees Feel Motivated</h4>
-                      <p className="font-medium">{getQualitativeLabel(report.employees_feel_motivated)}</p>
-                    </div>
-                  )}
-                  
-                  {report.leaders_abusive_language && (
-                    <div className="p-3 bg-slate-50 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500">Leaders Use Abusive Language</h4>
-                      <p className="font-medium">{getQualitativeLabel(report.leaders_abusive_language)}</p>
-                    </div>
-                  )}
-                  
-                  {report.employees_comfort_escalation && (
-                    <div className="p-3 bg-slate-50 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500">Employees Comfortable with Escalation</h4>
-                      <p className="font-medium">{getQualitativeLabel(report.employees_comfort_escalation)}</p>
-                    </div>
-                  )}
-                  
-                  {report.inclusive_culture && (
-                    <div className="p-3 bg-slate-50 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500">Inclusive Culture</h4>
-                      <p className="font-medium">{getQualitativeLabel(report.inclusive_culture)}</p>
-                    </div>
-                  )}
-                </div>
+              <div className="p-3 bg-slate-50 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500">Attrition Percentage</h4>
+                <p className="font-medium">{report.attrition_percentage}%</p>
               </div>
-            ) : null}
-
-            {report.feedback && (
-              <div>
-                <h3 className="font-medium text-lg border-b pb-2">Feedback</h3>
-                <div className="mt-2 p-4 bg-slate-50 rounded-md">
-                  <p>{report.feedback}</p>
+              {report.status && (
+                <div className="p-3 bg-slate-50 rounded-md">
+                  <h4 className="text-sm font-medium text-gray-500">Status</h4>
+                  <div className="mt-1">{getStatusBadge(report.status)}</div>
                 </div>
-              </div>
-            )}
-
-            <div className="sticky bottom-0 py-4 bg-white border-t mt-6 flex justify-end gap-3">
-              {report.status === "submitted" && (
-                <>
-                  <Button
-                    variant="outline"
-                    className="bg-white border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => onStatusUpdate(report.id, "rejected")}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Reject Report
-                  </Button>
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => onStatusUpdate(report.id, "approved")}
-                  >
-                    <Check className="mr-2 h-4 w-4" />
-                    Approve Report
-                  </Button>
-                </>
-              )}
-
-              {report.status === "approved" && (
-                <Button
-                  variant="outline"
-                  className="bg-white border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700"
-                  onClick={() => onStatusUpdate(report.id, "rejected")}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Reject Report
-                </Button>
-              )}
-
-              {report.status === "rejected" && (
-                <Button
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => onStatusUpdate(report.id, "approved")}
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Approve Report
-                </Button>
-              )}
-
-              {report.status === "draft" && onDeleteReport && (
-                <Button
-                  variant="destructive"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Report
-                </Button>
               )}
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the report.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmDelete(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+          {report.feedback && (
+            <div>
+              <h3 className="font-medium text-lg border-b pb-2">Feedback</h3>
+              <div className="mt-2 p-4 bg-slate-50 rounded-md">
+                <p>{report.feedback}</p>
+              </div>
+            </div>
+          )}
+
+          {report.status === "submitted" && (
+            <div className="sticky bottom-0 py-4 bg-white border-t mt-6 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                className="bg-white border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700"
+                onClick={() => onStatusUpdate(report.id, "rejected")}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Reject Report
+              </Button>
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => onStatusUpdate(report.id, "approved")}
+              >
+                <Check className="mr-2 h-4 w-4" />
+                Approve Report
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -370,25 +172,7 @@ const ZHReviewReports = () => {
   const handleStatusUpdate = async (reportId: string, status: "approved" | "rejected") => {
     await updateReportStatus(reportId, status);
     refetch();
-    
-    toast({
-      title: `Report ${status}`,
-      description: `The report has been ${status} successfully.`,
-      variant: status === "approved" ? "default" : "destructive"
-    });
-    
     setSelectedReportId(null);
-  };
-
-  const handleDeleteReport = async (reportId: string) => {
-    // This would need implementation in reportService.ts if you want the delete functionality
-    console.log("Delete report:", reportId);
-    toast({
-      title: "Report deleted",
-      description: "The draft report has been deleted successfully.",
-      variant: "destructive"
-    });
-    refetch();
   };
 
   const filteredReports = reports.filter((report) => {
@@ -510,7 +294,6 @@ const ZHReviewReports = () => {
         open={!!selectedReportId}
         onClose={() => setSelectedReportId(null)}
         onStatusUpdate={handleStatusUpdate}
-        onDeleteReport={handleDeleteReport}
       />
     </div>
   );
