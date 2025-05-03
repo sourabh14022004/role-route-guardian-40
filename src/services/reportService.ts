@@ -13,6 +13,13 @@ export interface BranchVisitSummary {
   bh_code: string;
 }
 
+export interface BHRReportStats {
+  total: number;
+  approved: number;
+  submitted: number;
+  rejected: number;
+}
+
 export async function fetchRecentReports(limit: number = 5): Promise<BranchVisitSummary[]> {
   try {
     // First get the visits
@@ -151,6 +158,57 @@ export interface HeatmapData {
   good: number;
   excellent: number;
   total: number;
+}
+
+/**
+ * Fetches statistics for a BHR's reports
+ * @param bhrId The ID of the BHR whose stats to fetch
+ * @returns Object with stats about report counts by status
+ */
+export async function fetchBHRReportStats(bhrId: string): Promise<BHRReportStats> {
+  try {
+    // Get all reports for this BHR
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select('status')
+      .eq('user_id', bhrId);
+    
+    if (error) throw error;
+    
+    // Initialize stats object
+    const stats: BHRReportStats = {
+      total: 0,
+      approved: 0,
+      submitted: 0, 
+      rejected: 0
+    };
+    
+    // Count reports by status
+    if (data) {
+      stats.total = data.length;
+      
+      data.forEach(visit => {
+        if (visit.status === 'approved') stats.approved += 1;
+        else if (visit.status === 'submitted') stats.submitted += 1;
+        else if (visit.status === 'rejected') stats.rejected += 1;
+      });
+    }
+    
+    return stats;
+  } catch (error: any) {
+    console.error("Error fetching BHR report stats:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading stats",
+      description: error.message || "Unable to load BHR statistics"
+    });
+    return {
+      total: 0,
+      approved: 0,
+      submitted: 0,
+      rejected: 0
+    };
+  }
 }
 
 export async function getQualitativeMetricsForHeatmap(
