@@ -91,7 +91,6 @@ const ZHBranchMapping = () => {
     branchName: string;
     bhUserId: string;
     bhName: string;
-    assignmentId: string;
   } | null>(null);
   
   // Fetch data on component mount
@@ -172,13 +171,12 @@ const ZHBranchMapping = () => {
     setDialogOpen(true);
   };
   
-  const handleOpenUnassignDialog = (branchId: string, branchName: string, bhUserId: string, bhName: string, assignmentId: string) => {
+  const handleOpenUnassignDialog = (branchId: string, branchName: string, bhUserId: string, bhName: string) => {
     setSelectedBranchForUnassign({
       branchId,
       branchName,
       bhUserId,
-      bhName,
-      assignmentId
+      bhName
     });
     setDialogType("unassign");
     setDialogOpen(true);
@@ -190,41 +188,57 @@ const ZHBranchMapping = () => {
     const { branchId, bhUserId, branchName, bhName } = selectedBranchForUnassign;
     
     try {
-      await unassignBranchFromBHR(bhUserId, branchId);
+      // First perform the database operation
+      const result = await unassignBranchFromBHR(bhUserId, branchId);
       
-      // Update the assignments in state
-      setBranchAssignments(prev => {
-        const updated = { ...prev };
-        if (updated[branchId]) {
-          updated[branchId] = updated[branchId].filter(
-            assignment => assignment.user_id !== bhUserId
-          );
-        }
-        return updated;
-      });
-      
-      // Update branch count in branches list
-      setBranches(prev => 
-        prev.map(branch => 
-          branch.id === branchId 
-            ? { ...branch, bh_count: Math.max((branch.bh_count || 1) - 1, 0) }
-            : branch
-        )
-      );
-      
-      // Update BH user's assigned branches count
-      setBHUsers(prev => 
-        prev.map(user => 
-          user.id === bhUserId 
-            ? { ...user, branches_assigned: Math.max((user.branches_assigned || 1) - 1, 0) }
-            : user
-        )
-      );
-      
-      toast({
-        title: "BHR Unassigned",
-        description: `${bhName} has been unassigned from ${branchName}.`,
-      });
+      if (result) {
+        // Update the assignments in state
+        setBranchAssignments(prev => {
+          const updated = { ...prev };
+          if (updated[branchId]) {
+            updated[branchId] = updated[branchId].filter(
+              assignment => assignment.user_id !== bhUserId
+            );
+            // Remove the branch entry if no assignments left
+            if (updated[branchId].length === 0) {
+              delete updated[branchId];
+            }
+          }
+          return updated;
+        });
+        
+        // Update branch count in branches list
+        setBranches(prev => 
+          prev.map(branch => 
+            branch.id === branchId 
+              ? { ...branch, bh_count: Math.max(0, branch.bh_count - 1) }
+              : branch
+          )
+        );
+        
+        // Update BH user's assigned branches count
+        setBHUsers(prev => 
+          prev.map(user => 
+            user.id === bhUserId 
+              ? { ...user, branches_assigned: Math.max(0, user.branches_assigned - 1) }
+              : user
+          )
+        );
+        
+        // Update filtered branches to reflect the changes
+        setFilteredBranches(prev => 
+          prev.map(branch => 
+            branch.id === branchId 
+              ? { ...branch, bh_count: Math.max(0, branch.bh_count - 1) }
+              : branch
+          )
+        );
+        
+        toast({
+          title: "BHR Unassigned",
+          description: `${bhName} has been unassigned from ${branchName}.`,
+        });
+      }
     } catch (error) {
       console.error("Error unassigning BHR from branch:", error);
       toast({
@@ -291,6 +305,11 @@ const ZHBranchMapping = () => {
       }
     } catch (error) {
       console.error("Error during branch assignment operation:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to complete the operation. Please try again.",
+      });
     } finally {
       setDialogOpen(false);
     }
@@ -392,8 +411,7 @@ const ZHBranchMapping = () => {
                                     branch.id, 
                                     branch.name, 
                                     assignment.user_id,
-                                    assignment.bh_name,
-                                    assignment.id
+                                    assignment.bh_name
                                   )}
                                   aria-label={`Remove ${assignment.bh_name} from ${branch.name}`}
                                 >

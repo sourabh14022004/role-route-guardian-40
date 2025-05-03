@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -108,10 +107,12 @@ export interface Database {
           new_employees_covered: number | null
           star_employees_total: number | null
           star_employees_covered: number | null
-          culture_branch: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          line_manager_behavior: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          branch_hygiene: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          overall_discipline: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          leaders_aligned_with_code: string | null
+          employees_feel_safe: string | null
+          employees_feel_motivated: string | null
+          leaders_abusive_language: string | null
+          employees_comfort_escalation: string | null
+          inclusive_culture: string | null
           feedback: string | null
           status: "draft" | "submitted" | "approved" | null
           created_at: string
@@ -136,10 +137,12 @@ export interface Database {
           new_employees_covered?: number | null
           star_employees_total?: number | null
           star_employees_covered?: number | null
-          culture_branch?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          line_manager_behavior?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          branch_hygiene?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          overall_discipline?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          leaders_aligned_with_code?: string | null
+          employees_feel_safe?: string | null
+          employees_feel_motivated?: string | null
+          leaders_abusive_language?: string | null
+          employees_comfort_escalation?: string | null
+          inclusive_culture?: string | null
           feedback?: string | null
           status?: "draft" | "submitted" | "approved" | null
           created_at?: string
@@ -164,10 +167,12 @@ export interface Database {
           new_employees_covered?: number | null
           star_employees_total?: number | null
           star_employees_covered?: number | null
-          culture_branch?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          line_manager_behavior?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          branch_hygiene?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
-          overall_discipline?: "very_poor" | "poor" | "neutral" | "good" | "excellent" | null
+          leaders_aligned_with_code?: string | null
+          employees_feel_safe?: string | null
+          employees_feel_motivated?: string | null
+          leaders_abusive_language?: string | null
+          employees_comfort_escalation?: string | null
+          inclusive_culture?: string | null
           feedback?: string | null
           status?: "draft" | "submitted" | "approved" | null
           created_at?: string

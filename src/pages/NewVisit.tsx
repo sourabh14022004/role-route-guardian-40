@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -122,13 +121,12 @@ const formSchema = z.object({
   manningPercentage: z.number().min(0).max(100),
   attritionPercentage: z.number().min(0).max(100),
   leaders_aligned_with_code: z.enum(["yes", "no"]),
-  leaders_aligned_remarks: z.string().optional(),
   employees_feel_safe: z.enum(["yes", "no"]),
   employees_feel_motivated: z.enum(["yes", "no"]),
   leaders_abusive_language: z.enum(["yes", "no"]),
   employees_comfort_escalation: z.enum(["yes", "no"]),
   inclusive_culture: z.enum(["yes", "no"]),
-  feedback: z.string().max(200, { message: "Feedback must not be longer than 200 words" }).optional(),
+  feedback: z.string().max(200, { message: "Additional remarks must not be longer than 200 words" }).optional(),
   nonVendorPercentage: z.number().min(0).max(100).optional(),
   erPercentage: z.number().min(0).max(100).optional(),
   cwtCases: z.number().min(0).optional(),
@@ -154,14 +152,13 @@ const NewVisit = () => {
       branchId: "",
       branchCode: "",
       visitDate: new Date(),
-      branchCategory: "" as BranchCategory, // Empty string as default
+      branchCategory: "" as BranchCategory,
       hrConnectSession: false,
       totalEmployeesInvited: 0,
       totalParticipants: 0,
       manningPercentage: 0,
       attritionPercentage: 0,
       leaders_aligned_with_code: 'yes',
-      leaders_aligned_remarks: '',
       employees_feel_safe: 'yes',
       employees_feel_motivated: 'yes',
       leaders_abusive_language: 'no',
@@ -227,27 +224,34 @@ const NewVisit = () => {
       const visitData = {
         user_id: user.id,
         branch_id: values.branchId,
-        visit_date: values.visitDate.toISOString(),
+        visit_date: values.visitDate.toISOString().split('T')[0],
         branch_category: values.branchCategory,
         hr_connect_session: values.hrConnectSession,
         total_employees_invited: values.totalEmployeesInvited,
         total_participants: values.totalParticipants,
         manning_percentage: values.manningPercentage,
         attrition_percentage: values.attritionPercentage,
+        non_vendor_percentage: values.nonVendorPercentage || 0,
+        er_percentage: values.erPercentage || 0,
+        cwt_cases: values.cwtCases || 0,
+        performance_level: values.performanceLevel || null,
+        new_employees_total: values.newEmployeesTotal || 0,
+        new_employees_covered: values.newEmployeesCovered || 0,
+        star_employees_total: values.starEmployeesTotal || 0,
+        star_employees_covered: values.starEmployeesCovered || 0,
+        feedback: values.feedback || null,
         leaders_aligned_with_code: values.leaders_aligned_with_code,
-        leaders_aligned_remarks: values.leaders_aligned_remarks,
         employees_feel_safe: values.employees_feel_safe,
         employees_feel_motivated: values.employees_feel_motivated,
         leaders_abusive_language: values.leaders_abusive_language,
         employees_comfort_escalation: values.employees_comfort_escalation,
         inclusive_culture: values.inclusive_culture,
-        feedback: values.feedback,
-        status: "submitted" as const
+        status: "submitted"
       };
       
       const result = await createBranchVisit(visitData);
       
-      if (result) {
+      if (result.success) {
         setSaveStatus("saved");
         toast({
           title: "Success",
@@ -258,6 +262,8 @@ const NewVisit = () => {
         setTimeout(() => {
           navigate("/bh/my-visits");
         }, 1500);
+      } else {
+        throw new Error(result.error?.message || "Failed to submit branch visit");
       }
     } catch (error: any) {
       console.error("Error submitting visit:", error);
@@ -266,7 +272,7 @@ const NewVisit = () => {
         title: "Error",
         description: error.message || "Failed to submit branch visit.",
       });
-      setSaveStatus("idle");
+      setSaveStatus("error");
     } finally {
       setLoading(false);
     }
@@ -288,7 +294,6 @@ const NewVisit = () => {
       
       const values = form.getValues();
       
-      // Make sure required fields are set
       if (!values.branchId) {
         toast({
           variant: "destructive",
@@ -311,7 +316,6 @@ const NewVisit = () => {
         manning_percentage: values.manningPercentage,
         attrition_percentage: values.attritionPercentage,
         leaders_aligned_with_code: values.leaders_aligned_with_code,
-        leaders_aligned_remarks: values.leaders_aligned_remarks,
         employees_feel_safe: values.employees_feel_safe,
         employees_feel_motivated: values.employees_feel_motivated,
         leaders_abusive_language: values.leaders_abusive_language,
@@ -890,25 +894,6 @@ const NewVisit = () => {
                     )}
                   />
 
-                  {/* Leaders aligned remarks */}
-                  <FormField
-                    control={form.control}
-                    name="leaders_aligned_remarks"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Remarks (if any)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter any remarks about leaders' alignment with code of conduct"
-                            className="resize-none"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   {/* Employees feel safe */}
                   <FormField
                     control={form.control}
@@ -1091,9 +1076,9 @@ const NewVisit = () => {
                 </div>
               </div>
               
-              {/* Overall Feedback */}
+              {/* Additional Remarks */}
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Overall Feedback</h2>
+                <h2 className="text-xl font-semibold">Additional Remarks</h2>
                 <FormField
                   control={form.control}
                   name="feedback"
@@ -1101,7 +1086,7 @@ const NewVisit = () => {
                     <FormItem>
                       <FormControl>
                         <Textarea
-                          placeholder="Any additional comments or observations (optional)"
+                          placeholder="Enter any additional remarks (optional)"
                           className="resize-none min-h-[120px]"
                           {...field}
                           value={field.value || ""}

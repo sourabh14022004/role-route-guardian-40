@@ -331,9 +331,6 @@ export const fetchMonthlySummaryReport = async (month: string, year: string) => 
       
       const totalVisits = visitsData?.length || 0;
       
-      // Calculate unique branches visited
-      const uniqueBranches = new Set(visitsData?.map(v => v.branch_id) || []).size;
-      
       // Calculate average manning and attrition
       let totalManning = 0;
       let totalAttrition = 0;
@@ -381,7 +378,6 @@ export const fetchMonthlySummaryReport = async (month: string, year: string) => 
         BHR_Name: bhr.full_name,
         e_code: bhr.e_code,
         Total_Visits: totalVisits,
-        Unique_Branches: uniqueBranches,
         Avg_Manning: `${avgManning}%`,
         Avg_Attrition: `${avgAttrition}%`,
         Culture_Good: qualitativeMetrics.culture_branch.good,
@@ -793,8 +789,6 @@ export const exportBranchAssignments = async () => {
     return [];
   }
 };
-
-
 
 // Update report status
 export const updateReportStatus = async (

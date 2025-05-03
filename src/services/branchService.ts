@@ -279,13 +279,49 @@ export const getBranchesByZone = async (zoneId: string): Promise<Branch[]> => {
 // Create a new branch visit
 export const createBranchVisit = async (visitData: Partial<BranchVisit>): Promise<{ success: boolean, data: any, error: any }> => {
   try {
+    // Ensure required fields are present
+    if (!visitData.user_id || !visitData.branch_id || !visitData.visit_date || !visitData.branch_category) {
+      throw new Error("Missing required fields for branch visit");
+    }
+
+    // Format the data to match the database schema
+    const formattedData = {
+      user_id: visitData.user_id,
+      branch_id: visitData.branch_id,
+      visit_date: visitData.visit_date,
+      branch_category: visitData.branch_category,
+      hr_connect_session: visitData.hr_connect_session || false,
+      total_employees_invited: visitData.total_employees_invited || 0,
+      total_participants: visitData.total_participants || 0,
+      manning_percentage: visitData.manning_percentage || 0,
+      attrition_percentage: visitData.attrition_percentage || 0,
+      non_vendor_percentage: visitData.non_vendor_percentage || 0,
+      er_percentage: visitData.er_percentage || 0,
+      cwt_cases: visitData.cwt_cases || 0,
+      performance_level: visitData.performance_level || null,
+      new_employees_total: visitData.new_employees_total || 0,
+      new_employees_covered: visitData.new_employees_covered || 0,
+      star_employees_total: visitData.star_employees_total || 0,
+      star_employees_covered: visitData.star_employees_covered || 0,
+      feedback: visitData.feedback || null,
+      status: visitData.status || 'submitted',
+      best_practices: visitData.best_practices || null,
+      leaders_aligned_with_code: visitData.leaders_aligned_with_code || null,
+      employees_feel_safe: visitData.employees_feel_safe || null,
+      employees_feel_motivated: visitData.employees_feel_motivated || null,
+      leaders_abusive_language: visitData.leaders_abusive_language || null,
+      employees_comfort_escalation: visitData.employees_comfort_escalation || null,
+      inclusive_culture: visitData.inclusive_culture || null
+    };
+
     const { data, error } = await supabase
       .from('branch_visits')
-      .insert([visitData])
+      .insert([formattedData])
       .select()
       .single();
     
     if (error) {
+      console.error("Supabase error:", error);
       throw error;
     }
     

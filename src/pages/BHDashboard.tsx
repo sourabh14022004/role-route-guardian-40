@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { FilePlus, Users, Calendar, ClipboardCheck, TrendingUp } from "lucide-react";
+import { FilePlus, Users, Calendar, ClipboardCheck, TrendingUp, Building2 } from "lucide-react";
 import { 
   getBranchVisitStats, 
   getBranchCategoryCoverage,
@@ -137,6 +137,20 @@ const BHDashboard = () => {
                     <p className="mt-1 text-sm text-blue-700">Total branches under your supervision</p>
                   </div>
                   <Users className="h-6 w-6 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-violet-50">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-violet-700 font-medium mb-6">Branches Covered</h3>
+                    <div className="text-4xl font-bold text-violet-900">{stats.branchesVisited}</div>
+                    <p className="mt-1 text-sm text-violet-700">Branches visited this month</p>
+                    <span className="mt-2 inline-block text-xs text-violet-600 bg-violet-100 px-2 py-0.5 rounded">this month</span>
+                  </div>
+                  <Building2 className="h-6 w-6 text-violet-600" />
                 </div>
               </CardContent>
             </Card>

@@ -332,14 +332,53 @@ export async function assignBranchToBHR(bhUserId: string, branchId: string) {
 
 export async function unassignBranchFromBHR(bhUserId: string, branchId: string) {
   try {
-    const { error } = await supabase
+    // First, verify the assignment exists and get its ID
+    const { data: assignment, error: checkError } = await supabase
+      .from('branch_assignments')
+      .select('id')
+      .eq('user_id', bhUserId)
+      .eq('branch_id', branchId)
+      .single();
+
+    if (checkError) {
+      if (checkError.code === 'PGRST116') {
+        // No assignment found
+        toast({
+          variant: "destructive",
+          title: "Assignment not found",
+          description: "This branch assignment does not exist."
+        });
+        return null;
+      }
+      throw checkError;
+    }
+
+    if (!assignment) {
+      toast({
+        variant: "destructive",
+        title: "Assignment not found",
+        description: "This branch assignment does not exist."
+      });
+      return null;
+    }
+
+    // Delete the assignment using the ID
+    const { error: deleteError } = await supabase
       .from('branch_assignments')
       .delete()
-      .eq('user_id', bhUserId)
-      .eq('branch_id', branchId);
+      .eq('id', assignment.id);
 
-    if (error) {
-      throw error;
+    if (deleteError) {
+      if (deleteError.code === '23503') {
+        // Foreign key violation
+        toast({
+          variant: "destructive",
+          title: "Cannot remove assignment",
+          description: "This assignment cannot be removed due to existing dependencies."
+        });
+        return null;
+      }
+      throw deleteError;
     }
 
     toast({
@@ -347,7 +386,7 @@ export async function unassignBranchFromBHR(bhUserId: string, branchId: string) 
       description: "The branch assignment has been removed."
     });
 
-    return true;
+    return { user_id: bhUserId, branch_id: branchId };
   } catch (error: any) {
     console.error("Error removing branch assignment:", error);
     toast({
