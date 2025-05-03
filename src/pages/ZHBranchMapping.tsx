@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -35,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { Search, Plus, X } from "lucide-react";
+import { Search, Plus, X, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
   fetchBranches, 
@@ -365,65 +364,30 @@ const ZHBranchMapping = () => {
         </CardHeader>
         <CardContent className="pt-4">
           <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 h-4 w-4" />
               <Input
                 placeholder="Search branches by name or location..."
-                className="pl-9"
+                className="pl-9 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
-            <Tabs 
-              value={categoryFilter} 
-              onValueChange={setCategoryFilter}
-              className="w-full"
-            >
-              <TabsList className="w-full justify-start overflow-x-auto mb-2 p-1 bg-slate-100">
-                <TabsTrigger 
-                  value="all" 
-                  className="px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                >
-                  All Categories
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="platinum" 
-                  className={`px-4 ${categoryFilter === 'platinum' ? 'bg-violet-100 text-violet-700 shadow-sm' : ''}`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-violet-500 mr-2 inline-block"></span>
-                  Platinum
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="diamond" 
-                  className={`px-4 ${categoryFilter === 'diamond' ? 'bg-blue-100 text-blue-700 shadow-sm' : ''}`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-blue-500 mr-2 inline-block"></span>
-                  Diamond
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="gold" 
-                  className={`px-4 ${categoryFilter === 'gold' ? 'bg-amber-100 text-amber-700 shadow-sm' : ''}`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-amber-500 mr-2 inline-block"></span>
-                  Gold
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="silver" 
-                  className={`px-4 ${categoryFilter === 'silver' ? 'bg-slate-100 text-slate-700 shadow-sm' : ''}`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-slate-500 mr-2 inline-block"></span>
-                  Silver
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="bronze" 
-                  className={`px-4 ${categoryFilter === 'bronze' ? 'bg-orange-100 text-orange-700 shadow-sm' : ''}`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-orange-500 mr-2 inline-block"></span>
-                  Bronze
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="w-full md:w-48">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="platinum">Platinum</SelectItem>
+                  <SelectItem value="diamond">Diamond</SelectItem>
+                  <SelectItem value="gold">Gold</SelectItem>
+                  <SelectItem value="silver">Silver</SelectItem>
+                  <SelectItem value="bronze">Bronze</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           
           <div className="border rounded-md overflow-hidden">
@@ -442,7 +406,12 @@ const ZHBranchMapping = () => {
                   filteredBranches.map((branch) => (
                     <TableRow key={branch.id}>
                       <TableCell className="font-medium">{branch.name}</TableCell>
-                      <TableCell>{branch.location}</TableCell>
+                      <TableCell>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="inline-block h-4 w-4 text-slate-400" />
+                          {branch.location}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColorClass(branch.category)}`}>
                           {formatCategoryName(branch.category)}
