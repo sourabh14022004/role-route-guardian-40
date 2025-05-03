@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
@@ -647,9 +646,10 @@ export async function exportBHRPerformanceSummary(
     if (bhrError) throw bhrError;
     if (!bhrs?.length) return [];
     
-    let dateFilter = {};
-    
     // Apply date filters if provided
+    let startDateStr: string | undefined;
+    let endDateStr: string | undefined;
+    
     if (month && year) {
       const months = ["January", "February", "March", "April", "May", "June", "July", 
         "August", "September", "October", "November", "December"];
@@ -659,10 +659,8 @@ export async function exportBHRPerformanceSummary(
         const startDate = new Date(parseInt(year), monthIndex, 1);
         const endDate = new Date(parseInt(year), monthIndex + 1, 0);
         
-        dateFilter = {
-          gte: startDate.toISOString().split('T')[0],
-          lte: endDate.toISOString().split('T')[0]
-        };
+        startDateStr = startDate.toISOString().split('T')[0];
+        endDateStr = endDate.toISOString().split('T')[0];
       }
     }
     
@@ -670,17 +668,20 @@ export async function exportBHRPerformanceSummary(
     const bhrPerformance = await Promise.all(
       bhrs.map(async (bhr) => {
         // Get all visits by this BHR
-        const { data: visits, error } = await supabase
+        let query = supabase
           .from('branch_visits')
           .select('*, branches:branch_id (category)')
-          .eq('user_id', bhr.id)
-          ...(Object.keys(dateFilter).length > 0 
-            ? [
-                'visit_date', 
-                dateFilter
-              ]
-            : []);
+          .eq('user_id', bhr.id);
+        
+        // Apply date filters if they exist
+        if (startDateStr && endDateStr) {
+          query = query
+            .gte('visit_date', startDateStr)
+            .lte('visit_date', endDateStr);
+        }
           
+        const { data: visits, error } = await query;
+        
         if (error) throw error;
         
         // Calculate metrics
