@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,126 +12,54 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { BarChart2, Users, ClipboardCheck, PieChart as PieChartIcon } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { getActiveBHRsCount, getTotalBranchVisitsInMonth, fetchReportById } from "@/services/reportService";
+import { fetchDashboardStats } from "@/services/zhService";
+import { fetchRecentReports } from "@/services/reportService";
 import BranchVisitDetailsModal from "@/components/branch/BranchVisitDetailsModal";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
+import { Building2, ClipboardList } from "lucide-react";
 
 const ZHDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeBHRs, setActiveBHRs] = useState(0);
-  const [totalBHRs, setTotalBHRs] = useState(0);
-  const [totalBranches, setTotalBranches] = useState(0);
+  const [dashboardStats, setDashboardStats] = useState<any>({
+    totalBranches: 0,
+    totalBHRs: 0,
+    activeBHRs: 0,
+    visitedBranches: 0,
+    coverage: 0,
+    totalVisits: 0,
+    submittedApproval: 0,
+    participationRate: 0,
+    newEmployeeCoverage: 0
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [recentReports, setRecentReports] = useState<any[]>([]);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [categoryData, setCategoryData] = useState<{name: string; value: number; color: string}[]>([]);
-  
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!user) return;
       
       setIsLoading(true);
       try {
-        // Get active BHRs count - BHRs who submitted at least one report in the current month
-        const activeBHRsCount = await getActiveBHRsCount();
-        setActiveBHRs(activeBHRsCount);
+        // Get dashboard stats
+        const stats = await fetchDashboardStats(user.id);
+        setDashboardStats(stats);
+
+        // Get recent reports
+        const reports = await fetchRecentReports(5);
+        setRecentReports(reports);
         
-        // Get total BHRs under this ZH
-        const { count: bhCount, error: bhError } = await supabase
-          .from("profiles")
-          .select("count", { count: 'exact', head: true })
-          .eq("role", "BH");
-        
-        if (bhError) throw bhError;
-        setTotalBHRs(bhCount || 0);
-        
-        // Get total branches count
-        const { count: branchCount, error: branchError } = await supabase
-          .from("branches")
-          .select("count", { count: 'exact', head: true });
-        
-        if (branchError) throw branchError;
-        setTotalBranches(branchCount || 0);
-        
-        // Get branch visits with their category information for real-time pie chart
-        const { data: visits, error: visitsError } = await supabase
-          .from("branch_visits")
-          .select(`
-            branches:branch_id (
-              category
-            )
-          `)
-          .in('status', ['submitted', 'approved'])
-          .gte('visit_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
-        
-        if (visitsError) throw visitsError;
-        
-        // Process category data for pie chart based on actual visit data
-        const categories: Record<string, number> = {
-          'platinum': 0,
-          'diamond': 0,
-          'gold': 0,
-          'silver': 0,
-          'bronze': 0,
-          'unknown': 0
-        };
-        
-        if (visits && visits.length > 0) {
-          visits.forEach((visit) => {
-            const branchData = visit.branches as any;
-            const category = branchData?.category?.toLowerCase() || 'unknown';
-            categories[category] = (categories[category] || 0) + 1;
-          });
-        }
-        
-        const colors = {
-          'platinum': '#9333ea', // purple
-          'diamond': '#2563eb', // blue
-          'gold': '#eab308',   // amber
-          'silver': '#94a3b8', // slate
-          'bronze': '#f97316', // orange
-          'unknown': '#cbd5e1'  // slate light
-        };
-        
-        const categoryChartData = Object.entries(categories)
-          .filter(([_, value]) => value > 0) // Only include categories with visits
-          .map(([name, value]) => ({
-            name: name.charAt(0).toUpperCase() + name.slice(1),
-            value,
-            color: colors[name as keyof typeof colors] || '#cbd5e1'
-          }));
-        
-        setCategoryData(categoryChartData);
-        
-        // Get recent reports with full details
-        const { data: reports, error: reportsError } = await supabase
-          .from("branch_visits")
-          .select(`
-            id,
-            visit_date,
-            status,
-            user_id,
-            branch_id,
-            profiles:user_id (full_name, e_code),
-            branches:branch_id (name, location, category)
-          `)
-          .order("visit_date", { ascending: false })
-          .limit(5);
-        
-        if (reportsError) throw reportsError;
-        setRecentReports(reports || []);
-        
-      } catch (error) {
-        console.error("Error fetching ZH dashboard data:", error);
+      } catch (error: any) {
+        console.error("Error fetching dashboard data:", error);
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Failed to load dashboard data.",
+          title: "Error loading dashboard",
+          description: error.message || "Unable to load dashboard data"
         });
       } finally {
         setIsLoading(false);
@@ -141,209 +68,170 @@ const ZHDashboard = () => {
     
     fetchDashboardData();
   }, [user]);
-  
+
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { 
-      day: 'numeric',
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
       month: 'short',
-      year: 'numeric'
+      day: 'numeric'
     });
   };
-  
+
   const getStatusClass = (status: string) => {
-    switch(status) {
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "submitted":
-        return "bg-blue-100 text-blue-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+    const classes = {
+      submitted: "bg-blue-100 text-blue-800",
+      approved: "bg-green-100 text-green-800",
+      rejected: "bg-red-100 text-red-800",
+      draft: "bg-slate-100 text-slate-800"
+    };
+    return classes[status as keyof typeof classes] || classes.draft;
   };
-  
+
   const handleViewReport = async (reportId: string) => {
     try {
-      // Fetch complete report details with proper data
-      const report = await fetchReportById(reportId);
-      
+      const report = recentReports.find(r => r.id === reportId);
       if (report) {
         setSelectedVisit(report);
         setIsModalOpen(true);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load report details.",
-        });
       }
-    } catch (error) {
-      console.error("Error fetching report details:", error);
+    } catch (error: any) {
+      console.error("Error loading report:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to load report details.",
+        title: "Error loading report",
+        description: error.message || "Unable to load report details"
       });
     }
   };
-  
+
   return (
-    <div className="p-5 md:p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Zone HR Dashboard</h1>
-        <p className="text-lg text-slate-600">
-          Monitor branch performance and BHR activity across your zone.
-        </p>
-      </div>
+    <div className="px-6 py-8 md:px-8 lg:px-10 max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-blue-500 bg-clip-text text-transparent mb-8">
+        Zonal Head Dashboard
+      </h1>
       
       {isLoading ? (
-        <div className="flex justify-center py-16">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="h-32"></CardContent>
+            </Card>
+          ))}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center">
-                  <div className="p-3 rounded-full bg-blue-100 text-blue-600 mb-3">
-                    <Users className="h-8 w-8" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-0 shadow-md hover:shadow-lg transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-blue-900">Total Branches</h3>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Building2 className="h-5 w-5 text-blue-600" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-800">{activeBHRs}</div>
-                  <p className="text-sm text-slate-600 mt-1">Active BHRs this month</p>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-3xl font-bold text-blue-700">
+                    {dashboardStats.totalBranches}
+                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-sm text-slate-600">
+                      {dashboardStats.visitedBranches} visited
+                    </span>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                      this month
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <Progress value={dashboardStats.coverage} className="h-2" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
-            
-            <Card className="bg-gradient-to-br from-amber-50 to-white shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center">
-                  <div className="p-3 rounded-full bg-amber-100 text-amber-600 mb-3">
-                    <BarChart2 className="h-8 w-8" />
+
+            <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-0 shadow-md hover:shadow-lg transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-emerald-900">Active BHRs</h3>
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <Users className="h-5 w-5 text-emerald-600" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-800">{totalBranches}</div>
-                  <p className="text-sm text-slate-600 mt-1">Total Branches</p>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-3xl font-bold text-emerald-700">
+                    {dashboardStats.activeBHRs}
+                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-sm text-slate-600">
+                      out of {dashboardStats.totalBHRs} total BHRs
+                    </span>
+                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                      this month
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <Progress 
+                      value={(dashboardStats.activeBHRs / dashboardStats.totalBHRs) * 100} 
+                      className="h-2" 
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
-            
-            <Card className="bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center">
-                  <div className="p-3 rounded-full bg-emerald-100 text-emerald-600 mb-3">
-                    <ClipboardCheck className="h-8 w-8" />
+
+            <Card className="bg-gradient-to-br from-violet-50 to-purple-50 border-0 shadow-md hover:shadow-lg transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-violet-900">Branch Visits</h3>
+                  <div className="p-2 bg-violet-100 rounded-lg">
+                    <ClipboardList className="h-5 w-5 text-violet-600" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-800">{recentReports.length}</div>
-                  <p className="text-sm text-slate-600 mt-1">Recent Reports</p>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-3xl font-bold text-violet-700">
+                    {dashboardStats.totalVisits}
+                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-sm text-slate-600">
+                      visits completed
+                    </span>
+                    <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">
+                      this month
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-0 shadow-md hover:shadow-lg transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-amber-900">submitted Reviews</h3>
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <ClipboardCheck className="h-5 w-5 text-amber-600" />
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-3xl font-bold text-amber-700">
+                    {dashboardStats.submittedApproval}
+                  </span>
+                  <span className="text-sm text-slate-600 mt-1">
+                    reports awaiting review
+                  </span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-4 bg-white hover:bg-amber-50"
+                    onClick={() => navigate("/zh/review-reports")}
+                  >
+                    Review Reports
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="border-b pb-3">
-                <CardTitle className="text-lg font-medium">BHR Performance</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-5">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium text-slate-700">Active vs Total BHRs</p>
-                      <p className="text-sm text-slate-600 font-medium">{activeBHRs} / {totalBHRs}</p>
-                    </div>
-                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 rounded-full" 
-                        style={{ 
-                          width: totalBHRs > 0 ? `${(activeBHRs / totalBHRs) * 100}%` : '0%'
-                        }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {totalBHRs > 0 ? Math.round((activeBHRs / totalBHRs) * 100) : 0}% active participation
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="border-b pb-3">
-                <CardTitle className="text-lg font-medium">Visit Distribution by Branch Category</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {categoryData.length > 0 ? (
-                  <div className="h-[220px] w-full">
-                    <ChartContainer 
-                      config={{
-                        platinum: { color: '#9333ea' },
-                        diamond: { color: '#2563eb' },
-                        gold: { color: '#eab308' },
-                        silver: { color: '#94a3b8' },
-                        bronze: { color: '#f97316' },
-                        unknown: { color: '#cbd5e1' }
-                      }}
-                    >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={categoryData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                            label={({name, value}) => `${name} (${value})`}
-                          >
-                            {categoryData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (active && payload && payload.length) {
-                                const data = payload[0].payload;
-                                return (
-                                  <div className="bg-white p-3 border rounded shadow-md">
-                                    <p className="font-medium">{data.name}: {data.value} visits</p>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                      {((data.value / categoryData.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1)}% of total visits
-                                    </p>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
-                          <Legend 
-                            layout="horizontal"
-                            verticalAlign="bottom"
-                            align="center"
-                            formatter={(value, entry, index) => (
-                              <span className="text-sm font-medium text-slate-700">{value}</span>
-                            )}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </ChartContainer>
-                  </div>
-                ) : (
-                  <div className="h-[220px] flex items-center justify-center">
-                    <div className="text-center">
-                      <PieChartIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                      <p className="text-slate-500">No visit data available</p>
-                      <p className="text-xs text-slate-400 mt-1">Reports will appear as they're submitted</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <Card className="shadow-sm hover:shadow-md transition-shadow mb-8">
             <CardHeader className="border-b pb-3">
               <CardTitle className="text-lg font-medium">Recent Branch Visit Reports</CardTitle>
             </CardHeader>
@@ -370,19 +258,29 @@ const ZHDashboard = () => {
                       {recentReports.map((report) => (
                         <tr key={report.id} className="border-b last:border-0 hover:bg-slate-50">
                           <td className="py-3">
-                            <div className="font-medium text-slate-800">{report.profiles?.full_name || "Unknown"}</div>
-                            <div className="text-xs text-slate-500">{report.profiles?.e_code}</div>
+                            <div className="font-medium text-slate-800">
+                              {report.bh_name}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {report.bh_code}
+                            </div>
                           </td>
                           <td className="py-3">
-                            <div className="font-medium text-slate-800">{report.branches?.name || "Unknown"}</div>
-                            <div className="text-xs text-slate-500">{report.branches?.location}</div>
+                            <div className="font-medium text-slate-800">
+                              {report.branch_name}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {report.branch_location}
+                            </div>
                           </td>
                           <td className="py-3">
-                            <div className="font-medium text-slate-700">{formatDate(report.visit_date)}</div>
+                            <div className="font-medium text-slate-700">
+                              {formatDate(report.visit_date)}
+                            </div>
                           </td>
                           <td className="py-3">
                             <span className={`inline-block px-2 py-1 text-xs rounded-full font-medium ${getStatusClass(report.status)}`}>
-                              {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
+                              {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
                             </span>
                           </td>
                           <td className="py-3">

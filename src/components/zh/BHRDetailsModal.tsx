@@ -154,7 +154,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
       case "approved":
         return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
       case "submitted":
-        return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800">submitted</Badge>;
       case "rejected":
         return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default:
@@ -257,8 +257,8 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
               </Card>
               <Card className="bg-blue-50 border-blue-100 shadow-sm">
                 <CardContent className="p-4">
-                  <p className="text-sm text-blue-700">Pending</p>
-                  <p className="text-2xl font-bold">{reportStats?.pending || 0}</p>
+                  <p className="text-sm text-blue-700">submitted</p>
+                  <p className="text-2xl font-bold">{reportStats?.submitted || 0}</p>
                 </CardContent>
               </Card>
               <Card className="bg-red-50 border-red-100 shadow-sm">

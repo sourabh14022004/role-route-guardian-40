@@ -59,185 +59,147 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
       throw branchError;
     }
 
-    console.log("Total branches:", totalBranches);
-
-    // Get all branch visits with status 'submitted' or 'approved'
-    const { data: allVisits, error: visitsError } = await supabase
+    // Get current month's visits
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const { data: currentMonthVisits, error: currentVisitsError } = await supabase
       .from('branch_visits')
-      .select('branch_id, visit_date, manning_percentage, attrition_percentage, er_percentage, status')
-      .in('status', ['submitted', 'approved']);
+      .select(`
+        branch_id,
+        visit_date,
+        manning_percentage,
+        attrition_percentage,
+        er_percentage,
+        total_employees_invited,
+        total_participants,
+        new_employees_covered,
+        new_employees_total
+      `)
+      .in('status', ['submitted', 'approved'])
+      .gte('visit_date', firstDayOfMonth.toISOString())
+      .lte('visit_date', today.toISOString()) as { data: BranchVisit[] | null, error: any };
 
-    if (visitsError) {
-      console.error("Error fetching visits:", visitsError);
-      throw visitsError;
+    if (currentVisitsError) {
+      console.error("Error fetching current month visits:", currentVisitsError);
+      throw currentVisitsError;
     }
 
-    console.log("All visits:", allVisits);
+    // Get previous month's visits
+    const lastMonth = new Date(firstDayOfMonth);
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    const lastMonthEnd = new Date(firstDayOfMonth);
+    lastMonthEnd.setDate(0);
 
-    // Handle case where no visits are found
-    if (!allVisits || allVisits.length === 0) {
-      console.log("No visits found");
-      return {
-        totalBranches: totalBranches || 0,
-        visitedBranches: 0,
-        coverage: 0,
-        activeBHRs: 0,
-        avgCoverage: 0,
-        attritionRate: 0,
-        manningPercentage: 0,
-        erPercentage: 0,
-        vsLastMonth: {
-          coverage: 0,
-          avgCoverage: 0,
-          attritionRate: 0,
-          manningPercentage: 0,
-          erPercentage: 0
-        }
-      };
+    const { data: lastMonthVisits, error: lastMonthVisitsError } = await supabase
+      .from('branch_visits')
+      .select(`
+        branch_id,
+        visit_date,
+        manning_percentage,
+        attrition_percentage,
+        er_percentage,
+        total_employees_invited,
+        total_participants,
+        new_employees_covered,
+        new_employees_total
+      `)
+      .in('status', ['submitted', 'approved'])
+      .gte('visit_date', lastMonth.toISOString())
+      .lte('visit_date', lastMonthEnd.toISOString()) as { data: BranchVisit[] | null, error: any };
+
+    if (lastMonthVisitsError) {
+      console.error("Error fetching last month visits:", lastMonthVisitsError);
+      throw lastMonthVisitsError;
     }
 
-    // Count unique visited branches
-    const visitedBranchIds = new Set(allVisits.map(v => v.branch_id));
-    const visitedBranchesCount = visitedBranchIds.size;
-    console.log("Visited branches count:", visitedBranchesCount);
+    // Calculate current month metrics
+    const currentVisitedBranches = new Set(currentMonthVisits?.map(v => v.branch_id) || []);
+    const currentCoverage = totalBranches ? Math.round((currentVisitedBranches.size / totalBranches) * 100) : 0;
 
-    // Get active BHRs (those with a submitted or approved visit)
+    let currentManningSum = 0;
+    let currentAttritionSum = 0;
+    let currentErSum = 0;
+    let currentValidVisits = 0;
+
+    currentMonthVisits?.forEach(visit => {
+      if (visit.manning_percentage !== null) {
+        currentManningSum += visit.manning_percentage;
+        currentValidVisits++;
+      }
+      if (visit.attrition_percentage !== null) currentAttritionSum += visit.attrition_percentage;
+      if (visit.er_percentage !== null) currentErSum += visit.er_percentage;
+    });
+
+    const currentMetrics = {
+      coverage: currentCoverage,
+      avgCoverage: currentValidVisits > 0 ? Math.round(currentManningSum / currentValidVisits) : 0,
+      attritionRate: currentValidVisits > 0 ? Math.round(currentAttritionSum / currentValidVisits) : 0,
+      manningPercentage: currentValidVisits > 0 ? Math.round(currentManningSum / currentValidVisits) : 0,
+      erPercentage: currentValidVisits > 0 ? Math.round(currentErSum / currentValidVisits) : 0
+    };
+
+    // Calculate last month metrics for comparison
+    const lastVisitedBranches = new Set(lastMonthVisits?.map(v => v.branch_id) || []);
+    const lastCoverage = totalBranches ? Math.round((lastVisitedBranches.size / totalBranches) * 100) : 0;
+
+    let lastManningSum = 0;
+    let lastAttritionSum = 0;
+    let lastErSum = 0;
+    let lastValidVisits = 0;
+
+    lastMonthVisits?.forEach(visit => {
+      if (visit.manning_percentage !== null) {
+        lastManningSum += visit.manning_percentage;
+        lastValidVisits++;
+      }
+      if (visit.attrition_percentage !== null) lastAttritionSum += visit.attrition_percentage;
+      if (visit.er_percentage !== null) lastErSum += visit.er_percentage;
+    });
+
+    const lastMetrics = {
+      coverage: lastCoverage,
+      avgCoverage: lastValidVisits > 0 ? Math.round(lastManningSum / lastValidVisits) : 0,
+      attritionRate: lastValidVisits > 0 ? Math.round(lastAttritionSum / lastValidVisits) : 0,
+      manningPercentage: lastValidVisits > 0 ? Math.round(lastManningSum / lastValidVisits) : 0,
+      erPercentage: lastValidVisits > 0 ? Math.round(lastErSum / lastValidVisits) : 0
+    };
+
+    // Get active BHRs count
     const { data: activeBhrs, error: activeBhrsError } = await supabase
-      .from('branch_visits')
-      .select('user_id')
-      .in('status', ['submitted', 'approved']);
-      
+      .from('profiles')
+      .select('id')
+      .eq('role', 'BH');
+
     if (activeBhrsError) {
       console.error("Error fetching active BHRs:", activeBhrsError);
       throw activeBhrsError;
     }
 
-    // Count unique BHR IDs
-    const uniqueBhrIds = new Set((activeBhrs || []).map(v => v.user_id));
-    console.log("Active BHRs count:", uniqueBhrIds.size);
-
-    // Get recent visits for metrics (within last 30 days)
-    const lastMonthDate = new Date();
-    lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
-    
-    const { data: recentVisits, error: recentError } = await supabase
-      .from('branch_visits')
-      .select('*')
-      .gte('visit_date', lastMonthDate.toISOString())
-      .in('status', ['submitted', 'approved']);
-
-    if (recentError) {
-      console.error("Error fetching recent visits:", recentError);
-      throw recentError;
-    }
-
-    const currentVisits = recentVisits || [];
-    console.log("Recent visits count:", currentVisits.length);
-    
-    // Get data for previous month (30-60 days ago) to compare
-    const twoMonthsAgo = new Date();
-    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    
-    const { data: previousVisits, error: previousError } = await supabase
-      .from('branch_visits')
-      .select('branch_id, manning_percentage, attrition_percentage, er_percentage')
-      .gte('visit_date', twoMonthsAgo.toISOString())
-      .lt('visit_date', lastMonthDate.toISOString())
-      .in('status', ['submitted', 'approved']);
-    
-    if (previousError) {
-      console.error("Error fetching previous visits:", previousError);
-      throw previousError;
-    }
-
-    // Calculate current month averages
-    const manningSum = currentVisits.reduce((sum, visit) => {
-      return sum + (typeof visit.manning_percentage === 'number' ? visit.manning_percentage : 0);
-    }, 0);
-    
-    const attritionSum = currentVisits.reduce((sum, visit) => {
-      return sum + (typeof visit.attrition_percentage === 'number' ? visit.attrition_percentage : 0);
-    }, 0);
-    
-    const erSum = currentVisits.reduce((sum, visit) => {
-      return sum + (typeof visit.er_percentage === 'number' ? visit.er_percentage : 0);
-    }, 0);
-    
-    const visitCount = currentVisits.length || 1; // Avoid division by zero
-    
-    // Calculate previous month averages
-    const prevVisits = previousVisits || [];
-    const prevVisitCount = prevVisits.length || 1;
-    
-    const prevManningSum = prevVisits.reduce((sum, visit) => {
-      return sum + (typeof visit.manning_percentage === 'number' ? visit.manning_percentage : 0);
-    }, 0);
-    
-    const prevAttritionSum = prevVisits.reduce((sum, visit) => {
-      return sum + (typeof visit.attrition_percentage === 'number' ? visit.attrition_percentage : 0);
-    }, 0);
-    
-    const prevErSum = prevVisits.reduce((sum, visit) => {
-      return sum + (typeof visit.er_percentage === 'number' ? visit.er_percentage : 0);
-    }, 0);
-
-    // Calculate month-over-month changes
-    const prevManningAvg = Math.round(prevManningSum / prevVisitCount);
-    const prevAttritionAvg = Math.round(prevAttritionSum / prevVisitCount);
-    const prevErAvg = Math.round(prevErSum / prevVisitCount);
-    
-    // Get previous month unique branch visits
-    const prevVisitedBranchIds = new Set(prevVisits.map(v => v.branch_id));
-    const prevCoverage = totalBranches ? Math.round((prevVisitedBranchIds.size / totalBranches) * 100) : 0;
-    
-    const currentManningAvg = Math.round(manningSum / visitCount);
-    const currentAttritionAvg = Math.round(attritionSum / visitCount);
-    const currentErAvg = Math.round(erSum / visitCount);
-    const currentCoverage = totalBranches ? Math.round((visitedBranchesCount / totalBranches) * 100) : 0;
-    
-    // Calculate percentage changes
-    const coverageChange = currentCoverage - prevCoverage;
-    const manningChange = currentManningAvg - prevManningAvg;
-    const attritionChange = currentAttritionAvg - prevAttritionAvg;
-    const erChange = currentErAvg - prevErAvg;
-
-    console.log("Stats calculation complete");
-    console.log({
-      totalBranches,
-      visitedBranchesCount,
-      currentCoverage,
-      uniqueBhrIds: uniqueBhrIds.size,
-      currentManningAvg,
-      currentAttritionAvg,
-      currentErAvg
-    });
-
     return {
       totalBranches: totalBranches || 0,
-      visitedBranches: visitedBranchesCount,
-      coverage: currentCoverage,
-      activeBHRs: uniqueBhrIds.size,
-      avgCoverage: currentCoverage,
-      attritionRate: currentAttritionAvg,
-      manningPercentage: currentManningAvg,
-      erPercentage: currentErAvg,
+      visitedBranches: currentVisitedBranches.size,
+      coverage: currentMetrics.coverage,
+      activeBHRs: activeBhrs?.length || 0,
+      avgCoverage: currentMetrics.avgCoverage,
+      attritionRate: currentMetrics.attritionRate,
+      manningPercentage: currentMetrics.manningPercentage,
+      erPercentage: currentMetrics.erPercentage,
       vsLastMonth: {
-        coverage: coverageChange,
-        avgCoverage: coverageChange,
-        attritionRate: attritionChange,
-        manningPercentage: manningChange,
-        erPercentage: erChange
+        coverage: currentMetrics.coverage - lastMetrics.coverage,
+        avgCoverage: currentMetrics.avgCoverage - lastMetrics.avgCoverage,
+        attritionRate: currentMetrics.attritionRate - lastMetrics.attritionRate,
+        manningPercentage: currentMetrics.manningPercentage - lastMetrics.manningPercentage,
+        erPercentage: currentMetrics.erPercentage - lastMetrics.erPercentage
       }
     };
   } catch (error: any) {
     console.error("Error fetching dashboard stats:", error);
     toast({
       variant: "destructive",
-      title: "Error loading dashboard statistics",
-      description: error.message || "An unexpected error occurred"
+      title: "Error loading dashboard",
+      description: error.message || "Unable to load dashboard statistics"
     });
-    
-    // Return default values on error so the UI doesn't break
     return {
       totalBranches: 0,
       visitedBranches: 0,
@@ -260,77 +222,65 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 
 export async function fetchBranchCategoryStats(): Promise<BranchCategoryStats[]> {
   try {
-    console.log("Fetching branch category stats...");
-    
     // Get all branches with their categories
     const { data: branches, error: branchError } = await supabase
       .from('branches')
-      .select('id, category');
-    
+      .select('id, category') as { data: Branch[] | null, error: any };
+
     if (branchError) {
-      console.error("Error fetching branches by category:", branchError);
       throw branchError;
     }
 
-    if (!branches || branches.length === 0) {
-      console.log("No branches found");
+    if (!branches) {
       return [];
     }
 
-    console.log(`Found ${branches.length} branches`);
-
-    // Get all submitted or approved branch visits
+    // Get current month's visits
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
     const { data: visits, error: visitError } = await supabase
       .from('branch_visits')
       .select('branch_id')
-      .in('status', ['submitted', 'approved']);
-    
+      .in('status', ['submitted', 'approved'])
+      .gte('visit_date', firstDayOfMonth.toISOString())
+      .lte('visit_date', today.toISOString());
+
     if (visitError) {
-      console.error("Error fetching branch visits:", visitError);
       throw visitError;
     }
 
-    console.log(`Found ${visits ? visits.length : 0} branch visits`);
+    // Create a set of visited branch IDs
+    const visitedBranchIds = new Set(visits?.map(v => v.branch_id) || []);
 
-    // Create a set of visited branch IDs for quick lookup
-    const visitedBranchIds = new Set((visits || []).map(visit => visit.branch_id));
-
-    // Count by category
-    const categoryStats: Record<string, { total: number, visited: number }> = {
-      'platinum': { total: 0, visited: 0 },
-      'diamond': { total: 0, visited: 0 },
-      'gold': { total: 0, visited: 0 },
-      'silver': { total: 0, visited: 0 },
-      'bronze': { total: 0, visited: 0 }
-    };
+    // Group branches by category
+    const categoryStats: Record<string, { total: number; visited: number }> = {};
 
     branches.forEach(branch => {
-      if (!branch.category) return;
-      
-      const category = branch.category.toLowerCase();
-      if (categoryStats[category]) {
-        categoryStats[category].total++;
-        if (visitedBranchIds.has(branch.id)) {
-          categoryStats[category].visited++;
-        }
+      const category = branch.category || 'unknown';
+      if (!categoryStats[category]) {
+        categoryStats[category] = { total: 0, visited: 0 };
+      }
+      categoryStats[category].total++;
+      if (visitedBranchIds.has(branch.id)) {
+        categoryStats[category].visited++;
       }
     });
 
-    console.log("Category stats:", categoryStats);
-
-    // Format the results
+    // Convert to array format and calculate coverage
     return Object.entries(categoryStats).map(([category, stats]) => ({
-      category,
+      category: category.charAt(0).toUpperCase() + category.slice(1),
       total: stats.total,
       visited: stats.visited,
-      coverage: stats.total > 0 ? Math.round((stats.visited / stats.total) * 100) : 0
-    }));
+      coverage: Math.round((stats.visited / stats.total) * 100)
+    })).sort((a, b) => b.coverage - a.coverage);
+
   } catch (error: any) {
     console.error("Error fetching branch category stats:", error);
     toast({
       variant: "destructive",
-      title: "Error loading category statistics",
-      description: error.message || "An unexpected error occurred"
+      title: "Error loading category stats",
+      description: error.message || "Unable to load branch category statistics"
     });
     return [];
   }
@@ -338,269 +288,189 @@ export async function fetchBranchCategoryStats(): Promise<BranchCategoryStats[]>
 
 export async function fetchMonthlyTrends(): Promise<MonthlyStats[]> {
   try {
-    console.log("Fetching monthly trends...");
+    // Get date range for last 6 months
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 5); // Get 6 months including current
+    startDate.setDate(1); // Start from first of month
     
-    // Get visits for the last 6 months
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-    sixMonthsAgo.setDate(1); // Start from first day of that month
+    // Get total branches for coverage calculation
+    const { count: totalBranches, error: branchError } = await supabase
+      .from('branches')
+      .select('*', { count: 'exact', head: true });
+      
+    if (branchError) {
+      throw branchError;
+    }
     
+    // Get all visits within date range
     const { data: visits, error: visitError } = await supabase
       .from('branch_visits')
-      .select('branch_id, visit_date, total_employees_invited, total_participants')
-      .gte('visit_date', sixMonthsAgo.toISOString())
+      .select(`
+        visit_date,
+        branch_id,
+        total_employees_invited,
+        total_participants
+      `)
       .in('status', ['submitted', 'approved'])
-      .order('visit_date', { ascending: false });
-    
+      .gte('visit_date', startDate.toISOString())
+      .lte('visit_date', endDate.toISOString()) as { data: BranchVisit[] | null, error: any };
+      
     if (visitError) {
-      console.error("Error fetching monthly visits:", visitError);
       throw visitError;
     }
     
     if (!visits || visits.length === 0) {
-      console.log("No monthly visit data found");
-      // Return empty data with month names as fallback
-      const monthNames = [];
-      for (let i = 0; i < 6; i++) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        monthNames.unshift(d.toLocaleString('default', { month: 'long' }));
-      }
-      return monthNames.map(month => ({
-        month,
-        branchCoverage: 0,
-        participationRate: 0
-      }));
+      return [];
     }
-    
-    console.log(`Found ${visits.length} visits for monthly trends`);
-    
-    // Get total branches count
-    const { count: totalBranches, error: branchError } = await supabase
-      .from('branches')
-      .select('*', { count: 'exact', head: true });
-    
-    if (branchError) {
-      console.error("Error counting branches:", branchError);
-      throw branchError;
-    }
-    
-    console.log(`Total branches for monthly trends: ${totalBranches}`);
     
     // Group visits by month
-    const visitsByMonth: Record<string, {
-      branchIds: Set<string>;
+    const monthlyStats: Record<string, {
+      visitedBranches: Set<string>;
       totalInvited: number;
       totalParticipated: number;
     }> = {};
     
     visits.forEach(visit => {
-      if (!visit.visit_date) return;
-      
       const visitDate = new Date(visit.visit_date);
-      const monthKey = `${visitDate.getFullYear()}-${visitDate.getMonth() + 1}`;
+      const monthKey = `${visitDate.getFullYear()}-${String(visitDate.getMonth() + 1).padStart(2, '0')}`;
       
-      if (!visitsByMonth[monthKey]) {
-        visitsByMonth[monthKey] = {
-          branchIds: new Set(),
+      if (!monthlyStats[monthKey]) {
+        monthlyStats[monthKey] = {
+          visitedBranches: new Set(),
           totalInvited: 0,
           totalParticipated: 0
         };
       }
       
-      visitsByMonth[monthKey].branchIds.add(visit.branch_id);
-      
-      // Add participation data if available
-      if (typeof visit.total_employees_invited === 'number') {
-        visitsByMonth[monthKey].totalInvited += visit.total_employees_invited;
-      }
-      
-      if (typeof visit.total_participants === 'number') {
-        visitsByMonth[monthKey].totalParticipated += visit.total_participants;
-      }
+      monthlyStats[monthKey].visitedBranches.add(visit.branch_id);
+      monthlyStats[monthKey].totalInvited += visit.total_employees_invited || 0;
+      monthlyStats[monthKey].totalParticipated += visit.total_participants || 0;
     });
     
-    console.log("Visits by month:", Object.keys(visitsByMonth));
-    
-    // Format the results
-    const monthlyData: MonthlyStats[] = [];
-    
-    // Get last 6 month names
-    const months = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const monthKey = `${d.getFullYear()}-${d.getMonth() + 1}`;
-      const monthName = d.toLocaleString('default', { month: 'long' });
+    // Convert to array format
+    const trends = Object.entries(monthlyStats).map(([monthKey, stats]) => {
+      const [year, month] = monthKey.split('-').map(Number);
+      const date = new Date(year, month - 1);
       
-      months.unshift({
-        key: monthKey,
-        name: monthName
-      });
-    }
-    
-    months.forEach(({ key, name }) => {
-      const monthData = visitsByMonth[key];
-      
-      if (monthData) {
-        const branchCoverage = totalBranches ? 
-          Math.round((monthData.branchIds.size / totalBranches) * 100) : 0;
-          
-        const participationRate = monthData.totalInvited > 0 ? 
-          Math.round((monthData.totalParticipated / monthData.totalInvited) * 100) : 0;
-          
-        monthlyData.push({
-          month: name,
-          branchCoverage,
-          participationRate
-        });
-      } else {
-        // No data for this month
-        monthlyData.push({
-          month: name,
-          branchCoverage: 0,
-          participationRate: 0
-        });
-      }
+      return {
+        month: date.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        branchCoverage: totalBranches ? Math.round((stats.visitedBranches.size / totalBranches) * 100) : 0,
+        participationRate: stats.totalInvited > 0 ? 
+          Math.round((stats.totalParticipated / stats.totalInvited) * 100) : 0
+      };
     });
     
-    console.log("Monthly data processed:", monthlyData);
-    return monthlyData;
+    // Sort by date
+    return trends.sort((a, b) => {
+      const dateA = new Date(a.month);
+      const dateB = new Date(b.month);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
   } catch (error: any) {
     console.error("Error fetching monthly trends:", error);
     toast({
       variant: "destructive",
-      title: "Error loading monthly trends",
-      description: error.message || "An unexpected error occurred"
-    });
-    
-    // Return empty data with month names as fallback
-    const monthNames = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      monthNames.unshift(d.toLocaleString('default', { month: 'long' }));
-    }
-    return monthNames.map(month => ({
-      month,
-      branchCoverage: 0
-    }));
-  }
-}
-
-export async function fetchTopPerformers(): Promise<BHRPerformance[]> {
-  try {
-    console.log("Fetching top performers...");
-    
-    // Get all BHRs
-    const { data: bhrs, error: bhrError } = await supabase
-      .from('profiles')
-      .select('id, full_name, e_code')
-      .eq('role', 'BH');
-    
-    if (bhrError) {
-      console.error("Error fetching BHRs:", bhrError);
-      throw bhrError;
-    }
-    
-    if (!bhrs || bhrs.length === 0) {
-      console.log("No BHRs found");
-      return [];
-    }
-
-    console.log(`Found ${bhrs.length} BHRs`);
-
-    // Get branch assignments
-    const { data: assignments, error: assignmentError } = await supabase
-      .from('branch_assignments')
-      .select('user_id, branch_id');
-    
-    if (assignmentError) {
-      console.error("Error fetching branch assignments:", assignmentError);
-      throw assignmentError;
-    }
-
-    console.log(`Found ${assignments ? assignments.length : 0} branch assignments`);
-
-    // Get branch visits for the current month
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    
-    const { data: visits, error: visitError } = await supabase
-      .from('branch_visits')
-      .select('user_id, branch_id')
-      .gte('visit_date', startOfMonth.toISOString())
-      .in('status', ['submitted', 'approved']);
-    
-    if (visitError) {
-      console.error("Error fetching visits for top performers:", visitError);
-      throw visitError;
-    }
-
-    console.log(`Found ${visits ? visits.length : 0} visits for top performers`);
-
-    // Group assignments by BHR
-    const bhrAssignments: Record<string, Set<string>> = {};
-    (assignments || []).forEach(assignment => {
-      if (!assignment.user_id) return;
-      
-      if (!bhrAssignments[assignment.user_id]) {
-        bhrAssignments[assignment.user_id] = new Set();
-      }
-      if (assignment.branch_id) {
-        bhrAssignments[assignment.user_id].add(assignment.branch_id);
-      }
-    });
-
-    // Count visits by BHR
-    const bhrVisits: Record<string, Set<string>> = {};
-    (visits || []).forEach(visit => {
-      if (!visit.user_id) return;
-      
-      if (!bhrVisits[visit.user_id]) {
-        bhrVisits[visit.user_id] = new Set();
-      }
-      if (visit.branch_id) {
-        bhrVisits[visit.user_id].add(visit.branch_id);
-      }
-    });
-
-    // Calculate coverage and reports for each BHR
-    const performers = bhrs.map(bhr => {
-      const assignedBranches = bhrAssignments[bhr.id] || new Set();
-      const visitedBranches = bhrVisits[bhr.id] || new Set();
-      
-      return {
-        id: bhr.id,
-        name: bhr.full_name || 'Unknown BHR',
-        e_code: bhr.e_code,
-        reports: visitedBranches.size,
-        coverage: assignedBranches.size > 0 
-          ? Math.round((visitedBranches.size / assignedBranches.size) * 100) 
-          : 0
-      };
-    });
-
-    console.log("Top performers calculated:", performers);
-
-    // Sort by number of reports first
-    return performers.sort((a, b) => {
-      if (b.reports !== a.reports) return b.reports - a.reports;
-      return b.coverage - a.coverage;
-    }).slice(0, 3); // Return top 3
-  } catch (error: any) {
-    console.error("Error fetching top performers:", error);
-    toast({
-      variant: "destructive",
-      title: "Error loading top performers",
-      description: error.message || "An unexpected error occurred"
+      title: "Error loading trends",
+      description: error.message || "Unable to load monthly trends"
     });
     return [];
   }
 }
 
-// Update the analytics data fetching to use real database data
+export async function fetchTopPerformers(): Promise<BHRPerformance[]> {
+  try {
+    // Get current month's visits
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const { data: visits, error: visitError } = await supabase
+      .from('branch_visits')
+      .select(`
+        user_id,
+        branch_id,
+        profiles:user_id (
+          full_name,
+          e_code
+        )
+      `)
+      .in('status', ['submitted', 'approved'])
+      .gte('visit_date', firstDayOfMonth.toISOString())
+      .lte('visit_date', today.toISOString()) as { data: (BranchVisit & { profiles: Profile })[] | null, error: any };
+
+    if (visitError) {
+      throw visitError;
+    }
+
+    if (!visits || visits.length === 0) {
+      return [];
+    }
+
+    // Get total branches count for coverage calculation
+    const { count: totalBranches, error: branchError } = await supabase
+      .from('branches')
+      .select('*', { count: 'exact', head: true });
+
+    if (branchError) {
+      throw branchError;
+    }
+
+    // Group visits by BHR
+    const bhrStats: Record<string, {
+      id: string;
+      name: string;
+      e_code?: string;
+      visitedBranches: Set<string>;
+      totalVisits: number;
+    }> = {};
+
+    visits.forEach(visit => {
+      const userId = visit.user_id;
+      if (!userId || !visit.profiles) return;
+
+      if (!bhrStats[userId]) {
+        bhrStats[userId] = {
+          id: userId,
+          name: visit.profiles.full_name || 'Unknown',
+          e_code: visit.profiles.e_code,
+          visitedBranches: new Set(),
+          totalVisits: 0
+        };
+      }
+
+      bhrStats[userId].visitedBranches.add(visit.branch_id);
+      bhrStats[userId].totalVisits++;
+    });
+
+    // Convert to array and calculate coverage
+    const performers = Object.values(bhrStats).map(bhr => ({
+      id: bhr.id,
+      name: bhr.name,
+      e_code: bhr.e_code,
+      coverage: totalBranches ? Math.round((bhr.visitedBranches.size / totalBranches) * 100) : 0,
+      reports: bhr.totalVisits
+    }));
+
+    // Sort by coverage and then by number of reports
+    return performers.sort((a, b) => {
+      if (b.coverage === a.coverage) {
+        return b.reports - a.reports;
+      }
+      return b.coverage - a.coverage;
+    });
+
+  } catch (error: any) {
+    console.error("Error fetching top performers:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading performers",
+      description: error.message || "Unable to load top performers"
+    });
+    return [];
+  }
+}
+
 export async function fetchAnalyticsData(month?: string, year?: string) {
   try {
     console.log("Fetching analytics data...");
@@ -819,12 +689,6 @@ export async function fetchAnalyticsData(month?: string, year?: string) {
   }
 }
 
-// Months array for date calculations
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-
 export async function fetchCategoryBreakdown() {
   try {
     console.log("Fetching category breakdown...");
@@ -890,22 +754,12 @@ export async function fetchCategoryBreakdown() {
 
 export async function generateReportData(month?: string, year?: string) {
   try {
-    console.log("Generating report data...");
-    const currentDate = new Date();
-    const selectedYear = year ? parseInt(year) : currentDate.getFullYear();
-    const selectedMonth = month ? 
-      MONTHS.indexOf(month) : 
-      currentDate.getMonth();
+    // Get date range for the selected month
+    const selectedYear = year ? parseInt(year) : new Date().getFullYear();
+    const selectedMonth = month ? MONTHS.indexOf(month) : new Date().getMonth();
     
-    if (selectedMonth === -1) {
-      throw new Error("Invalid month selected");
-    }
-    
-    // Create date range for the selected month
     const startDate = new Date(selectedYear, selectedMonth, 1);
     const endDate = new Date(selectedYear, selectedMonth + 1, 0);
-    
-    console.log(`Report period: ${startDate.toISOString()} to ${endDate.toISOString()}`);
     
     // Get branches count
     const { count: totalBranches, error: branchError } = await supabase
@@ -924,59 +778,77 @@ export async function generateReportData(month?: string, year?: string) {
         visit_date,
         total_employees_invited,
         total_participants,
-        profiles:user_id(full_name)
+        new_employees_covered,
+        new_employees_total,
+        profiles:user_id (
+          full_name,
+          e_code
+        )
       `)
       .gte('visit_date', startDate.toISOString())
       .lte('visit_date', endDate.toISOString())
-      .in('status', ['submitted', 'approved']);
+      .in('status', ['submitted', 'approved']) as { data: (BranchVisit & { profiles: Profile })[] | null, error: any };
     
     if (visitError) throw visitError;
-    
-    console.log(`Found ${visits ? visits.length : 0} visits for reporting period`);
     
     if (!visits || visits.length === 0) {
       return {
         totalBranchVisits: 0,
         coveragePercentage: 0,
         avgParticipation: 0,
+        employeeCoverage: 0,
+        newEmployeeCoverage: 0,
         topPerformer: "No data",
         categoryBreakdown: []
       };
     }
     
-    // Count unique visited branches
+    // Calculate coverage metrics
     const visitedBranchIds = new Set(visits.map(v => v.branch_id));
-    const totalVisits = visits.length;
     const coveragePercentage = totalBranches ? 
       Math.round((visitedBranchIds.size / totalBranches) * 100) : 0;
     
-    // Calculate participation rate
-    const totalInvited = visits.reduce((sum, v) => sum + (v.total_employees_invited || 0), 0);
-    const totalParticipated = visits.reduce((sum, v) => sum + (v.total_participants || 0), 0);
-    const avgParticipation = totalInvited > 0 ? 
-      Math.round((totalParticipated / totalInvited) * 100) : 0;
-    
-    // Find top performer (BHR with most visits)
-    const bhrVisitCounts: Record<string, { name: string, count: number }> = {};
+    // Calculate participation and coverage rates
+    let totalInvited = 0;
+    let totalParticipated = 0;
+    let totalEmployeeCoverage = 0;
+    let totalNewEmployeeCoverage = 0;
+    let validEmployeeCounts = 0;
+    let validNewEmployeeCounts = 0;
     
     visits.forEach(visit => {
-      const userId = visit.user_id;
-      if (!userId) return;
-      
-      if (!bhrVisitCounts[userId]) {
-        // Extract BH name safely
-        let name = 'Unknown';
-        if (visit.profiles && typeof visit.profiles === 'object' && visit.profiles !== null) {
-          const profileObj = visit.profiles as { full_name?: string };
-          if (profileObj && typeof profileObj.full_name === 'string') {
-            name = profileObj.full_name;
-          }
-        }
-        
-        bhrVisitCounts[userId] = { name, count: 0 };
+      if (visit.total_employees_invited && visit.total_participants) {
+        totalInvited += visit.total_employees_invited;
+        totalParticipated += visit.total_participants;
       }
       
-      bhrVisitCounts[userId].count++;
+      if (visit.new_employees_covered !== null && visit.new_employees_total !== null && visit.new_employees_total > 0) {
+        totalNewEmployeeCoverage += (visit.new_employees_covered / visit.new_employees_total) * 100;
+        validNewEmployeeCounts++;
+      }
+    });
+    
+    const avgParticipation = totalInvited > 0 ? 
+      Math.round((totalParticipated / totalInvited) * 100) : 0;
+      
+    const employeeCoverage = validEmployeeCounts > 0 ?
+      Math.round(totalEmployeeCoverage / validEmployeeCounts) : 0;
+      
+    const newEmployeeCoverage = validNewEmployeeCounts > 0 ?
+      Math.round(totalNewEmployeeCoverage / validNewEmployeeCounts) : 0;
+    
+    // Find top performer
+    const bhrVisitCounts: Record<string, { name: string; count: number }> = {};
+    visits.forEach(visit => {
+      if (!visit.user_id || !visit.profiles?.full_name) return;
+      
+      if (!bhrVisitCounts[visit.user_id]) {
+        bhrVisitCounts[visit.user_id] = {
+          name: visit.profiles.full_name,
+          count: 0
+        };
+      }
+      bhrVisitCounts[visit.user_id].count++;
     });
     
     const topPerformer = Object.values(bhrVisitCounts).reduce(
@@ -988,9 +860,11 @@ export async function generateReportData(month?: string, year?: string) {
     const categoryBreakdown = await fetchCategoryBreakdown();
     
     return {
-      totalBranchVisits: totalVisits,
+      totalBranchVisits: visits.length,
       coveragePercentage,
       avgParticipation,
+      employeeCoverage,
+      newEmployeeCoverage,
       topPerformer,
       categoryBreakdown
     };
@@ -999,36 +873,35 @@ export async function generateReportData(month?: string, year?: string) {
     toast({
       variant: "destructive",
       title: "Error generating report",
-      description: error.message || "An unexpected error occurred"
+      description: error.message || "Unable to generate report data"
     });
     
     return {
       totalBranchVisits: 0,
       coveragePercentage: 0,
       avgParticipation: 0,
+      employeeCoverage: 0,
+      newEmployeeCoverage: 0,
       topPerformer: "Error loading data",
       categoryBreakdown: []
     };
   }
 }
 
-export async function fetchZoneBHRPerformance() {
-  try {
-    const { data: responseData, error } = await supabase
-      .rpc('get_zone_bhr_performance');
-      
-    if (error) throw error;
-    
-    // Fix the typing issue - make sure we're returning an array of objects
-    const performanceData = Array.isArray(responseData) ? responseData.map(item => ({
-      name: item.name,
-      branches: item.branches,
-      coverage: item.coverage
-    })) : [];
-    
-    return performanceData;
-  } catch (error) {
-    console.error("Error fetching zone BHR performance:", error);
-    return [];
-  }
-}
+// Helper function to get category colors
+const getCategoryColor = (category: string) => {
+  const colors = {
+    platinum: "bg-violet-500",
+    diamond: "bg-blue-500",
+    gold: "bg-amber-500",
+    silver: "bg-slate-400",
+    bronze: "bg-orange-700"
+  };
+  return colors[category.toLowerCase()] || "bg-gray-500";
+};
+
+// Months array for date calculations
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];

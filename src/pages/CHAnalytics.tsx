@@ -60,7 +60,13 @@ const CHAnalytics = () => {
     hygiene: 0,
     culture: 0,
     overall: 0,
-    count: 0
+    count: 0,
+    leadersAligned: 0,
+    employeesSafe: 0,
+    employeesMotivated: 0,
+    noAbusiveLanguage: 0,
+    comfortEscalation: 0,
+    inclusiveCulture: 0
   });
   const [isQualitativeLoading, setIsQualitativeLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("performance");
@@ -76,6 +82,7 @@ const CHAnalytics = () => {
   const [showAttritionCategory, setShowAttritionCategory] = useState(true);
   const [showErCategory, setShowErCategory] = useState(true);
   const [showCwtCategory, setShowCwtCategory] = useState(true);
+  const [showNonVendorCategory, setShowNonVendorCategory] = useState(true);
   
   // State for category breakdown
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
@@ -181,10 +188,12 @@ const CHAnalytics = () => {
   // Prepare qualitative data for radar visualization
   const prepareQualitativeData = () => {
     return [
-      { subject: 'Branch Culture', value: qualitativeData.culture },
-      { subject: 'Branch Hygiene', value: qualitativeData.hygiene },
-      { subject: 'Overall Discipline', value: qualitativeData.discipline },
-      { subject: 'Overall Rating', value: qualitativeData.overall }
+      { subject: 'Leaders Code Aligned', value: (qualitativeData.leadersAligned / 5) * 100, type: 'percentage' },
+      { subject: 'Employee Safety', value: (qualitativeData.employeesSafe / 5) * 100, type: 'percentage' },
+      { subject: 'Employee Motivation', value: (qualitativeData.employeesMotivated / 5) * 100, type: 'percentage' },
+      { subject: 'No Abusive Language', value: (qualitativeData.noAbusiveLanguage / 5) * 100, type: 'percentage' },
+      { subject: 'Comfort Escalation', value: (qualitativeData.comfortEscalation / 5) * 100, type: 'percentage' },
+      { subject: 'Inclusive Culture', value: (qualitativeData.inclusiveCulture / 5) * 100, type: 'percentage' }
     ];
   };
   
@@ -353,6 +362,22 @@ const CHAnalytics = () => {
                           ER
                         </Label>
                       </div>
+
+                      <div className="flex items-center gap-2">
+                        <Switch id="non-vendor-category-toggle" checked={showNonVendorCategory} onCheckedChange={setShowNonVendorCategory} />
+                        <Label htmlFor="non-vendor-category-toggle" className="text-sm cursor-pointer">
+                          <span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-1"></span>
+                          Non-Vendor
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Switch id="cwt-category-toggle" checked={showCwtCategory} onCheckedChange={setShowCwtCategory} />
+                        <Label htmlFor="cwt-category-toggle" className="text-sm cursor-pointer">
+                          <span className="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-1"></span>
+                          CWT Cases
+                        </Label>
+                      </div>
                       
                       <div className="flex items-center gap-2">
                         <Switch id="cwt-category-toggle" checked={showCwtCategory} onCheckedChange={setShowCwtCategory} />
@@ -481,7 +506,7 @@ const CHAnalytics = () => {
                         <RadarChart outerRadius={90} data={prepareQualitativeData()}>
                           <PolarGrid />
                           <PolarAngleAxis dataKey="subject" />
-                          <PolarRadiusAxis domain={[0, 5]} />
+                          <PolarRadiusAxis domain={[0, 100]} />
                           <Radar
                             name="Quality Rating"
                             dataKey="value"
@@ -489,63 +514,95 @@ const CHAnalytics = () => {
                             fill="#8884d8"
                             fillOpacity={0.6}
                           />
-                          <Tooltip formatter={(value) => {
-                            return typeof value === 'number' ? [`${value.toFixed(1)}/5`, 'Rating'] : [`${value}/5`, 'Rating'];
+                          <Tooltip formatter={(value, name, props) => {
+                            const entry = props.payload;
+                            if (entry && entry.type === 'rating') {
+                              return [`${value.toFixed(1)}/5`, 'Rating'];
+                            }
+                            return [`${value.toFixed(1)}%`, 'Yes Responses'];
                           }} />
                         </RadarChart>
                       </ResponsiveContainer>
                     </div>
                     <div>
                       <div className="space-y-6">
+
+
                         <div>
-                          <h3 className="text-sm font-medium mb-2">Branch Culture</h3>
-                          <div className="flex items-center">
-                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
-                              <div 
-                                className="bg-blue-500 h-2 rounded-full"
-                                style={{ width: `${(qualitativeData.culture / 5) * 100}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-medium">{qualitativeData.culture.toFixed(1)}</span>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <h3 className="text-sm font-medium mb-2">Branch Hygiene</h3>
-                          <div className="flex items-center">
-                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
-                              <div 
-                                className="bg-green-500 h-2 rounded-full"
-                                style={{ width: `${(qualitativeData.hygiene / 5) * 100}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-medium">{qualitativeData.hygiene.toFixed(1)}</span>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <h3 className="text-sm font-medium mb-2">Overall Discipline</h3>
+                          <h3 className="text-sm font-medium mb-2">Leaders Code Alignment</h3>
                           <div className="flex items-center">
                             <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
                               <div 
                                 className="bg-purple-500 h-2 rounded-full"
-                                style={{ width: `${(qualitativeData.discipline / 5) * 100}%` }}
+                                style={{ width: `${(qualitativeData.leadersAligned / 5) * 100}%` }}
                               />
                             </div>
-                            <span className="text-sm font-medium">{qualitativeData.discipline.toFixed(1)}</span>
+                            <span className="text-sm font-medium">{((qualitativeData.leadersAligned / 5) * 100).toFixed(1)}%</span>
                           </div>
                         </div>
-                        
+
                         <div>
-                          <h3 className="text-sm font-medium mb-2">Overall Rating</h3>
+                          <h3 className="text-sm font-medium mb-2">Employee Safety</h3>
                           <div className="flex items-center">
                             <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
                               <div 
-                                className="bg-amber-500 h-2 rounded-full"
-                                style={{ width: `${(qualitativeData.overall / 5) * 100}%` }}
+                                className="bg-yellow-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.employeesSafe / 5) * 100}%` }}
                               />
                             </div>
-                            <span className="text-sm font-medium">{qualitativeData.overall.toFixed(1)}</span>
+                            <span className="text-sm font-medium">{((qualitativeData.employeesSafe / 5) * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Employee Motivation</h3>
+                          <div className="flex items-center">
+                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
+                              <div 
+                                className="bg-orange-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.employeesMotivated / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{((qualitativeData.employeesMotivated / 5) * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">No Abusive Language</h3>
+                          <div className="flex items-center">
+                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
+                              <div 
+                                className="bg-red-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.noAbusiveLanguage / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{((qualitativeData.noAbusiveLanguage / 5) * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Comfort with Escalation</h3>
+                          <div className="flex items-center">
+                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
+                              <div 
+                                className="bg-indigo-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.comfortEscalation / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{((qualitativeData.comfortEscalation / 5) * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Inclusive Culture</h3>
+                          <div className="flex items-center">
+                            <div className="w-full bg-slate-200 h-2 rounded-full mr-2">
+                              <div 
+                                className="bg-pink-500 h-2 rounded-full"
+                                style={{ width: `${(qualitativeData.inclusiveCulture / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{((qualitativeData.inclusiveCulture / 5) * 100).toFixed(1)}%</span>
                           </div>
                         </div>
                       </div>

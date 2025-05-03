@@ -2,66 +2,105 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/components/ui/use-toast";
 
-// Get stats for a BHR's reports
-export const fetchBHRReportStats = async (bhId: string) => {
-  try {
-    const { data: totalData, error: totalError } = await supabase
-      .from('branch_visits')
-      .select('count', { count: 'exact' })
-      .eq('user_id', bhId);
-    
-    const { data: approvedData, error: approvedError } = await supabase
-      .from('branch_visits')
-      .select('count', { count: 'exact' })
-      .eq('user_id', bhId)
-      .eq('status', 'approved');
-    
-    const { data: pendingData, error: pendingError } = await supabase
-      .from('branch_visits')
-      .select('count', { count: 'exact' })
-      .eq('user_id', bhId)
-      .eq('status', 'submitted');
-    
-    const { data: rejectedData, error: rejectedError } = await supabase
-      .from('branch_visits')
-      .select('count', { count: 'exact' })
-      .eq('user_id', bhId)
-      .eq('status', 'rejected');
-    
-    if (totalError || approvedError || pendingError || rejectedError) {
-      throw new Error('Error fetching report stats');
-    }
-    
-    return {
-      total: totalData ? totalData.length : 0,
-      approved: approvedData ? approvedData.length : 0,
-      pending: pendingData ? pendingData.length : 0,
-      rejected: rejectedData ? rejectedData.length : 0
-    };
-  } catch (error) {
-    console.error("Error in fetchBHRReportStats:", error);
-    return {
-      total: 0,
-      approved: 0,
-      pending: 0, 
-      rejected: 0
-    };
-  }
-};
+// Define types for Supabase responses
+type QualitativeRating = 'very_poor' | 'poor' | 'neutral' | 'good' | 'excellent';
+type BranchCategory = 'platinum' | 'diamond' | 'gold' | 'silver' | 'bronze';
+type ReportStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+type UserRole = 'BH' | 'ZH' | 'CH' | 'admin';
+type Gender = 'male' | 'female' | 'other';
 
-// Define the types for qualitative metrics
-export type QualitativeRating = "very_poor" | "poor" | "neutral" | "good" | "excellent" | null;
-export type QualitativeMetric = "culture_branch" | "line_manager_behavior" | "branch_hygiene" | "overall_discipline";
-
-export interface QualitativeData {
-  culture_branch: QualitativeRating;
-  line_manager_behavior: QualitativeRating;
-  branch_hygiene: QualitativeRating;
-  overall_discipline: QualitativeRating;
+interface Profile {
+  id: string;
+  full_name: string;
+  e_code: string;
+  role: UserRole;
+  location: string;
+  gender: Gender;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface HeatmapData {
-  metric: QualitativeMetric;
+interface Branch {
+  id: string;
+  name: string;
+  location: string;
+  category: BranchCategory;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface BranchAssignment {
+  id: string;
+  user_id: string;
+  branch_id: string;
+  assigned_at: string;
+  profiles?: {
+    full_name: string;
+    e_code: string;
+  };
+  branches?: {
+    name: string;
+    location: string;
+    category: BranchCategory;
+  };
+}
+
+interface BranchVisit {
+  id: string;
+  user_id: string;
+  branch_id: string;
+  visit_date: string;
+  branch_category: BranchCategory;
+  hr_connect_session?: boolean;
+  total_employees_invited?: number;
+  total_participants?: number;
+  manning_percentage?: number;
+  attrition_percentage?: number;
+  non_vendor_percentage?: number;
+  er_percentage?: number;
+  cwt_cases?: number;
+  performance_level?: string;
+  new_employees_total?: number;
+  new_employees_covered?: number;
+  star_employees_total?: number;
+  star_employees_covered?: number;
+  culture_branch?: QualitativeRating;
+  line_manager_behavior?: QualitativeRating;
+  branch_hygiene?: QualitativeRating;
+  overall_discipline?: QualitativeRating;
+  feedback?: string;
+  status: ReportStatus;
+  created_at?: string;
+  updated_at?: string;
+  profiles?: {
+    full_name: string;
+    e_code: string;
+  };
+  branches?: {
+    name: string;
+    location: string;
+    category: BranchCategory;
+  };
+}
+
+interface BranchVisitReport extends BranchVisit {
+  branch: {
+    name: string;
+    location: string;
+    category: BranchCategory;
+  };
+  bhr: {
+    name: string;
+    code: string;
+  };
+}
+
+interface Zone {
+  id: string;
+  name: string;
+}
+
+interface QualitativeMetricCounts {
   very_poor: number;
   poor: number;
   neutral: number;
@@ -70,46 +109,103 @@ export interface HeatmapData {
   total: number;
 }
 
+interface HeatmapData extends QualitativeMetricCounts {
+  metric: 'culture_branch' | 'line_manager_behavior' | 'branch_hygiene' | 'overall_discipline';
+}
+
 // Function to get qualitative data metrics by category
 export const getQualitativeMetricsByCategory = async (
   dateRange?: { from: Date; to: Date } | null,
-  specificCategory?: string | null
-): Promise<QualitativeData[]> => {
+  branchCategory?: string | null
+): Promise<Array<{
+  metric: 'culture_branch' | 'line_manager_behavior' | 'branch_hygiene' | 'overall_discipline';
+  counts: {
+    very_poor: number;
+    poor: number;
+    neutral: number;
+    good: number;
+    excellent: number;
+    total: number;
+  };
+}>> => {
   try {
     let query = supabase.from('branch_visits')
       .select(`
-        branch_category,
         culture_branch,
         line_manager_behavior,
         branch_hygiene,
-        overall_discipline
+        overall_discipline,
+        branches:branch_id (
+          category
+        )
       `);
     
     // Apply date filter if provided
-    if (dateRange?.from && dateRange?.to) {
-      query = query
-        .gte('visit_date', dateRange.from.toISOString().split('T')[0])
-        .lte('visit_date', dateRange.to.toISOString().split('T')[0]);
+    if (dateRange?.from) {
+      query = query.gte('visit_date', dateRange.from.toISOString().split('T')[0]);
+      
+      if (dateRange.to) {
+        query = query.lte('visit_date', dateRange.to.toISOString().split('T')[0]);
+      }
     }
     
     // Apply category filter if provided
-    if (specificCategory && specificCategory !== 'all') {
-      query = query.eq('branch_category', specificCategory.toLowerCase());
+    if (branchCategory && branchCategory !== 'all') {
+      query = query.eq('branches.category', branchCategory.toLowerCase());
     }
     
-    const { data, error } = await query;
+    const { data, error } = await query as { data: Array<{
+      culture_branch: QualitativeRating;
+      line_manager_behavior: QualitativeRating;
+      branch_hygiene: QualitativeRating;
+      overall_discipline: QualitativeRating;
+      branches: {
+        category: string;
+      } | null;
+    }> | null, error: any };
     
     if (error) throw error;
+    if (!data) return [];
     
-    return data as QualitativeData[];
-  } catch (error) {
+    const metrics = ['culture_branch', 'line_manager_behavior', 'branch_hygiene', 'overall_discipline'] as const;
+    
+    return metrics.map(metric => {
+      const counts = {
+        very_poor: 0,
+        poor: 0,
+        neutral: 0,
+        good: 0,
+        excellent: 0,
+        total: 0
+      };
+      
+      data.forEach(visit => {
+        const rating = visit[metric];
+        if (rating && rating in counts) {
+          counts[rating as keyof typeof counts]++;
+          counts.total++;
+        }
+      });
+      
+      return {
+        metric,
+        counts
+      };
+    });
+  } catch (error: any) {
     console.error("Error fetching qualitative metrics by category:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: error.message || "Failed to get metrics data"
+    });
     return [];
   }
 };
 
 // Get the breakdown of qualitative metrics for the heatmap
 export const getQualitativeMetricsForHeatmap = async (
+  metric: 'culture_branch' | 'line_manager_behavior' | 'branch_hygiene' | 'overall_discipline',
   dateRange?: { from: Date; to: Date | undefined } | null,
   branchCategory?: string | null
 ): Promise<HeatmapData[]> => {
@@ -136,169 +232,182 @@ export const getQualitativeMetricsForHeatmap = async (
       query = query.eq('branch_category', branchCategory.toLowerCase());
     }
     
-    const { data, error } = await query;
+    const { data, error } = await query as { data: Array<{
+      culture_branch: QualitativeRating;
+      line_manager_behavior: QualitativeRating;
+      branch_hygiene: QualitativeRating;
+      overall_discipline: QualitativeRating;
+    }> | null, error: any };
     
     if (error) throw error;
+    if (!data) return [];
     
-    // Process the data for the heatmap
-    const metrics: QualitativeMetric[] = [
-      "culture_branch",
-      "line_manager_behavior",
-      "branch_hygiene",
-      "overall_discipline"
-    ];
-
-    // Initialize the counts for each metric and rating
-    const processedData: HeatmapData[] = metrics.map(metric => ({
-      metric,
-      very_poor: 0,
-      poor: 0,
-      neutral: 0,
-      good: 0,
-      excellent: 0,
-      total: 0
-    }));
-
-    // Count the occurrences of each rating for each metric
-    if (data) {
+    const metrics = ['culture_branch', 'line_manager_behavior', 'branch_hygiene', 'overall_discipline'] as const;
+    const ratings = ['very_poor', 'poor', 'neutral', 'good', 'excellent'] as const;
+    
+    return metrics.map(metric => {
+      const counts: QualitativeMetricCounts = {
+        very_poor: 0,
+        poor: 0,
+        neutral: 0,
+        good: 0,
+        excellent: 0,
+        total: 0
+      };
+      
       data.forEach(visit => {
-        metrics.forEach(metric => {
-          const rating = visit[metric] as QualitativeRating;
-          if (rating) {
-            const metricData = processedData.find(d => d.metric === metric);
-            if (metricData) {
-              metricData[rating] += 1;
-              metricData.total += 1;
-            }
-          }
-        });
+        const rating = visit[metric];
+        if (rating && rating in counts) {
+          counts[rating as keyof QualitativeMetricCounts]++;
+          counts.total++;
+        }
       });
-    }
-    
-    console.log("Processed heatmap data:", processedData);
-    return processedData;
-  } catch (error) {
+      
+      return {
+        metric,
+        ...counts
+      };
+    });
+  } catch (error: any) {
     console.error("Error fetching qualitative metrics for heatmap:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: error.message || "Failed to get metrics data"
+    });
     return [];
+  }
+};
+
+// Helper function to convert rating to numeric value
+const getRatingValue = (rating: QualitativeRating): number => {
+  switch (rating) {
+    case 'excellent': return 5;
+    case 'good': return 4;
+    case 'neutral': return 3;
+    case 'poor': return 2;
+    case 'very_poor': return 1;
+    default: return 0;
   }
 };
 
 // Fetch monthly summary report data
 export const fetchMonthlySummaryReport = async (month: string, year: string) => {
   try {
-    // Parse date for filtering
-    const monthIndex = ["January", "February", "March", "April", "May", "June", "July", 
-      "August", "September", "October", "November", "December"].indexOf(month);
-    
-    if (monthIndex === -1) {
-      throw new Error("Invalid month");
-    }
-    
-    const startDate = new Date(parseInt(year), monthIndex, 1);
-    const endDate = new Date(parseInt(year), monthIndex + 1, 0); // Last day of month
-    
-    // Format dates for Supabase
-    const fromDate = startDate.toISOString().split('T')[0];
-    const toDate = endDate.toISOString().split('T')[0];
-    
-    // Get total branch visits
-    const { data: visitsData, error: visitsError } = await supabase
-      .from('branch_visits')
-      .select('count', { count: 'exact' })
-      .gte('visit_date', fromDate)
-      .lte('visit_date', toDate);
+    // First get all BHRs
+    const { data: bhrs, error: bhrsError } = await supabase
+      .from('profiles')
+      .select('id, full_name, e_code')
+      .eq('role', 'BH') as { data: Array<{
+        id: string;
+        full_name: string;
+        e_code: string;
+      }>, error: any };
       
-    if (visitsError) throw visitsError;
+    if (bhrsError) throw bhrsError;
+    if (!bhrs) return [];
     
-    const totalVisits = visitsData?.length || 0;
+    const monthlyReport = [];
     
-    // Get coverage percentage - we'll need to compare with assigned branches
-    const { data: branchData, error: branchError } = await supabase
-      .from('branches')
-      .select('count', { count: 'exact' });
+    // For each BHR, get their visit metrics
+    for (const bhr of bhrs) {
+      // Get visit data for the BHR
+      let visitsQuery = supabase
+        .from('branch_visits')
+        .select('*')
+        .eq('user_id', bhr.id);
       
-    if (branchError) throw branchError;
-    
-    const totalBranches = branchData?.length || 0;
-    const coveragePercentage = totalBranches > 0 ? Math.round((totalVisits / totalBranches) * 100) : 0;
-    
-    // Get average participation percentage
-    const { data: avgParticipationData, error: avgParticipationError } = await supabase
-      .from('branch_visits')
-      .select('total_participants, total_employees_invited')
-      .gte('visit_date', fromDate)
-      .lte('visit_date', toDate);
-      
-    if (avgParticipationError) throw avgParticipationError;
-    
-    let totalParticipants = 0;
-    let totalInvited = 0;
-    
-    avgParticipationData?.forEach(visit => {
-      if (visit.total_participants && visit.total_employees_invited) {
-        totalParticipants += visit.total_participants;
-        totalInvited += visit.total_employees_invited;
+      if (month && year) {
+        const startDate = `${year}-${month.padStart(2, '0')}-01`;
+        const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
+        visitsQuery = visitsQuery
+          .gte('visit_date', startDate)
+          .lte('visit_date', endDate);
       }
-    });
-    
-    const avgParticipation = totalInvited > 0 ? Math.round((totalParticipants / totalInvited) * 100) : 0;
-    
-    // Get top performer - BHR with most completed visits
-    const { data: topPerformerData, error: topPerformerError } = await supabase
-      .from('branch_visits')
-      .select('user_id, profiles:user_id(full_name)')
-      .gte('visit_date', fromDate)
-      .lte('visit_date', toDate);
-    
-    if (topPerformerError) throw topPerformerError;
-    
-    // Count visits by BHR
-    const bhrVisits = new Map();
-    topPerformerData?.forEach(visit => {
-      if (!visit.user_id) return;
       
-      const currentCount = bhrVisits.get(visit.user_id) || {
-        count: 0,
-        name: visit.profiles?.full_name || 'Unknown'
+      const { data: visitsData, error: visitsError } = await visitsQuery as { data: BranchVisit[] | null, error: any };
+      
+      if (visitsError) throw visitsError;
+      
+      const totalVisits = visitsData?.length || 0;
+      
+      // Calculate unique branches visited
+      const uniqueBranches = new Set(visitsData?.map(v => v.branch_id) || []).size;
+      
+      // Calculate average manning and attrition
+      let totalManning = 0;
+      let totalAttrition = 0;
+      let validManningCount = 0;
+      let validAttritionCount = 0;
+      
+      visitsData?.forEach(visit => {
+        if (visit.manning_percentage !== undefined) {
+          totalManning += visit.manning_percentage;
+          validManningCount++;
+        }
+        if (visit.attrition_percentage !== undefined) {
+          totalAttrition += visit.attrition_percentage;
+          validAttritionCount++;
+        }
+      });
+      
+      const avgManning = validManningCount > 0 ? Math.round(totalManning / validManningCount) : 0;
+      const avgAttrition = validAttritionCount > 0 ? Math.round(totalAttrition / validAttritionCount) : 0;
+      
+      // Calculate metrics distribution
+      const qualitativeMetrics = {
+        culture_branch: { good: 0, neutral: 0, poor: 0 },
+        line_manager_behavior: { good: 0, neutral: 0, poor: 0 },
+        branch_hygiene: { good: 0, neutral: 0, poor: 0 },
+        overall_discipline: { good: 0, neutral: 0, poor: 0 }
       };
       
-      bhrVisits.set(visit.user_id, {
-        count: currentCount.count + 1,
-        name: currentCount.name
+      visitsData?.forEach(visit => {
+        Object.keys(qualitativeMetrics).forEach(metric => {
+          const rating = visit[metric as keyof typeof visit] as QualitativeRating;
+          if (rating) {
+            if (rating === 'excellent' || rating === 'good') {
+              qualitativeMetrics[metric as keyof typeof qualitativeMetrics].good++;
+            } else if (rating === 'neutral') {
+              qualitativeMetrics[metric as keyof typeof qualitativeMetrics].neutral++;
+            } else {
+              qualitativeMetrics[metric as keyof typeof qualitativeMetrics].poor++;
+            }
+          }
+        });
       });
-    });
+      
+      monthlyReport.push({
+        BHR_Name: bhr.full_name,
+        e_code: bhr.e_code,
+        Total_Visits: totalVisits,
+        Unique_Branches: uniqueBranches,
+        Avg_Manning: `${avgManning}%`,
+        Avg_Attrition: `${avgAttrition}%`,
+        Culture_Good: qualitativeMetrics.culture_branch.good,
+        Culture_Neutral: qualitativeMetrics.culture_branch.neutral,
+        Culture_Poor: qualitativeMetrics.culture_branch.poor,
+        LM_Good: qualitativeMetrics.line_manager_behavior.good,
+        LM_Neutral: qualitativeMetrics.line_manager_behavior.neutral,
+        LM_Poor: qualitativeMetrics.line_manager_behavior.poor,
+        Hygiene_Good: qualitativeMetrics.branch_hygiene.good,
+        Hygiene_Neutral: qualitativeMetrics.branch_hygiene.neutral,
+        Hygiene_Poor: qualitativeMetrics.branch_hygiene.poor,
+        Discipline_Good: qualitativeMetrics.overall_discipline.good,
+        Discipline_Neutral: qualitativeMetrics.overall_discipline.neutral,
+        Discipline_Poor: qualitativeMetrics.overall_discipline.poor
+      });
+    }
     
-    // Find BHR with most visits
-    let topPerformer = 'N/A';
-    let highestCount = 0;
-    
-    bhrVisits.forEach((value, key) => {
-      if (value.count > highestCount) {
-        highestCount = value.count;
-        topPerformer = value.name;
-      }
-    });
-    
-    return {
-      totalBranchVisits: totalVisits,
-      coveragePercentage,
-      avgParticipation,
-      topPerformer
-    };
+    return monthlyReport;
   } catch (error: any) {
-    console.error("Error fetching monthly summary:", error);
+    console.error("Error fetching monthly summary report:", error);
     toast({
       variant: "destructive",
-      title: "Error fetching report data",
-      description: error.message || "Unable to load report data"
+      title: "Error",
+      description: error.message || "Failed to fetch monthly summary report"
     });
-    
-    return {
-      totalBranchVisits: 0,
-      coveragePercentage: 0,
-      avgParticipation: 0,
-      topPerformer: 'N/A'
-    };
+    return [];
   }
 };
 
@@ -457,7 +566,7 @@ export const exportBranchVisitData = async (
         branch_location,
         branch_category,
         user_id,
-        profiles:user_id (full_name, employee_code),
+        profiles:user_id (full_name, e_code),
         manning_percentage,
         attrition_percentage,
         er_percentage,
@@ -510,8 +619,8 @@ export const exportBranchVisitData = async (
       Branch_Name: visit.branch_name,
       Branch_Location: visit.branch_location,
       Branch_Category: visit.branch_category,
-      BHR_Name: visit.profiles?.full_name || 'N/A',
-      BHR_Code: visit.profiles?.employee_code || 'N/A',
+      BHR_Name: visit.profiles?.[0]?.full_name || 'N/A',
+      BHR_Code: visit.profiles?.[0]?.e_code || 'N/A',
       Manning_Percentage: visit.manning_percentage || 0,
       Attrition_Percentage: visit.attrition_percentage || 0,
       ER_Percentage: visit.er_percentage || 0,
@@ -543,64 +652,55 @@ export const exportBHRPerformanceSummary = async (
   year?: string
 ) => {
   try {
-    // First get all BHRs
-    const { data: bhrs, error: bhrsError } = await supabase
+    // Get all BHRs
+    const { data: bhrs, error: bhrError } = await supabase
       .from('profiles')
-      .select('id, full_name, employee_code, designation')
-      .eq('role', 'bh');
-      
-    if (bhrsError) throw bhrsError;
+      .select('id, full_name, e_code, designation')
+      .eq('role', 'BH') as { data: Array<{
+        id: string;
+        full_name: string;
+        e_code: string;
+        designation?: string;
+      }>, error: any };
+    
+    if (bhrError) throw bhrError;
+    if (!bhrs) return [];
     
     const bhrPerformance = [];
     
     // For each BHR, get their visit metrics
-    for (const bhr of (bhrs || [])) {
-      // Calculate date range if provided
-      let fromDate, toDate;
-      
-      if (month && year) {
-        const monthIndex = ["January", "February", "March", "April", "May", "June", "July", 
-          "August", "September", "October", "November", "December"].indexOf(month);
-          
-        if (monthIndex !== -1) {
-          const startDate = new Date(parseInt(year), monthIndex, 1);
-          const endDate = new Date(parseInt(year), monthIndex + 1, 0);
-          
-          fromDate = startDate.toISOString().split('T')[0];
-          toDate = endDate.toISOString().split('T')[0];
-        }
-      }
-      
-      // Get BHR's branch assignments count
-      const { data: assignmentsData, error: assignmentsError } = await supabase
+    for (const bhr of bhrs) {
+      // Get assigned branches count
+      const { count: assignedCount, error: assignedError } = await supabase
         .from('branch_assignments')
-        .select('branch_id', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', bhr.id);
-        
-      if (assignmentsError) throw assignmentsError;
       
-      const assignedBranches = assignmentsData?.length || 0;
+      if (assignedError) throw assignedError;
       
-      // Get BHR's visits within date range
+      const assignedBranches = assignedCount || 0;
+      
+      // Get visit data for the BHR
       let visitsQuery = supabase
         .from('branch_visits')
-        .select('id, branch_id, visit_date, status, manning_percentage, attrition_percentage')
+        .select('*')
         .eq('user_id', bhr.id);
-        
-      if (fromDate && toDate) {
+      
+      if (month && year) {
+        const startDate = `${year}-${month.padStart(2, '0')}-01`;
+        const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
         visitsQuery = visitsQuery
-          .gte('visit_date', fromDate)
-          .lte('visit_date', toDate);
+          .gte('visit_date', startDate)
+          .lte('visit_date', endDate);
       }
       
-      const { data: visitsData, error: visitsError } = await visitsQuery;
+      const { data: visitsData, error: visitsError } = await visitsQuery as { data: BranchVisit[] | null, error: any };
       
       if (visitsError) throw visitsError;
       
-      // Calculate metrics
       const totalVisits = visitsData?.length || 0;
       const approvedVisits = visitsData?.filter(v => v.status === 'approved').length || 0;
-      const pendingVisits = visitsData?.filter(v => v.status === 'submitted').length || 0;
+      const submittedVisits = visitsData?.filter(v => v.status === 'submitted').length || 0;
       const rejectedVisits = visitsData?.filter(v => v.status === 'rejected').length || 0;
       
       // Calculate unique branches visited
@@ -613,25 +713,33 @@ export const exportBHRPerformanceSummary = async (
       // Calculate average manning and attrition
       let totalManning = 0;
       let totalAttrition = 0;
+      let validManningCount = 0;
+      let validAttritionCount = 0;
       
       visitsData?.forEach(visit => {
-        if (visit.manning_percentage) totalManning += visit.manning_percentage;
-        if (visit.attrition_percentage) totalAttrition += visit.attrition_percentage;
+        if (visit.manning_percentage !== undefined) {
+          totalManning += visit.manning_percentage;
+          validManningCount++;
+        }
+        if (visit.attrition_percentage !== undefined) {
+          totalAttrition += visit.attrition_percentage;
+          validAttritionCount++;
+        }
       });
       
-      const avgManning = totalVisits > 0 ? Math.round(totalManning / totalVisits) : 0;
-      const avgAttrition = totalVisits > 0 ? Math.round(totalAttrition / totalVisits) : 0;
+      const avgManning = validManningCount > 0 ? Math.round(totalManning / validManningCount) : 0;
+      const avgAttrition = validAttritionCount > 0 ? Math.round(totalAttrition / validAttritionCount) : 0;
       
       bhrPerformance.push({
-        BHR_Name: bhr.full_name || 'N/A',
-        Employee_Code: bhr.employee_code || 'N/A',
+        BHR_Name: bhr.full_name,
+        e_code: bhr.e_code,
         Designation: bhr.designation || 'Branch HR',
         Assigned_Branches: assignedBranches,
         Total_Visits: totalVisits,
         Unique_Branches_Visited: uniqueBranchesVisited,
         Completion_Rate: `${completionRate}%`,
         Approved_Reports: approvedVisits,
-        Pending_Reports: pendingVisits,
+        submitted_Reports: submittedVisits,
         Rejected_Reports: rejectedVisits,
         Avg_Manning: `${avgManning}%`,
         Avg_Attrition: `${avgAttrition}%`,
@@ -659,37 +767,22 @@ export const exportBranchAssignments = async () => {
         id,
         user_id,
         branch_id,
-        profiles:user_id (full_name, employee_code),
-        branches:branch_id (name, location, category, zone_id)
-      `);
+        profiles:user_id (full_name, e_code),
+        branches:branch_id (name, location, category)
+      `) as { data: BranchAssignment[] | null, error: any };
       
     if (error) throw error;
-    
-    // Get zone names for reference
-    const { data: zoneData, error: zoneError } = await supabase
-      .from('zones')
-      .select('id, name');
-      
-    if (zoneError) throw zoneError;
-    
-    // Create zone lookup
-    const zoneLookup = new Map();
-    zoneData?.forEach(zone => {
-      zoneLookup.set(zone.id, zone.name);
-    });
     
     // Transform data for export
     const exportData = data?.map(assignment => ({
       BHR_Name: assignment.profiles?.full_name || 'N/A',
-      BHR_Code: assignment.profiles?.employee_code || 'N/A',
+      BHR_Code: assignment.profiles?.e_code || 'N/A',
       Branch_Name: assignment.branches?.name || 'N/A',
       Branch_Location: assignment.branches?.location || 'N/A',
-      Branch_Category: (assignment.branches?.category || 'unknown').charAt(0).toUpperCase() + 
-        (assignment.branches?.category || 'unknown').slice(1),
-      Zone: zoneLookup.get(assignment.branches?.zone_id) || 'N/A'
-    }));
+      Branch_Category: assignment.branches?.category || 'bronze'
+    })) || [];
     
-    return exportData || [];
+    return exportData;
   } catch (error: any) {
     console.error("Error exporting branch assignments:", error);
     toast({
@@ -701,10 +794,422 @@ export const exportBranchAssignments = async () => {
   }
 };
 
-// Export these functions that are referenced in other files
-export const getActiveBHRsCount = async () => ({ count: 0, total: 0 });
-export const getTotalBranchVisitsInMonth = async () => ({ count: 0 });
-export interface BranchVisitReport {} // Empty interface to satisfy imports
-export const fetchRecentReports = async () => [];
-export const fetchReportById = async (id: string) => null;
-export const updateReportStatus = async () => false;
+
+
+// Update report status
+export const updateReportStatus = async (
+  reportId: string,
+  status: 'approved' | 'rejected',
+  feedback?: string
+) => {
+  try {
+    const { error } = await supabase
+      .from('branch_visits')
+      .update({
+        status,
+        feedback,
+        reviewed_at: new Date().toISOString()
+      })
+      .eq('id', reportId);
+    
+    if (error) throw error;
+    
+    toast({
+      title: "Success",
+      description: `Report ${status === 'approved' ? 'approved' : 'rejected'} successfully`
+    });
+    
+    return true;
+  } catch (error: any) {
+    console.error("Error updating report status:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: error.message || "Failed to update report status"
+    });
+    return false;
+  }
+};
+
+// Get stats for a BHR's reports
+export const fetchBHRReportStats = async (bhId: string) => {
+  try {
+    const { data: totalData, error: totalError } = await supabase
+      .from('branch_visits')
+      .select('*')
+      .eq('user_id', bhId) as { data: BranchVisit[] | null, error: any };
+    
+    if (totalError) throw totalError;
+    
+    const { data: approvedData, error: approvedError } = await supabase
+      .from('branch_visits')
+      .select('*')
+      .eq('user_id', bhId)
+      .eq('status', 'approved') as { data: BranchVisit[] | null, error: any };
+    
+    if (approvedError) throw approvedError;
+    
+    const { data: submittedData, error: submittedError } = await supabase
+      .from('branch_visits')
+      .select('*')
+      .eq('user_id', bhId)
+      .eq('status', 'submitted') as { data: BranchVisit[] | null, error: any };
+    
+    if (submittedError) throw submittedError;
+    
+    const { data: rejectedData, error: rejectedError } = await supabase
+      .from('branch_visits')
+      .select('*')
+      .eq('user_id', bhId)
+      .eq('status', 'rejected') as { data: BranchVisit[] | null, error: any };
+    
+    if (rejectedError) throw rejectedError;
+    
+    return {
+      total: totalData?.length || 0,
+      approved: approvedData?.length || 0,
+      submitted: submittedData?.length || 0,
+      rejected: rejectedData?.length || 0
+    };
+  } catch (error) {
+    console.error("Error in fetchBHRReportStats:", error);
+    return {
+      total: 0,
+      approved: 0,
+      submitted: 0, 
+      rejected: 0
+    };
+  }
+};
+
+// Get active BHRs count
+export const getActiveBHRsCount = async () => {
+  try {
+    // Get all BHRs
+    const { data: bhrs, error: bhrError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'BH') as { data: Array<{ id: string }>, error: any };
+    
+    if (bhrError) throw bhrError;
+    if (!bhrs) return { count: 0, total: 0 };
+    
+    const total = bhrs.length;
+    
+    // Get current month's start and end dates
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    // Get active BHRs (those who submitted at least one report this month)
+    const { data: visits, error: visitsError } = await supabase
+      .from('branch_visits')
+      .select('user_id')
+      .gte('visit_date', startOfMonth.toISOString().split('T')[0])
+      .lte('visit_date', endOfMonth.toISOString().split('T')[0])
+      .in('status', ['submitted', 'approved']) as { data: Array<{ user_id: string }>, error: any };
+    
+    if (visitsError) throw visitsError;
+    if (!visits) return { count: 0, total };
+    
+    // Count unique BHRs who submitted reports
+    const uniqueActiveBHRs = new Set(visits.map(visit => visit.user_id));
+    
+    return {
+      count: uniqueActiveBHRs.size,
+      total
+    };
+  } catch (error: any) {
+    console.error("Error getting active BHRs count:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: error.message || "Failed to get active BHRs count"
+    });
+    return { count: 0, total: 0 };
+  }
+};
+
+// Get total branch visits in current month
+export const getTotalBranchVisitsInMonth = async () => {
+  try {
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    
+    const { count, error } = await supabase
+      .from('branch_visits')
+      .select('*', { count: 'exact', head: true })
+      .gte('visit_date', `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`)
+      .lt('visit_date', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`);
+    
+    if (error) throw error;
+    
+    return { count: count || 0 };
+  } catch (error: any) {
+    console.error("Error getting total branch visits:", error);
+    return { count: 0 };
+  }
+};
+
+export interface BranchVisitResponse {
+  id: string;
+  visit_date: string;
+  status: string;
+  manning_percentage?: number;
+  attrition_percentage?: number;
+  er_percentage?: number;
+  total_employees_invited?: number;
+  total_participants?: number;
+  hr_connect_session?: boolean;
+  culture_branch?: QualitativeRating;
+  line_manager_behavior?: QualitativeRating;
+  branch_hygiene?: QualitativeRating;
+  overall_discipline?: QualitativeRating;
+  feedback?: string;
+  non_vendor_percentage?: number;
+  cwt_cases?: number;
+  performance_level?: string;
+  new_employees_total?: number;
+  new_employees_covered?: number;
+  star_employees_total?: number;
+  star_employees_covered?: number;
+  branches: {
+    name: string;
+    location: string;
+    category: string;
+  };
+  profiles: {
+    full_name: string;
+    e_code: string;
+  };
+}
+
+export interface BranchVisitSummary {
+  id: string;
+  visit_date: string;
+  status: string;
+  manning_percentage?: number;
+  attrition_percentage?: number;
+  er_percentage?: number;
+  total_employees_invited?: number;
+  total_participants?: number;
+  hr_connect_session?: boolean;
+  feedback?: string;
+  non_vendor_percentage?: number;
+  cwt_cases?: number;
+  performance_level?: string;
+  new_employees_total?: number;
+  new_employees_covered?: number;
+  star_employees_total?: number;
+  star_employees_covered?: number;
+  leaders_aligned_with_code?: string;
+  employees_feel_safe?: string;
+  employees_feel_motivated?: string;
+  leaders_abusive_language?: string;
+  employees_comfort_escalation?: string;
+  inclusive_culture?: string;
+  branches?: {
+    id: string;
+    name: string;
+    location: string;
+    category: BranchCategory;
+    branch_code: string | null;
+  };
+  profiles?: {
+    full_name: string;
+    e_code: string;
+  };
+}
+
+// Fetch recent reports for ZH dashboard
+export const fetchRecentReports = async (limit: number = 10): Promise<BranchVisitSummary[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        branch_id,
+        user_id,
+        visit_date,
+        status,
+        manning_percentage,
+        attrition_percentage,
+        er_percentage,
+        total_employees_invited,
+        total_participants,
+        hr_connect_session,
+        culture_branch,
+        line_manager_behavior,
+        branch_hygiene,
+        overall_discipline,
+        feedback,
+        non_vendor_percentage,
+        cwt_cases,
+        performance_level,
+        new_employees_total,
+        new_employees_covered,
+        star_employees_total,
+        star_employees_covered,
+        branches:branch_id (name, location, category),
+        profiles:user_id (full_name, e_code)
+      `)
+      .order('visit_date', { ascending: false })
+      .limit(limit) as { data: BranchVisitResponse[] | null, error: any };
+    
+    if (error) throw error;
+    if (!data) return [];
+    
+    return data.map(visit => ({
+      id: visit.id,
+      branch_name: visit.branches.name,
+      branch_location: visit.branches.location,
+      branch_category: visit.branches.category,
+      bh_name: visit.profiles.full_name,
+      bh_code: visit.profiles.e_code,
+      visit_date: visit.visit_date,
+      status: visit.status,
+      manning_percentage: visit.manning_percentage,
+      attrition_percentage: visit.attrition_percentage,
+      er_percentage: visit.er_percentage,
+      total_employees_invited: visit.total_employees_invited,
+      total_participants: visit.total_participants,
+      hr_connect_session: visit.hr_connect_session,
+      culture_branch: visit.culture_branch,
+      line_manager_behavior: visit.line_manager_behavior,
+      branch_hygiene: visit.branch_hygiene,
+      overall_discipline: visit.overall_discipline,
+      feedback: visit.feedback,
+      non_vendor_percentage: visit.non_vendor_percentage,
+      cwt_cases: visit.cwt_cases,
+      performance_level: visit.performance_level,
+      new_employees_total: visit.new_employees_total,
+      new_employees_covered: visit.new_employees_covered,
+      star_employees_total: visit.star_employees_total,
+      star_employees_covered: visit.star_employees_covered
+    }));
+  } catch (error: any) {
+    console.error("Error fetching recent reports:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: error.message || "Failed to fetch recent reports"
+    });
+    return [];
+  }
+};
+
+// Fetch report by ID
+export const fetchReportById = async (id: string): Promise<BranchVisitSummary | null> => {
+  try {
+    const { data: visit, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        branch_id,
+        visit_date,
+        status,
+        manning_percentage,
+        attrition_percentage,
+        er_percentage,
+        total_employees_invited,
+        total_participants,
+        hr_connect_session,
+        leaders_aligned_with_code,
+        employees_feel_safe,
+        employees_feel_motivated,
+        leaders_abusive_language,
+        employees_comfort_escalation,
+        inclusive_culture,
+        feedback,
+        non_vendor_percentage,
+        cwt_cases,
+        performance_level,
+        new_employees_total,
+        new_employees_covered,
+        star_employees_total,
+        star_employees_covered,
+        branches:branch_id (id, name, location, category, branch_code),
+        profiles (full_name, e_code)
+      `)
+      .eq('id', id)
+      .single() as {
+        data: {
+          id: string;
+          branch_id: string;
+          visit_date: string;
+          status: string;
+          manning_percentage?: number;
+          attrition_percentage?: number;
+          er_percentage?: number;
+          total_employees_invited?: number;
+          total_participants?: number;
+          hr_connect_session?: boolean;
+          leaders_aligned_with_code?: string;
+          employees_feel_safe?: string;
+          employees_feel_motivated?: string;
+          leaders_abusive_language?: string;
+          employees_comfort_escalation?: string;
+          inclusive_culture?: string;
+          feedback?: string;
+          non_vendor_percentage?: number;
+          cwt_cases?: number;
+          performance_level?: string;
+          new_employees_total?: number;
+          new_employees_covered?: number;
+          star_employees_total?: number;
+          star_employees_covered?: number;
+          branches: {
+            id: string;
+            name: string;
+            location: string;
+            category: BranchCategory;
+            branch_code: string | null;
+          };
+          profiles: {
+            full_name: string;
+            e_code: string;
+          };
+        } | null;
+        error: any;
+      };
+    
+    if (error) throw error;
+    if (!visit) return null;
+    
+    return {
+      id: visit.id,
+      visit_date: visit.visit_date,
+      status: visit.status,
+      manning_percentage: visit.manning_percentage,
+      attrition_percentage: visit.attrition_percentage,
+      er_percentage: visit.er_percentage,
+      total_employees_invited: visit.total_employees_invited,
+      total_participants: visit.total_participants,
+      hr_connect_session: visit.hr_connect_session,
+      feedback: visit.feedback,
+      non_vendor_percentage: visit.non_vendor_percentage,
+      cwt_cases: visit.cwt_cases,
+      performance_level: visit.performance_level,
+      new_employees_total: visit.new_employees_total,
+      new_employees_covered: visit.new_employees_covered,
+      star_employees_total: visit.star_employees_total,
+      star_employees_covered: visit.star_employees_covered,
+      leaders_aligned_with_code: visit.leaders_aligned_with_code,
+      employees_feel_safe: visit.employees_feel_safe,
+      employees_feel_motivated: visit.employees_feel_motivated,
+      leaders_abusive_language: visit.leaders_abusive_language,
+      employees_comfort_escalation: visit.employees_comfort_escalation,
+      inclusive_culture: visit.inclusive_culture,
+      branches: visit.branches,
+      profiles: visit.profiles
+    };
+  } catch (error: any) {
+    console.error("Error fetching report:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: error.message || "Failed to fetch report details"
+    });
+    return null;
+  }
+};

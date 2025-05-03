@@ -149,7 +149,7 @@ const MyVisits = () => {
         };
       case 'submitted':
         return { 
-          label: 'Submitted', 
+          label: 'submitted', 
           className: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
           icon: <Eye className="h-3 w-3 mr-1" />
         };
@@ -262,7 +262,7 @@ const MyVisits = () => {
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="submitted">Submitted</SelectItem>
+                      <SelectItem value="submitted">submitted</SelectItem>
                       <SelectItem value="approved">Approved</SelectItem>
                     </SelectContent>
                   </Select>
@@ -341,7 +341,7 @@ const MyVisits = () => {
                         <SelectContent>
                           <SelectItem value="all">All Statuses</SelectItem>
                           <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="submitted">Submitted</SelectItem>
+                          <SelectItem value="submitted">submitted</SelectItem>
                           <SelectItem value="approved">Approved</SelectItem>
                         </SelectContent>
                       </Select>

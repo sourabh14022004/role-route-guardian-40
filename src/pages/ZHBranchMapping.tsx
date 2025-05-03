@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -38,8 +37,8 @@ import {
 import { Search, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
-  fetchZoneBranches, 
-  fetchZoneBHRs, 
+  fetchBranches, 
+  fetchBHRs, 
   assignBranchToBHR, 
   unassignBranchFromBHR, 
   fetchBranchAssignments 
@@ -105,8 +104,8 @@ const ZHBranchMapping = () => {
         
         // Fetch branches and BH users in parallel
         const [branchesData, bhUsersData, allAssignmentsData] = await Promise.all([
-          fetchZoneBranches(user.id),
-          fetchZoneBHRs(user.id),
+          fetchBranches(user.id),
+          fetchBHRs(user.id),
           fetchBranchAssignments()
         ]);
         

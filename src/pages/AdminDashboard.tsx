@@ -64,7 +64,7 @@ const AdminDashboard = () => {
         </p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {["Total Users", "Active Now", "New Today", "Pending Approvals"].map((title, i) => (
+          {["Total Users", "Active Now", "New Today", "submitted Approvals"].map((title, i) => (
             <div key={i} className="bg-white rounded-lg shadow-sm p-6 border border-slate-200">
               <h3 className="text-sm font-medium text-slate-500 mb-1">{title}</h3>
               <p className="text-2xl font-bold">{Math.floor(Math.random() * 1000)}</p>

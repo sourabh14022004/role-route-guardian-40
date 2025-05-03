@@ -40,36 +40,103 @@ import { fetchAssignedBranchesWithDetails, createBranchVisit } from "@/services/
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/integrations/supabase/types";
 
-type Branch = Database["public"]["Tables"]["branches"]["Row"];
+type BranchCategory = "platinum" | "diamond" | "gold" | "silver" | "bronze";
+
+type BranchAssignment = {
+  branch_id: string;
+  branches?: {
+    id: string;
+    name: string;
+    location: string;
+    category: string;
+    branch_code: string | null;
+  };
+};
+
+interface Branch {
+  id: string;
+  name: string;
+  location: string;
+  category: BranchCategory;
+  created_at: string;
+  updated_at: string;
+  branch_code: string;
+  branches?: {
+    id: string;
+    name: string;
+    location: string;
+    category: string;
+    branch_code: string | null;
+  };
+}
+
+interface BranchVisit {
+  id: string;
+  visit_date: string;
+  branch_id: string;
+  user_id: string;
+  status: string;
+  branch_category: string;
+  manning_percentage: number | null;
+  attrition_percentage: number | null;
+  er_percentage: number | null;
+  non_vendor_percentage: number | null;
+  cwt_cases: number | null;
+  performance_level: string | null;
+  total_employees_invited: number | null;
+  total_participants: number | null;
+  hr_connect_session: boolean | null;
+  new_employees_total: number | null;
+  new_employees_covered: number | null;
+  star_employees_total: number | null;
+  star_employees_covered: number | null;
+  feedback: string | null;
+  best_practices: string | null;
+  leaders_aligned_with_code: string | null;
+  employees_feel_safe: string | null;
+  employees_feel_motivated: string | null;
+  leaders_abusive_language: string | null;
+  employees_comfort_escalation: string | null;
+  inclusive_culture: string | null;
+  branches?: {
+    id: string;
+    name: string;
+    location: string;
+    category: string;
+    branch_code: string | null;
+  };
+  profiles?: {
+    full_name: string;
+    e_code: string;
+  };
+}
 
 const formSchema = z.object({
-  branchId: z.string({
-    required_error: "Please select a branch",
-  }),
-  visitDate: z.date({
-    required_error: "Please select a visit date",
-  }),
-  branchCategory: z.string(),
-  hrConnectSession: z.boolean().default(false),
-  totalEmployeesInvited: z.number().min(0).default(0),
-  totalParticipants: z.number().min(0).default(0),
-  manningPercentage: z.number().min(0).max(100).default(0),
-  attritionPercentage: z.number().min(0).max(100).default(0),
-  nonVendorPercentage: z.number().min(0).max(100).default(0),
-  erPercentage: z.number().min(0).max(100).default(0),
-  cwtCases: z.number().min(0).default(0),
+  branchId: z.string(),
+  branchCode: z.string(),
+  visitDate: z.date(),
+  branchCategory: z.enum(["", "platinum", "diamond", "gold", "silver", "bronze"]),
+  hrConnectSession: z.boolean(),
+  totalEmployeesInvited: z.number().min(0),
+  totalParticipants: z.number().min(0),
+  manningPercentage: z.number().min(0).max(100),
+  attritionPercentage: z.number().min(0).max(100),
+  leaders_aligned_with_code: z.enum(["yes", "no"]),
+  leaders_aligned_remarks: z.string().optional(),
+  employees_feel_safe: z.enum(["yes", "no"]),
+  employees_feel_motivated: z.enum(["yes", "no"]),
+  leaders_abusive_language: z.enum(["yes", "no"]),
+  employees_comfort_escalation: z.enum(["yes", "no"]),
+  inclusive_culture: z.enum(["yes", "no"]),
+  feedback: z.string().max(200, { message: "Feedback must not be longer than 200 words" }).optional(),
+  nonVendorPercentage: z.number().min(0).max(100).optional(),
+  erPercentage: z.number().min(0).max(100).optional(),
+  cwtCases: z.number().min(0).optional(),
   performanceLevel: z.string().optional(),
-  newEmployeesTotal: z.number().min(0).default(0),
-  newEmployeesCovered: z.number().min(0).default(0),
-  starEmployeesTotal: z.number().min(0).default(0),
-  starEmployeesCovered: z.number().min(0).default(0),
-  cultureBranch: z.enum(["very_poor", "poor", "neutral", "good", "excellent"]).optional(),
-  lineManagerBehavior: z.enum(["very_poor", "poor", "neutral", "good", "excellent"]).optional(),
-  branchHygiene: z.enum(["very_poor", "poor", "neutral", "good", "excellent"]).optional(),
-  overallDiscipline: z.enum(["very_poor", "poor", "neutral", "good", "excellent"]).optional(),
-  feedback: z.string().max(200, {
-    message: "Feedback must not be longer than 200 words",
-  }).optional(),
+  newEmployeesTotal: z.number().min(0).optional(),
+  newEmployeesCovered: z.number().min(0).optional(),
+  starEmployeesTotal: z.number().min(0).optional(),
+  starEmployeesCovered: z.number().min(0).optional(),
 });
 
 const NewVisit = () => {
@@ -77,44 +144,51 @@ const NewVisit = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branches, setBranches] = useState<BranchAssignment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      visitDate: new Date(), // Set default date to today
+      branchId: "",
+      branchCode: "",
+      visitDate: new Date(),
+      branchCategory: "" as BranchCategory, // Empty string as default
+      hrConnectSession: false,
       totalEmployeesInvited: 0,
       totalParticipants: 0,
       manningPercentage: 0,
       attritionPercentage: 0,
-      nonVendorPercentage: 0,
-      erPercentage: 0,
-      cwtCases: 0,
-      newEmployeesTotal: 0,
-      newEmployeesCovered: 0,
-      starEmployeesTotal: 0,
-      starEmployeesCovered: 0,
+      leaders_aligned_with_code: 'yes',
+      leaders_aligned_remarks: '',
+      employees_feel_safe: 'yes',
+      employees_feel_motivated: 'yes',
+      leaders_abusive_language: 'no',
+      employees_comfort_escalation: 'yes',
+      inclusive_culture: 'yes',
+      feedback: "",
     },
   });
   
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-
   useEffect(() => {
     const loadBranches = async () => {
       if (!user) return;
       
+      setLoading(true);
       try {
-        console.log("Fetching branches for user:", user.id);
         const assignedBranches = await fetchAssignedBranchesWithDetails(user.id);
-        console.log("Branches loaded:", assignedBranches);
-        setBranches(assignedBranches);
+        console.log('Assigned branches:', assignedBranches); // Debug log
         
+        console.log('Assigned branches:', assignedBranches);
+        setBranches(assignedBranches);
+
         // Set default branch category based on first branch if available
         if (assignedBranches.length > 0 && form.getValues('branchId')) {
-          const selectedBranch = assignedBranches.find(branch => branch.id === form.getValues('branchId'));
-          if (selectedBranch) {
-            form.setValue('branchCategory', selectedBranch.category);
+          const selectedBranch = assignedBranches.find(branch => branch.branch_id === form.getValues('branchId'));
+          if (selectedBranch?.branches) {
+            form.setValue('branchCategory', selectedBranch.branches.category as BranchCategory);
+            form.setValue('branchCode', selectedBranch.branches.branch_code || '');
           }
         }
       } catch (error) {
@@ -124,11 +198,17 @@ const NewVisit = () => {
           title: "Error",
           description: "Failed to load assigned branches.",
         });
+      } finally {
+        setLoading(false);
       }
     };
-    
+
     loadBranches();
-  }, [user]);
+  }, [user, form]);
+
+  const mapBranchCategory = (category: string): BranchCategory => {
+    return category as BranchCategory;
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) {
@@ -144,31 +224,23 @@ const NewVisit = () => {
     setSaveStatus("saving");
     
     try {
-      // Format the date to YYYY-MM-DD for Supabase
-      const formattedDate = format(values.visitDate, 'yyyy-MM-dd');
-      
       const visitData = {
         user_id: user.id,
         branch_id: values.branchId,
-        visit_date: formattedDate,
-        branch_category: values.branchCategory as any,
+        visit_date: values.visitDate.toISOString(),
+        branch_category: values.branchCategory,
         hr_connect_session: values.hrConnectSession,
         total_employees_invited: values.totalEmployeesInvited,
         total_participants: values.totalParticipants,
         manning_percentage: values.manningPercentage,
         attrition_percentage: values.attritionPercentage,
-        non_vendor_percentage: values.nonVendorPercentage,
-        er_percentage: values.erPercentage,
-        cwt_cases: values.cwtCases,
-        performance_level: values.performanceLevel,
-        new_employees_total: values.newEmployeesTotal,
-        new_employees_covered: values.newEmployeesCovered,
-        star_employees_total: values.starEmployeesTotal,
-        star_employees_covered: values.starEmployeesCovered,
-        culture_branch: values.cultureBranch,
-        line_manager_behavior: values.lineManagerBehavior,
-        branch_hygiene: values.branchHygiene,
-        overall_discipline: values.overallDiscipline,
+        leaders_aligned_with_code: values.leaders_aligned_with_code,
+        leaders_aligned_remarks: values.leaders_aligned_remarks,
+        employees_feel_safe: values.employees_feel_safe,
+        employees_feel_motivated: values.employees_feel_motivated,
+        leaders_abusive_language: values.leaders_abusive_language,
+        employees_comfort_escalation: values.employees_comfort_escalation,
+        inclusive_culture: values.inclusive_culture,
         feedback: values.feedback,
         status: "submitted" as const
       };
@@ -228,31 +300,23 @@ const NewVisit = () => {
         return;
       }
       
-      // Format the date to YYYY-MM-DD for Supabase
-      const formattedDate = format(values.visitDate, 'yyyy-MM-dd');
-      
       const draftData = {
         user_id: user.id,
         branch_id: values.branchId,
-        visit_date: formattedDate,
-        branch_category: values.branchCategory as any,
+        visit_date: values.visitDate.toISOString(),
+        branch_category: values.branchCategory,
         hr_connect_session: values.hrConnectSession,
         total_employees_invited: values.totalEmployeesInvited,
         total_participants: values.totalParticipants,
         manning_percentage: values.manningPercentage,
         attrition_percentage: values.attritionPercentage,
-        non_vendor_percentage: values.nonVendorPercentage,
-        er_percentage: values.erPercentage,
-        cwt_cases: values.cwtCases,
-        performance_level: values.performanceLevel,
-        new_employees_total: values.newEmployeesTotal,
-        new_employees_covered: values.newEmployeesCovered,
-        star_employees_total: values.starEmployeesTotal,
-        star_employees_covered: values.starEmployeesCovered,
-        culture_branch: values.cultureBranch,
-        line_manager_behavior: values.lineManagerBehavior,
-        branch_hygiene: values.branchHygiene,
-        overall_discipline: values.overallDiscipline,
+        leaders_aligned_with_code: values.leaders_aligned_with_code,
+        leaders_aligned_remarks: values.leaders_aligned_remarks,
+        employees_feel_safe: values.employees_feel_safe,
+        employees_feel_motivated: values.employees_feel_motivated,
+        leaders_abusive_language: values.leaders_abusive_language,
+        employees_comfort_escalation: values.employees_comfort_escalation,
+        inclusive_culture: values.inclusive_culture,
         feedback: values.feedback,
         status: "draft" as const
       };
@@ -286,9 +350,10 @@ const NewVisit = () => {
 
   // Handle branch selection and update category
   const handleBranchChange = (branchId: string) => {
-    const selectedBranch = branches.find(branch => branch.id === branchId);
-    if (selectedBranch) {
-      form.setValue('branchCategory', selectedBranch.category);
+    const selectedBranch = branches.find(branch => branch.branch_id === branchId);
+    if (selectedBranch?.branches) {
+      form.setValue('branchCategory', selectedBranch.branches.category as BranchCategory);
+      form.setValue('branchCode', selectedBranch.branches.branch_code || '');
     }
   };
 
@@ -348,8 +413,19 @@ const NewVisit = () => {
                             <SelectItem value="no-branches" disabled>No branches assigned</SelectItem>
                           ) : (
                             branches.map(branch => (
-                              <SelectItem key={branch.id} value={branch.id}>
-                                {branch.name} ({branch.location})
+                              <SelectItem 
+                                key={branch.branch_id} 
+                                value={branch.branch_id}
+                                onClick={() => {
+                                  const selectedBranch = branches.find(b => b.branch_id === branch.branch_id);
+                                  console.log('Selected branch:', selectedBranch);
+                                  if (selectedBranch?.branches) {
+                                    form.setValue('branchCategory', selectedBranch.branches.category as BranchCategory);
+                                    form.setValue('branchCode', selectedBranch.branches.branch_code || '');
+                                  }
+                                }}
+                              >
+                                {branch.branches?.name} ({branch.branches?.location})
                               </SelectItem>
                             ))
                           )}
@@ -401,30 +477,44 @@ const NewVisit = () => {
                     )}
                   />
                   
-                  <FormField
-                    control={form.control}
-                    name="branchCategory"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Branch Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="branchCategory"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Branch Category</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select branch category" />
-                            </SelectTrigger>
+                            <Input 
+                              {...field} 
+                              disabled 
+                              placeholder="Select a branch to set category" 
+                            />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="platinum">Platinum</SelectItem>
-                            <SelectItem value="diamond">Diamond</SelectItem>
-                            <SelectItem value="gold">Gold</SelectItem>
-                            <SelectItem value="silver">Silver</SelectItem>
-                            <SelectItem value="bronze">Bronze</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="branchCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Branch Code</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              disabled 
+                              placeholder="Select a branch to set code" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                  </div>
                 </div>
               </div>
               
@@ -764,124 +854,235 @@ const NewVisit = () => {
                 <h2 className="text-xl font-semibold">Qualitative Assessment</h2>
                 
                 <div className="space-y-6">
+                  {/* Leaders aligned with code */}
                   <FormField
                     control={form.control}
-                    name="cultureBranch"
+                    name="leaders_aligned_with_code"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Branch Culture</FormLabel>
-                        <div className="flex flex-wrap gap-2 w-full">
-                          {qualitativeOptions.map((option) => (
-                            <FormControl key={option.value}>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className={cn(
-                                  "flex flex-col h-auto items-center gap-1 p-3 flex-1 min-w-[80px]",
-                                  option.color,
-                                  field.value === option.value && "border-2"
-                                )}
-                                onClick={() => field.onChange(option.value)}
-                              >
-                                <option.icon className="h-5 w-5" />
-                                <span className="text-xs font-medium">{option.label}</span>
-                              </Button>
-                            </FormControl>
-                          ))}
+                      <FormItem className="space-y-3">
+                        <FormLabel>Do leaders conduct business/work that is aligned with company's code of conduct?</FormLabel>
+                        <div className="flex gap-4">
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'yes'}
+                                onChange={() => field.onChange('yes')}
+                              />
+                              <span>Yes</span>
+                            </div>
+                          </FormControl>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'no'}
+                                onChange={() => field.onChange('no')}
+                              />
+                              <span>No</span>
+                            </div>
+                          </FormControl>
                         </div>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
+
+                  {/* Leaders aligned remarks */}
                   <FormField
                     control={form.control}
-                    name="lineManagerBehavior"
+                    name="leaders_aligned_remarks"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Line Manager Behavior</FormLabel>
-                        <div className="flex flex-wrap gap-2 w-full">
-                          {qualitativeOptions.map((option) => (
-                            <FormControl key={option.value}>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className={cn(
-                                  "flex flex-col h-auto items-center gap-1 p-3 flex-1 min-w-[80px]",
-                                  option.color,
-                                  field.value === option.value && "border-2"
-                                )}
-                                onClick={() => field.onChange(option.value)}
-                              >
-                                <option.icon className="h-5 w-5" />
-                                <span className="text-xs font-medium">{option.label}</span>
-                              </Button>
-                            </FormControl>
-                          ))}
+                        <FormLabel>Remarks (if any)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter any remarks about leaders' alignment with code of conduct"
+                            className="resize-none"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Employees feel safe */}
+                  <FormField
+                    control={form.control}
+                    name="employees_feel_safe"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Do employees feel safe & secure at their workplace?</FormLabel>
+                        <div className="flex gap-4">
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'yes'}
+                                onChange={() => field.onChange('yes')}
+                              />
+                              <span>Yes</span>
+                            </div>
+                          </FormControl>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'no'}
+                                onChange={() => field.onChange('no')}
+                              />
+                              <span>No</span>
+                            </div>
+                          </FormControl>
                         </div>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
+
+                  {/* Employees feel motivated */}
                   <FormField
                     control={form.control}
-                    name="branchHygiene"
+                    name="employees_feel_motivated"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Branch Hygiene</FormLabel>
-                        <div className="flex flex-wrap gap-2 w-full">
-                          {qualitativeOptions.map((option) => (
-                            <FormControl key={option.value}>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className={cn(
-                                  "flex flex-col h-auto items-center gap-1 p-3 flex-1 min-w-[80px]",
-                                  option.color,
-                                  field.value === option.value && "border-2"
-                                )}
-                                onClick={() => field.onChange(option.value)}
-                              >
-                                <option.icon className="h-5 w-5" />
-                                <span className="text-xs font-medium">{option.label}</span>
-                              </Button>
-                            </FormControl>
-                          ))}
+                      <FormItem className="space-y-3">
+                        <FormLabel>Do employees feel motivated at workplace?</FormLabel>
+                        <div className="flex gap-4">
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'yes'}
+                                onChange={() => field.onChange('yes')}
+                              />
+                              <span>Yes</span>
+                            </div>
+                          </FormControl>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'no'}
+                                onChange={() => field.onChange('no')}
+                              />
+                              <span>No</span>
+                            </div>
+                          </FormControl>
                         </div>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
+
+                  {/* Leaders use abusive language */}
                   <FormField
                     control={form.control}
-                    name="overallDiscipline"
+                    name="leaders_abusive_language"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Overall Discipline</FormLabel>
-                        <div className="flex flex-wrap gap-2 w-full">
-                          {qualitativeOptions.map((option) => (
-                            <FormControl key={option.value}>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className={cn(
-                                  "flex flex-col h-auto items-center gap-1 p-3 flex-1 min-w-[80px]",
-                                  option.color,
-                                  field.value === option.value && "border-2"
-                                )}
-                                onClick={() => field.onChange(option.value)}
-                              >
-                                <option.icon className="h-5 w-5" />
-                                <span className="text-xs font-medium">{option.label}</span>
-                              </Button>
-                            </FormControl>
-                          ))}
+                      <FormItem className="space-y-3">
+                        <FormLabel>Do leaders use abusive and rude language in meetings or on the floor or in person?</FormLabel>
+                        <div className="flex gap-4">
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'yes'}
+                                onChange={() => field.onChange('yes')}
+                              />
+                              <span>Yes</span>
+                            </div>
+                          </FormControl>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'no'}
+                                onChange={() => field.onChange('no')}
+                              />
+                              <span>No</span>
+                            </div>
+                          </FormControl>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Employees comfortable with escalation */}
+                  <FormField
+                    control={form.control}
+                    name="employees_comfort_escalation"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Do employees feel comfortable to escalate or raise malpractice or ethically wrong things?</FormLabel>
+                        <div className="flex gap-4">
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'yes'}
+                                onChange={() => field.onChange('yes')}
+                              />
+                              <span>Yes</span>
+                            </div>
+                          </FormControl>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'no'}
+                                onChange={() => field.onChange('no')}
+                              />
+                              <span>No</span>
+                            </div>
+                          </FormControl>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Inclusive culture */}
+                  <FormField
+                    control={form.control}
+                    name="inclusive_culture"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Do employees feel workplace culture is inclusive with respect to caste, gender & religion?</FormLabel>
+                        <div className="flex gap-4">
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'yes'}
+                                onChange={() => field.onChange('yes')}
+                              />
+                              <span>Yes</span>
+                            </div>
+                          </FormControl>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                checked={field.value === 'no'}
+                                onChange={() => field.onChange('no')}
+                              />
+                              <span>No</span>
+                            </div>
+                          </FormControl>
                         </div>
                         <FormMessage />
                       </FormItem>

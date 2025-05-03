@@ -137,7 +137,7 @@ const RoleDashboard = () => {
               {[
                 "Updated team schedule",
                 "Approved expense report",
-                "Submitted monthly review",
+                "submitted monthly review",
                 "Added new team member"
               ].map((activity, i) => (
                 <div key={i} className="flex items-start pb-4 border-b last:border-0 last:pb-0">

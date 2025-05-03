@@ -4,11 +4,33 @@ import { Database } from "@/integrations/supabase/types";
 
 type Branch = Database['public']['Tables']['branches']['Row'];
 type BranchWithAssignments = Branch & { bh_count: number };
-type BHRUser = Database['public']['Tables']['profiles']['Row'] & { branches_assigned: number };
+type BHRUser = Database['public']['Tables']['profiles']['Row'] & { 
+  branches_assigned: number;
+  visit_count?: number;
+  coverage?: number;
+};
 
-export async function fetchZoneBranches(userId: string): Promise<BranchWithAssignments[]> {
+type BranchVisit = Database['public']['Tables']['branch_visits']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Row'];
+
+type BranchVisitWithDetails = {
+  id: string;
+  visit_date: string;
+  status: string;
+  branches: {
+    name: string;
+    location: string;
+    category: string;
+  };
+  profiles: {
+    full_name: string;
+    e_code: string;
+  };
+};
+
+export async function fetchBranches(userId: string): Promise<BranchWithAssignments[]> {
   try {
-    // Get all branches without location filter
+    // Get all branches with their assignments
     const { data: branches, error: branchError } = await supabase
       .from('branches')
       .select(`
@@ -16,21 +38,24 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
         branch_assignments (
           user_id
         )
-      `);
+      `) as { data: (Branch & { branch_assignments: { user_id: string }[] })[] | null, error: any };
 
-    if (branchError) throw branchError;
+    if (branchError) {
+      throw branchError;
+    }
+
+    if (!branches) {
+      return [];
+    }
 
     // Process the data to count BHs per branch
     const processedBranches = branches.map(branch => {
       // Count unique BHs for this branch
       const uniqueBhs = new Set();
       if (branch.branch_assignments) {
-        // Handle array of branch_assignments
-        if (Array.isArray(branch.branch_assignments)) {
-          branch.branch_assignments.forEach((assignment: any) => {
-            uniqueBhs.add(assignment.user_id);
-          });
-        }
+        branch.branch_assignments.forEach(assignment => {
+          uniqueBhs.add(assignment.user_id);
+        });
       }
 
       return {
@@ -39,155 +64,220 @@ export async function fetchZoneBranches(userId: string): Promise<BranchWithAssig
       };
     });
 
-    return processedBranches as BranchWithAssignments[];
-  } catch (error) {
-    console.error("Error fetching zone branches:", error);
-    throw error;
+    return processedBranches;
+  } catch (error: any) {
+    console.error("Error fetching branches:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading branches",
+      description: error.message || "Unable to load branches"
+    });
+    return [];
   }
 }
 
-export async function fetchZoneBHRs(userId: string): Promise<BHRUser[]> {
-    try {
-      // Get all BH users without location filter
-      const { data: bhUsers, error: bhError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'BH');
-  
-      if (bhError) throw bhError;
-      
-      // Get branch assignments for these users in a separate query
-      const bhUserIds = bhUsers.map(user => user.id);
-      
-      // Only proceed if we have users
-      if (bhUserIds.length === 0) {
-        return [] as BHRUser[];
-      }
-      
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from('branch_assignments')
-        .select('user_id, branch_id')
-        .in('user_id', bhUserIds);
-        
-      if (assignmentsError) throw assignmentsError;
-      
-      // Group assignments by user
-      const assignmentsByUser: Record<string, string[]> = {};
-      assignments?.forEach(assignment => {
-        if (!assignmentsByUser[assignment.user_id]) {
-          assignmentsByUser[assignment.user_id] = [];
-        }
-        assignmentsByUser[assignment.user_id].push(assignment.branch_id);
-      });
-      
-      // Process the data to count branches per BH
-      const processedBHRs = bhUsers.map(user => {
-        const branchIds = assignmentsByUser[user.id] || [];
-        return {
-          ...user,
-          branches_assigned: branchIds.length
-        };
-      });
-  
-      return processedBHRs as BHRUser[];
-    } catch (error) {
-      console.error("Error fetching zone BHRs:", error);
-      throw error;
+export async function fetchBHRs(userId: string): Promise<BHRUser[]> {
+  try {
+    // Get all BH users
+    const { data: bhUsers, error: bhError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'BH') as { data: BHRUser[] | null, error: any };
+
+    if (bhError) {
+      throw bhError;
     }
+
+    if (!bhUsers || bhUsers.length === 0) {
+      return [];
+    }
+
+    // Get branch assignments and visits for these users
+    const bhUserIds = bhUsers.map(user => user.id);
+    
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('branch_assignments')
+      .select('user_id, branch_id')
+      .in('user_id', bhUserIds);
+
+    if (assignmentsError) {
+      throw assignmentsError;
+    }
+
+    // Get current month's visits
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const { data: visits, error: visitsError } = await supabase
+      .from('branch_visits')
+      .select('user_id, branch_id')
+      .in('user_id', bhUserIds)
+      .in('status', ['submitted', 'approved'])
+      .gte('visit_date', firstDayOfMonth.toISOString())
+      .lte('visit_date', today.toISOString());
+
+    if (visitsError) {
+      throw visitsError;
+    }
+
+    // Group assignments and visits by user
+    const assignmentsByUser: Record<string, Set<string>> = {};
+    const visitsByUser: Record<string, Set<string>> = {};
+
+    assignments?.forEach(assignment => {
+      if (!assignmentsByUser[assignment.user_id]) {
+        assignmentsByUser[assignment.user_id] = new Set();
+      }
+      assignmentsByUser[assignment.user_id].add(assignment.branch_id);
+    });
+
+    visits?.forEach(visit => {
+      if (!visitsByUser[visit.user_id]) {
+        visitsByUser[visit.user_id] = new Set();
+      }
+      visitsByUser[visit.user_id].add(visit.branch_id);
+    });
+
+    // Process the data to include branch counts and coverage
+    const processedBHRs = bhUsers.map(user => {
+      const assignedBranches = assignmentsByUser[user.id] || new Set();
+      const visitedBranches = visitsByUser[user.id] || new Set();
+      
+      return {
+        ...user,
+        branches_assigned: assignedBranches.size,
+        visit_count: visitedBranches.size,
+        coverage: assignedBranches.size > 0 ? 
+          Math.round((visitedBranches.size / assignedBranches.size) * 100) : 0
+      };
+    });
+
+    return processedBHRs;
+  } catch (error: any) {
+    console.error("Error fetching BHRs:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading BHRs",
+      description: error.message || "Unable to load BHRs"
+    });
+    return [];
   }
+}
 
 export async function fetchDashboardStats(userId: string) {
   try {
-    // Count total branches without location filter
-    const { count: totalBranches, error: branchError } = await supabase
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // Get total branches and BHRs
+    const { count: totalBranches } = await supabase
       .from('branches')
-      .select('id', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true });
 
-    if (branchError) throw branchError;
-
-    // Count total BHRs without location filter
-    const { count: totalBHRs, error: bhrError } = await supabase
+    const { count: totalBHRs } = await supabase
       .from('profiles')
-      .select('id', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'BH');
+    
+    // Get all BHRs under this ZH
+    const { data: bhrs } = await supabase
+      .from('profiles')
+      .select('id')
       .eq('role', 'BH');
 
-    if (bhrError) throw bhrError;
+    const bhUserIds = bhrs?.map(bhr => bhr.id) || [];
 
-    // Get visits stats
+    // Get all visits from BHRs
     const { data: visits, error: visitsError } = await supabase
       .from('branch_visits')
-      .select(`
-        id,
-        visit_date,
-        status,
-        branches (location)
-      `);
+      .select('user_id, branch_id, status, visit_date')
+      .in('user_id', bhUserIds)
+      .in('status', ['submitted', 'approved']);
 
-    if (visitsError) throw visitsError;
+    if (visitsError) {
+      throw visitsError;
+    }
 
-    // Calculate visit stats
-    const visitStats = {
-      totalVisits: visits?.length || 0,
-      pendingApproval: visits?.filter(v => v.status === 'submitted').length || 0,
-      completedVisits: visits?.filter(v => v.status === 'approved').length || 0,
-    };
+    // Get submitted visits (no date filter)
+    const { data: submittedVisits, error: submittedError } = await supabase
+      .from('branch_visits')
+      .select('id')
+      .eq('status', 'submitted')
+      .in('user_id', bhUserIds);
 
-    // Get current month stats
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    const currentMonthVisits = visits?.filter(v => {
+    if (submittedError) {
+      throw submittedError;
+    }
+
+    // Calculate active BHRs (BHRs who have submitted visits this month)
+    const activeUserIds = new Set(
+      visits?.filter(v => {
+        const visitDate = new Date(v.visit_date);
+        return visitDate >= firstDayOfMonth && visitDate <= today;
+      }).map(v => v.user_id) || []
+    );
+    const activeBHRs = bhrs?.filter(bhr => activeUserIds.has(bhr.id)) || [];
+
+    // Calculate visited branches and other stats for this month
+    const monthlyVisits = visits?.filter(v => {
       const visitDate = new Date(v.visit_date);
-      return visitDate.getMonth() === currentMonth && 
-             visitDate.getFullYear() === currentYear;
-    });
-
-    const monthlyStats = {
-      totalVisits: currentMonthVisits?.length || 0,
-      pendingApproval: currentMonthVisits?.filter(v => v.status === 'submitted').length || 0,
-      completedVisits: currentMonthVisits?.filter(v => v.status === 'approved').length || 0,
-    };
+      return visitDate >= firstDayOfMonth && visitDate <= today;
+    }) || [];
+    const visitedBranches = new Set(monthlyVisits.map(v => v.branch_id));
+    const totalsubmittedVisits = submittedVisits?.length || 0;
 
     return {
       totalBranches: totalBranches || 0,
       totalBHRs: totalBHRs || 0,
-      visitStats,
-      monthlyStats,
+      activeBHRs: activeBHRs?.length || 0,
+      visitedBranches: visitedBranches.size,
+      coverage: totalBranches ? Math.round((visitedBranches.size / totalBranches) * 100) : 0,
+      totalVisits: visits?.length || 0,
+      submittedApproval: totalsubmittedVisits,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching dashboard stats:", error);
-    throw error;
+    toast({
+      variant: "destructive",
+      title: "Error loading stats",
+      description: error.message || "Unable to load dashboard statistics"
+    });
+    return {
+      totalBranches: 0,
+      totalBHRs: 0,
+      activeBHRs: 0,
+      visitedBranches: 0,
+      coverage: 0,
+      totalVisits: 0,
+      submittedApproval: 0
+    };
   }
 }
 
 export async function assignBranchToBHR(bhUserId: string, branchId: string) {
   try {
-    // First check if this assignment already exists to prevent duplicate entries
+    // Check if assignment already exists
     const { data: existingAssignment, error: checkError } = await supabase
       .from('branch_assignments')
       .select('id')
       .eq('user_id', bhUserId)
       .eq('branch_id', branchId)
       .single();
-    
+
     if (checkError && checkError.code !== 'PGRST116') {
-      // PGRST116 means no rows returned, which is what we want
       throw checkError;
     }
-    
+
     if (existingAssignment) {
-      // Assignment already exists
       toast({
         variant: "destructive",
         title: "Assignment already exists",
         description: "This branch is already assigned to this BHR."
       });
-      
       return null;
     }
-    
-    // If we get here, the assignment doesn't exist, so create it
+
+    // Create new assignment
     const { data, error } = await supabase
       .from('branch_assignments')
       .insert({
@@ -195,23 +285,27 @@ export async function assignBranchToBHR(bhUserId: string, branchId: string) {
         branch_id: branchId
       })
       .select();
-    
-    if (error) throw error;
-    
-    // Fetch the BHR's name in a separate query
+
+    if (error) {
+      throw error;
+    }
+
+    // Get BHR name
     const { data: bhrData, error: bhrError } = await supabase
       .from('profiles')
       .select('full_name')
       .eq('id', bhUserId)
       .single();
-    
-    if (bhrError) throw bhrError;
-    
+
+    if (bhrError) {
+      throw bhrError;
+    }
+
     toast({
       title: "Branch assigned successfully",
       description: "The branch has been assigned to the BHR."
     });
-    
+
     return {
       ...data[0],
       bh_name: bhrData?.full_name || 'Unknown',
@@ -220,21 +314,18 @@ export async function assignBranchToBHR(bhUserId: string, branchId: string) {
   } catch (error: any) {
     console.error("Error assigning branch to BHR:", error);
     
-    // Provide a more specific error message
     let errorMessage = "An unexpected error occurred.";
-    
     if (error.code === '23505') {
       errorMessage = "This branch is already assigned to this BHR.";
     } else if (error.message) {
       errorMessage = error.message;
     }
-    
+
     toast({
       variant: "destructive",
       title: "Failed to assign branch",
       description: errorMessage
     });
-    
     throw error;
   }
 }
@@ -246,14 +337,16 @@ export async function unassignBranchFromBHR(bhUserId: string, branchId: string) 
       .delete()
       .eq('user_id', bhUserId)
       .eq('branch_id', branchId);
-    
-    if (error) throw error;
-    
+
+    if (error) {
+      throw error;
+    }
+
     toast({
       title: "Assignment removed",
       description: "The branch assignment has been removed."
     });
-    
+
     return true;
   } catch (error: any) {
     console.error("Error removing branch assignment:", error);
@@ -266,28 +359,6 @@ export async function unassignBranchFromBHR(bhUserId: string, branchId: string) 
   }
 }
 
-export async function fetchZoneBHRPerformance() {
-  try {
-    const { data, error } = await supabase
-      .rpc('get_zone_bhr_performance');
-      
-    if (error) throw error;
-    
-    // Fix the typing issue - make sure we're returning an array of objects
-    const performanceData = Array.isArray(data) ? data.map(item => ({
-      name: item.name,
-      branches: item.branches,
-      coverage: item.coverage
-    })) : [];
-    
-    return performanceData;
-  } catch (error) {
-    console.error("Error fetching zone BHR performance:", error);
-    return [];
-  }
-}
-
-// Add a new function to fetch all branch assignments with BHR names
 export async function fetchBranchAssignments() {
   try {
     const { data, error } = await supabase
@@ -297,31 +368,131 @@ export async function fetchBranchAssignments() {
         branch_id,
         user_id,
         profiles:user_id (
-          full_name
+          full_name,
+          e_code
         )
-      `);
-      
-    if (error) throw error;
-    
+      `) as { data: { id: string; branch_id: string; user_id: string; profiles: Profile }[] | null, error: any };
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return [];
+    }
+
     // Transform the data to include the BH name directly
-    return data.map(assignment => {
-      let bhName = 'Unknown';
-      
-      // Extract BH name
-      if (assignment.profiles && typeof assignment.profiles === 'object') {
-        const profile = assignment.profiles as { full_name?: string };
-        bhName = profile.full_name || 'Unknown';
-      }
-      
-      return {
-        id: assignment.id,
-        branch_id: assignment.branch_id,
-        user_id: assignment.user_id,
-        bh_name: bhName
-      };
-    });
-  } catch (error) {
+    return data.map(assignment => ({
+      id: assignment.id,
+      branch_id: assignment.branch_id,
+      user_id: assignment.user_id,
+      bh_name: assignment.profiles?.full_name || 'Unknown',
+      e_code: assignment.profiles?.e_code
+    }));
+  } catch (error: any) {
     console.error("Error fetching branch assignments:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading assignments",
+      description: error.message || "Unable to load branch assignments"
+    });
     return [];
+  }
+}
+
+export async function fetchRecentVisits(limit: number = 5) {
+  try {
+    // First get the visits
+    const { data: rawVisits, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        branch_id,
+        user_id,
+        visit_date,
+        status,
+        branches:branch_id (
+          name,
+          location,
+          category
+        ),
+        profiles:user_id (
+          full_name,
+          e_code
+        )
+      `)
+      .order('visit_date', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    if (!rawVisits?.length) return [];
+
+    if (error) throw error;
+    if (!rawVisits?.length) return [];
+    
+    return rawVisits.map(visit => ({
+      id: visit.id,
+      visit_date: visit.visit_date,
+      status: visit.status,
+      branch_name: visit.branches?.name || 'Unknown',
+      branch_location: visit.branches?.location || 'Unknown',
+      branch_category: visit.branches?.category || 'Unknown',
+      bh_name: visit.profiles?.full_name || 'Unknown',
+      bh_code: visit.profiles?.e_code || 'Unknown'
+    }));
+  } catch (error: any) {
+    console.error("Error fetching recent visits:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading visits",
+      description: error.message || "Unable to load recent visits"
+    });
+    return [];
+  }
+}
+
+export async function fetchVisitById(visitId: string) {
+  try {
+    // Get the visit first
+    const { data: visit, error } = await supabase
+      .from('branch_visits')
+      .select('*')
+      .eq('id', visitId)
+      .single();
+
+    if (error || !visit) {
+      throw error || new Error("Visit not found");
+    }
+
+    // Get branch details
+    const { data: branch } = await supabase
+      .from('branches')
+      .select('*')
+      .eq('id', visit.branch_id)
+      .single();
+
+    // Get BHR details
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, e_code')
+      .eq('id', visit.user_id)
+      .single();
+
+    return {
+      ...visit,
+      branch_name: branch?.name || 'Unknown',
+      branch_location: branch?.location || 'Unknown',
+      branch_category: branch?.category || 'Unknown',
+      bh_name: profile?.full_name || 'Unknown',
+      bh_code: profile?.e_code || 'Unknown'
+    };
+  } catch (error: any) {
+    console.error("Error fetching visit details:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading visit",
+      description: error.message || "Unable to load visit details"
+    });
+    return null;
   }
 }

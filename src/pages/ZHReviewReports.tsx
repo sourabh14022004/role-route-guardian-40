@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, CalendarIcon, Check, X, Filter } from "lucide-react";
 import { 
-  BranchVisitReport, 
+  BranchVisitSummary, 
   fetchRecentReports, 
   fetchReportById, 
   updateReportStatus 
@@ -20,7 +20,7 @@ const getStatusBadge = (status: string | null) => {
     case "approved":
       return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
     case "submitted":
-      return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>;
+      return <Badge className="bg-blue-100 text-blue-800">submitted</Badge>;
     case "rejected":
       return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
     default:
@@ -224,7 +224,7 @@ const ZHReviewReports = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="submitted">submitted</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>

@@ -1,7 +1,6 @@
-
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchZoneBHRs } from "@/services/zhService";
+import { fetchBHRs } from "@/services/zhService";
 import { fetchBHRReportStats } from "@/services/reportService";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -34,7 +33,7 @@ const ZHBHRManagement = () => {
     queryFn: async () => {
       if (!user?.id) return [];
       
-      const bhrs = await fetchZoneBHRs(user.id);
+      const bhrs = await fetchBHRs(user.id);
       
       // Extract unique locations for filter dropdown
       const uniqueLocations = [...new Set(bhrs.map(bhr => bhr.location).filter(Boolean))];
@@ -65,7 +64,7 @@ const ZHBHRManagement = () => {
       return await fetchBHRReportStats(bhId);
     } catch (error) {
       console.error("Error fetching BHR stats:", error);
-      return { total: 0, approved: 0, pending: 0, rejected: 0 };
+      return { total: 0, approved: 0, submitted: 0, rejected: 0 };
     }
   };
 
@@ -184,7 +183,7 @@ const BHRCard = ({ bhr, onViewDetails }: BHRCardProps) => {
               <p className="text-3xl font-bold text-blue-700">{bhr.branches_assigned}</p>
             </div>
             <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
-              <p className="text-sm text-indigo-600 mb-1 font-medium">Reports Submitted</p>
+              <p className="text-sm text-indigo-600 mb-1 font-medium">Reports submitted</p>
               <p className="text-3xl font-bold text-indigo-700">
                 {isLoading ? "..." : stats?.total || 0}
               </p>
@@ -199,9 +198,9 @@ const BHRCard = ({ bhr, onViewDetails }: BHRCardProps) => {
               </p>
             </div>
             <div className="bg-blue-50 p-2 rounded-lg text-center border border-blue-100">
-              <p className="text-sm font-medium text-blue-700">Pending</p>
+              <p className="text-sm font-medium text-blue-700">submitted</p>
               <p className="text-xl font-bold text-blue-700">
-                {isLoading ? "..." : stats?.pending || 0}
+                {isLoading ? "..." : stats?.submitted || 0}
               </p>
             </div>
             <div className="bg-red-50 p-2 rounded-lg text-center border border-red-100">

@@ -13,16 +13,10 @@ import { X, Clock, Eye, CheckCircle, AlertTriangle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Database } from "@/integrations/supabase/types";
 
-type BranchVisitWithBranch = Database["public"]["Tables"]["branch_visits"]["Row"] & {
-  branches: {
-    name: string;
-    location: string;
-    category: string;
-  }
-};
+import { BranchVisitSummary } from "@/services/reportService";
 
 interface BranchVisitDetailsModalProps {
-  visit: BranchVisitWithBranch | null;
+  visit: BranchVisitSummary | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -54,7 +48,7 @@ const BranchVisitDetailsModal = ({
         };
       case 'submitted':
         return { 
-          label: 'Submitted', 
+          label: 'submitted', 
           className: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
           icon: <Eye className="h-3 w-3 mr-1" />
         };
@@ -119,7 +113,13 @@ const BranchVisitDetailsModal = ({
           <div className="flex flex-col md:flex-row gap-4 mb-6 items-start">
             <div className="flex-1">
               <h3 className="text-lg font-semibold">{visit.branches?.name || 'Unknown Branch'}</h3>
-              <p className="text-sm text-slate-500">{visit.branches?.location || 'Unknown Location'}</p>
+              <p className="text-sm text-slate-600">
+                {visit.branches?.location || 'Unknown Location'}
+                <span className="text-slate-400 mx-1">•</span>
+                {visit.branches?.branch_code || 'No Code'}
+                <span className="text-slate-400 mx-1">•</span>
+                {getCategoryName(visit.branches?.category)}
+              </p>
             </div>
             <div>
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -249,20 +249,28 @@ const BranchVisitDetailsModal = ({
             <div className="bg-slate-50 rounded-md p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <p className="text-xs text-slate-500">Branch Culture</p>
-                  <p className="text-sm font-medium">{getQualitativeLabel(visit.culture_branch)}</p>
+                  <p className="text-xs text-slate-500">Leaders Aligned with Code</p>
+                  <p className="text-sm font-medium">{visit.leaders_aligned_with_code || 'Not rated'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Line Manager Behavior</p>
-                  <p className="text-sm font-medium">{getQualitativeLabel(visit.line_manager_behavior)}</p>
+                  <p className="text-xs text-slate-500">Employees Feel Safe</p>
+                  <p className="text-sm font-medium">{visit.employees_feel_safe || 'Not rated'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Branch Hygiene</p>
-                  <p className="text-sm font-medium">{getQualitativeLabel(visit.branch_hygiene)}</p>
+                  <p className="text-xs text-slate-500">Employees Feel Motivated</p>
+                  <p className="text-sm font-medium">{visit.employees_feel_motivated || 'Not rated'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Overall Discipline</p>
-                  <p className="text-sm font-medium">{getQualitativeLabel(visit.overall_discipline)}</p>
+                  <p className="text-xs text-slate-500">Leaders Use Abusive Language</p>
+                  <p className="text-sm font-medium">{visit.leaders_abusive_language || 'Not rated'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Employees Comfortable with Escalation</p>
+                  <p className="text-sm font-medium">{visit.employees_comfort_escalation || 'Not rated'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Inclusive Culture</p>
+                  <p className="text-sm font-medium">{visit.inclusive_culture || 'Not rated'}</p>
                 </div>
               </div>
             </div>

@@ -4,8 +4,70 @@ import { toast } from "@/components/ui/use-toast";
 
 type Branch = Database['public']['Tables']['branches']['Row'];
 
+interface BranchDetails {
+  id?: string;
+  name?: string;
+  location?: string;
+  category: string;
+}
+
+interface BranchVisit {
+  id: string;
+  visit_date: string;
+  branch_id: string;
+  user_id: string;
+  status: string;
+  branch_category: string;
+  manning_percentage: number | null;
+  attrition_percentage: number | null;
+  er_percentage: number | null;
+  non_vendor_percentage: number | null;
+  cwt_cases: number | null;
+  performance_level: string | null;
+  total_employees_invited: number | null;
+  total_participants: number | null;
+  hr_connect_session: boolean | null;
+  new_employees_total: number | null;
+  new_employees_covered: number | null;
+  star_employees_total: number | null;
+  star_employees_covered: number | null;
+  feedback: string | null;
+  best_practices: string | null;
+  leaders_aligned_with_code: string | null;
+  employees_feel_safe: string | null;
+  employees_feel_motivated: string | null;
+  leaders_abusive_language: string | null;
+  employees_comfort_escalation: string | null;
+  inclusive_culture: string | null;
+  branches?: {
+    id: string;
+    name: string;
+    location: string;
+    category: string;
+    branch_code: string | null;
+  };
+  profiles?: {
+    full_name: string;
+    e_code: string;
+  };
+}
+
+export interface BranchAssignment {
+  id: string;
+  user_id: string;
+  branch_id: string;
+  assigned_at: string;
+  branches?: {
+    id: string;
+    name: string;
+    location: string;
+    category: string;
+    branch_code: string | null;
+  };
+}
+
 // Fetch all branches
-export const getAllBranches = async () => {
+export const getAllBranches = async (): Promise<Branch[]> => {
   try {
     const { data, error } = await supabase
       .from('branches')
@@ -28,8 +90,169 @@ export const getAllBranches = async () => {
   }
 };
 
+// Fetch branches by user ID (assigned branches)
+export const getBranchesByUser = async (userId: string): Promise<BranchDetails[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('branch_assignments')
+      .select(`
+        branch_id,
+        branches:branch_id (
+          id,
+          name,
+          location,
+          category
+        )
+      `)
+      .eq('user_id', userId) as { data: BranchAssignment[] | null, error: any };
+    
+    if (error) {
+      throw error;
+    }
+
+    const branchList = data?.filter(item => item.branches).map(item => item.branches!) || [];
+    return branchList;
+  } catch (error: any) {
+    console.error("Error fetching assigned branches:", error);
+    toast({
+      variant: "destructive",
+      title: "Error fetching assigned branches",
+      description: error.message || "Unable to fetch your assigned branches"
+    });
+    return [];
+  }
+};
+
+// Fetch branch details by ID
+export const getBranchById = async (branchId: string): Promise<Branch | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('branches')
+      .select('*')
+      .eq('id', branchId)
+      .single() as { data: Branch | null, error: any };
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data;
+  } catch (error: any) {
+    console.error("Error fetching branch details:", error);
+    toast({
+      variant: "destructive",
+      title: "Error fetching branch details",
+      description: error.message || "Unable to fetch branch details"
+    });
+    return null;
+  }
+};
+
+// Fetch user branch visits (for My Visits page)
+export const fetchUserBranchVisits = async (userId: string): Promise<BranchVisit[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('branch_visits')
+      .select(`
+        id,
+        visit_date,
+        branch_id,
+        user_id,
+        status,
+        manning_percentage,
+        attrition_percentage,
+        er_percentage,
+        non_vendor_percentage,
+        cwt_cases,
+        performance_level,
+        total_employees_invited,
+        total_participants,
+        hr_connect_session,
+        new_employees_total,
+        new_employees_covered,
+        star_employees_total,
+        star_employees_covered,
+        feedback,
+        best_practices,
+        leaders_aligned_with_code,
+        employees_feel_safe,
+        employees_feel_motivated,
+        leaders_abusive_language,
+        employees_comfort_escalation,
+        inclusive_culture,
+        branch_category,
+        branches:branch_id (
+          id,
+          name,
+          location,
+          category,
+          branch_code
+        ),
+        profiles:user_id (
+          full_name,
+          e_code
+        )
+      `)
+      .eq('user_id', userId)
+      .order('visit_date', { ascending: false }) as { data: BranchVisit[] | null, error: any };
+      
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error: any) {
+    console.error("Error fetching user branch visits:", error);
+    toast({
+      variant: "destructive",
+      title: "Error fetching visits",
+      description: error.message || "Unable to fetch your branch visits"
+    });
+    return [];
+  }
+};
+
+// Fetch assigned branches with details (for New Visit page)
+export const fetchAssignedBranchesWithDetails = async (userId: string): Promise<BranchAssignment[]> => {
+  try {
+    const { data: assignments, error: assignmentError } = await supabase
+      .from('branch_assignments')
+      .select(`
+        branch_id,
+        branches:branch_id (
+          id,
+          name,
+          location,
+          category,
+          branch_code
+        )
+      `)
+      .eq('user_id', userId)
+      .order('branches(name)', { ascending: true }) as { data: BranchAssignment[] | null, error: any };
+
+    if (assignmentError) {
+      throw assignmentError;
+    }
+
+    if (!assignments || assignments.length === 0) {
+      return [];
+    }
+
+    // Return just the branch assignments with branch details
+    return assignments || [];
+  } catch (error) {
+    console.error("Error fetching assigned branches with details:", error);
+    toast({
+      title: "Error fetching branch details",
+      description: error.message || "Unable to fetch branch visit details",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
+
 // Fetch branches by zone ID
-export const getBranchesByZone = async (zoneId: string) => {
+export const getBranchesByZone = async (zoneId: string): Promise<Branch[]> => {
   try {
     const { data, error } = await supabase
       .from('branches')
@@ -53,139 +276,12 @@ export const getBranchesByZone = async (zoneId: string) => {
   }
 };
 
-// Fetch branches by user ID (assigned branches)
-export const getBranchesByUser = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('branch_assignments')
-      .select(`
-        branch_id,
-        branches (*)
-      `)
-      .eq('user_id', userId);
-    
-    if (error) {
-      throw error;
-    }
-
-    const branchList = data?.map(item => item.branches) || [];
-    return branchList;
-  } catch (error: any) {
-    console.error("Error fetching assigned branches:", error);
-    toast({
-      variant: "destructive",
-      title: "Error fetching assigned branches",
-      description: error.message || "Unable to fetch your assigned branches"
-    });
-    return [];
-  }
-};
-
-// Fetch branch details by ID
-export const getBranchById = async (branchId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('branches')
-      .select('*')
-      .eq('id', branchId)
-      .single();
-    
-    if (error) {
-      throw error;
-    }
-    
-    return data;
-  } catch (error: any) {
-    console.error("Error fetching branch details:", error);
-    toast({
-      variant: "destructive",
-      title: "Error fetching branch details",
-      description: error.message || "Unable to fetch branch details"
-    });
-    return null;
-  }
-};
-
-// Fetch user branch visits (for My Visits page)
-export const fetchUserBranchVisits = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('branch_visits')
-      .select(`
-        *,
-        branches (
-          name,
-          location,
-          category
-        )
-      `)
-      .eq('user_id', userId)
-      .order('visit_date', { ascending: false });
-      
-    if (error) {
-      throw error;
-    }
-    
-    return data || [];
-  } catch (error: any) {
-    console.error("Error fetching user branch visits:", error);
-    toast({
-      variant: "destructive",
-      title: "Error fetching visits",
-      description: error.message || "Unable to fetch your branch visits"
-    });
-    return [];
-  }
-};
-
-// Fetch assigned branches with details (for New Visit page)
-export const fetchAssignedBranchesWithDetails = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('branch_assignments')
-      .select(`
-        branch_id,
-        branches (
-          id,
-          name,
-          location,
-          category,
-          zone_id
-        )
-      `)
-      .eq('user_id', userId);
-    
-    if (error) {
-      throw error;
-    }
-    
-    // Transform data structure for easier consumption
-    const branchesWithDetails = data?.map(item => ({
-      id: item.branches?.id,
-      name: item.branches?.name,
-      location: item.branches?.location,
-      category: item.branches?.category,
-      zoneId: item.branches?.zone_id
-    })) || [];
-    
-    return branchesWithDetails;
-  } catch (error: any) {
-    console.error("Error fetching assigned branches:", error);
-    toast({
-      variant: "destructive",
-      title: "Error fetching branches",
-      description: error.message || "Unable to fetch your assigned branches"
-    });
-    return [];
-  }
-};
-
 // Create a new branch visit
-export const createBranchVisit = async (visitData: any) => {
+export const createBranchVisit = async (visitData: Partial<BranchVisit>): Promise<{ success: boolean, data: any, error: any }> => {
   try {
     const { data, error } = await supabase
       .from('branch_visits')
-      .insert(visitData)
+      .insert([visitData])
       .select()
       .single();
     
@@ -193,169 +289,406 @@ export const createBranchVisit = async (visitData: any) => {
       throw error;
     }
     
-    return { success: true, data };
+    return {
+      success: true,
+      data,
+      error: null
+    };
   } catch (error: any) {
     console.error("Error creating branch visit:", error);
     toast({
       variant: "destructive",
-      title: "Error saving visit",
-      description: error.message || "Unable to save branch visit data"
+      title: "Error creating visit",
+      description: error.message || "Unable to create branch visit"
     });
-    return { success: false, error };
+    return {
+      success: false,
+      data: null,
+      error
+    };
   }
 };
 
 // Get branch visit stats for BH Dashboard
-export const getBranchVisitStats = async (userId: string) => {
+export const getBranchVisitStats = async (userId: string): Promise<{
+  assignedBranches: number;
+  branchesVisited: number;
+  submittedVisits: number;
+  approvedVisits: number;
+  totalVisits: number;
+  completionRate: number;
+}> => {
   try {
-    // Get total assigned branches
-    const { data: assignedData, error: assignedError } = await supabase
+    // First get user's role
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+      
+    if (userError) {
+      throw userError;
+    }
+    
+    // Get assigned branches
+    const { data: assignments, error: assignmentError } = await supabase
       .from('branch_assignments')
-      .select('branch_id')
+      .select('*, branches!branch_assignments_branch_id_fkey(*)')
       .eq('user_id', userId);
       
-    if (assignedError) throw assignedError;
+    if (assignmentError) {
+      throw assignmentError;
+    }
     
-    const assignedBranches = assignedData?.length || 0;
+    const assignedBranches = assignments?.length || 0;
     
-    // Get branches visited this month
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    if (assignedBranches === 0) {
+      return {
+        assignedBranches: 0,
+        branchesVisited: 0,
+        submittedVisits: 0,
+        approvedVisits: 0,
+        totalVisits: 0,
+        completionRate: 0
+      };
+    }
     
-    const { data: visitData, error: visitError } = await supabase
+    // Get branch visits for this month
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const { data: visits, error: visitsError } = await supabase
       .from('branch_visits')
-      .select('branch_id')
+      .select('branch_id, status')
       .eq('user_id', userId)
-      .gte('visit_date', firstDay)
-      .lte('visit_date', lastDay);
+      .gte('visit_date', firstDayOfMonth.toISOString())
+      .lte('visit_date', today.toISOString());
       
-    if (visitError) throw visitError;
+    if (visitsError) {
+      throw visitsError;
+    }
     
-    // Count unique branches visited
-    const uniqueBranchesVisited = new Set(visitData?.map(v => v.branch_id)).size;
-    
-    // Calculate completion rate
-    const completionRate = assignedBranches > 0 
-      ? Math.round((uniqueBranchesVisited / assignedBranches) * 100)
-      : 0;
-    
-    // Get pending visits (branches not visited yet this month)
-    const pendingVisits = assignedBranches - uniqueBranchesVisited;
+    // Calculate metrics
+    const allVisits = visits || [];
+    const submittedVisits = allVisits.filter(v => v.status === 'submitted').length;
+    const approvedVisits = allVisits.filter(v => v.status === 'approved').length;
+    const totalVisits = submittedVisits + approvedVisits;
+    const branchesVisited = new Set(allVisits.filter(v => v.status === 'submitted' || v.status === 'approved').map(v => v.branch_id)).size;
+    const completionRate = assignedBranches > 0 ? Math.round((branchesVisited / assignedBranches) * 100) : 0;
     
     return {
       assignedBranches,
-      branchesVisited: uniqueBranchesVisited,
-      pendingVisits: pendingVisits > 0 ? pendingVisits : 0,
+      branchesVisited,
+      submittedVisits,
+      approvedVisits,
+      totalVisits,
       completionRate
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error getting branch visit stats:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading stats",
+      description: error.message || "Unable to load branch visit statistics"
+    });
     return {
       assignedBranches: 0,
       branchesVisited: 0,
-      pendingVisits: 0,
+      submittedVisits: 0,
+      approvedVisits: 0,
+      totalVisits: 0,
       completionRate: 0
     };
   }
 };
 
-// Get coverage by branch category for BH Dashboard
-export const getBranchCategoryCoverage = async (userId: string) => {
+// Get visit metrics for a specific BH user
+export const getBHVisitMetrics = async (userId: string): Promise<{
+  hrConnectSessions: { completed: number, total: number };
+  avgParticipation: number;
+  employeeCoverage: number;
+  newEmployeeCoverage: number;
+}> => {
   try {
-    // Get all assigned branches by category
-    const { data: assignedBranches, error: assignedError } = await supabase
-      .from('branch_assignments')
-      .select(`
-        branch_id,
-        branches (
-          id,
-          category
-        )
-      `)
-      .eq('user_id', userId);
-      
-    if (assignedError) throw assignedError;
-    
-    // Group assigned branches by category
-    const assignedByCategory: Record<string, string[]> = {};
-    assignedBranches?.forEach(item => {
-      if (!item.branches || !item.branches.category) return;
-      
-      const category = item.branches.category || 'unknown';
-      if (!assignedByCategory[category]) {
-        assignedByCategory[category] = [];
-      }
-      if (item.branches.id) {
-        assignedByCategory[category].push(item.branches.id);
-      }
-    });
-    
-    // Get current month's visits
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    // Get visits for this month
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
     const { data: visits, error: visitsError } = await supabase
       .from('branch_visits')
-      .select('branch_id, branch_category')
+      .select(`
+        id,
+        hr_connect_session,
+        total_employees_invited,
+        total_participants,
+        new_employees_covered,
+        new_employees_total,
+        branches!branch_visits_branch_id_fkey(*)
+      `)
       .eq('user_id', userId)
-      .gte('visit_date', firstDay)
-      .lte('visit_date', lastDay);
+      .in('status', ['submitted', 'approved'])
+      .gte('visit_date', firstDayOfMonth.toISOString())
+      .lte('visit_date', today.toISOString()) as { data: BranchVisit[] | null, error: any };
       
-    if (visitsError) throw visitsError;
+    if (visitsError) {
+      throw visitsError;
+    }
     
-    // Count visits by category
-    const visitsByCategory: Record<string, Set<string>> = {};
-    visits?.forEach(visit => {
-      if (!visit.branch_category || !visit.branch_id) return;
+    if (!visits || visits.length === 0) {
+      return {
+        hrConnectSessions: { completed: 0, total: 0 },
+        avgParticipation: 0,
+        employeeCoverage: 0,
+        newEmployeeCoverage: 0
+      };
+    }
+    
+    // Calculate metrics
+    const hrConnectSessions = {
+      completed: visits.filter(v => v.hr_connect_session).length,
+      total: visits.length
+    };
+    
+    // Calculate participation rate and coverage
+    const validVisits = visits.filter(visit => 
+      visit.total_participants && 
+      visit.total_participants > 0 && 
+      visit.total_employees_invited && 
+      visit.total_employees_invited > 0
+    );
+
+    const participationRate = validVisits.reduce((total, visit) => {
+      return total + ((visit.total_participants || 0) / (visit.total_employees_invited || 1)) * 100;
+    }, 0);
+
+    // Calculate new employee coverage
+    const validNewEmployeeVisits = visits.filter(visit => 
+      visit.new_employees_covered && 
+      visit.new_employees_covered > 0 && 
+      visit.new_employees_total && 
+      visit.new_employees_total > 0
+    );
+
+    const newEmployeeCoverage = validNewEmployeeVisits.reduce((total, visit) => {
+      return total + ((visit.new_employees_covered || 0) / (visit.new_employees_total || 1)) * 100;
+    }, 0);
+
+    return {
+      hrConnectSessions,
+      avgParticipation: validVisits.length > 0 ? Math.round(participationRate / validVisits.length) : 0,
+      employeeCoverage: validVisits.length > 0 ? Math.round(participationRate / validVisits.length) : 0,
+      newEmployeeCoverage: validNewEmployeeVisits.length > 0 ? Math.round(newEmployeeCoverage / validNewEmployeeVisits.length) : 0
+    };
+  } catch (error: any) {
+    console.error("Error getting BH visit metrics:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading metrics",
+      description: error.message || "Unable to load visit metrics"
+    });
+    return {
+      hrConnectSessions: { completed: 0, total: 0 },
+      avgParticipation: 0,
+      employeeCoverage: 0,
+      newEmployeeCoverage: 0
+    };
+  }
+};
+
+// Get coverage by branch category for BH Dashboard
+export const getBranchCategoryCoverage = async (userId: string): Promise<{ category: string, completion: number, color: string }[]> => {
+  try {
+    // Get assigned branches with their categories
+    const { data: assignments, error: assignmentError } = await supabase
+      .from('branch_assignments')
+      .select('*, branches!branch_assignments_branch_id_fkey(*)')
+      .eq('user_id', userId) as { data: BranchAssignment[] | null, error: any };
       
-      const category = visit.branch_category;
-      if (!visitsByCategory[category]) {
-        visitsByCategory[category] = new Set();
+    if (assignmentError) {
+      throw assignmentError;
+    }
+    
+    if (!assignments || assignments.length === 0) {
+      return [];
+    }
+    
+    // Group branches by category
+    const categoryBranches: Record<string, string[]> = {};
+    assignments.forEach(assignment => {
+      if (assignment.branches) {
+        const category = assignment.branches.category.toLowerCase();
+        if (!categoryBranches[category]) {
+          categoryBranches[category] = [];
+        }
+        categoryBranches[category].push(assignment.branch_id);
       }
-      visitsByCategory[category].add(visit.branch_id);
     });
     
-    // Calculate completion percentage for each category
-    const categoryCoverage = [
-      { category: 'platinum', completion: 0, color: 'bg-violet-500' },
-      { category: 'diamond', completion: 0, color: 'bg-blue-500' },
-      { category: 'gold', completion: 0, color: 'bg-amber-500' },
-      { category: 'silver', completion: 0, color: 'bg-slate-400' },
-      { category: 'bronze', completion: 0, color: 'bg-orange-700' }
-    ];
+    // Get visits for this month
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    categoryCoverage.forEach(cat => {
-      const assigned = assignedByCategory[cat.category]?.length || 0;
-      const visited = visitsByCategory[cat.category]?.size || 0;
+    const { data: visits, error: visitsError } = await supabase
+      .from('branch_visits')
+      .select('branch_id')
+      .eq('user_id', userId)
+      .in('status', ['submitted', 'approved'])
+      .gte('visit_date', firstDayOfMonth.toISOString())
+      .lte('visit_date', today.toISOString());
       
-      cat.completion = assigned > 0 ? Math.round((visited / assigned) * 100) : 0;
+    if (visitsError) {
+      throw visitsError;
+    }
+    
+    // Calculate completion rates by category
+    const visitedBranches = new Set(visits?.map(v => v.branch_id) || []);
+    
+    const coverage = Object.entries(categoryBranches).map(([category, branches]) => {
+      const visitedCount = branches.filter(id => visitedBranches.has(id)).length;
+      const completion = Math.round((visitedCount / branches.length) * 100);
+      
+      return {
+        category: category.charAt(0).toUpperCase() + category.slice(1),
+        completion,
+        color: getCategoryColor(category)
+      };
     });
     
-    return categoryCoverage;
-  } catch (error) {
-    console.error("Error getting branch category coverage:", error);
-    return [
-      { category: 'platinum', completion: 0, color: 'bg-violet-500' },
-      { category: 'diamond', completion: 0, color: 'bg-blue-500' },
-      { category: 'gold', completion: 0, color: 'bg-amber-500' },
-      { category: 'silver', completion: 0, color: 'bg-slate-400' },
-      { category: 'bronze', completion: 0, color: 'bg-orange-700' }
-    ];
+    return coverage.sort((a, b) => b.completion - a.completion);
+  } catch (error: any) {
+    console.error("Error getting category coverage:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading coverage data",
+      description: error.message || "Unable to load category coverage data"
+    });
+    return [];
+  }
+};
+
+// Get coverage and participation data for Coverage & Participation Trends chart
+export const getCoverageParticipationTrends = async (timeRange = 'lastSixMonths'): Promise<{
+  month: string;
+  branchCoverage: number;
+  participationRate: number;
+}[]> => {
+  console.info("Fetching coverage and participation trends...");
+  
+  try {
+    // Get date range based on timeRange
+    const endDate = new Date();
+    let startDate: Date;
+    
+    switch (timeRange) {
+      case 'lastMonth':
+        startDate = new Date(endDate);
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      case 'lastQuarter':
+        startDate = new Date(endDate);
+        startDate.setMonth(startDate.getMonth() - 3);
+        break;
+      case 'lastSixMonths':
+      default:
+        startDate = new Date(endDate);
+        startDate.setMonth(startDate.getMonth() - 6);
+    }
+    
+    // Get time periods for the chart
+    const periods = getTimePeriods(timeRange, startDate, endDate);
+    
+    // Get all visits within the date range
+    const { data: visits, error: visitsError } = await supabase
+      .from('branch_visits')
+      .select(`
+        visit_date,
+        branch_id,
+        total_employees_invited,
+        total_participants
+      `)
+      .in('status', ['submitted', 'approved'])
+      .gte('visit_date', startDate.toISOString())
+      .lte('visit_date', endDate.toISOString()) as { data: BranchVisit[] | null, error: any };
+      
+    if (visitsError) {
+      throw visitsError;
+    }
+    
+    // Get total number of branches for coverage calculation
+    const { count: totalBranches, error: branchError } = await supabase
+      .from('branches')
+      .select('*', { count: 'exact' });
+      
+    if (branchError) {
+      throw branchError;
+    }
+    
+    // Calculate metrics for each period
+    const trends = periods.map(period => {
+      // Filter visits for this period
+      const periodVisits = visits?.filter(visit => {
+        const visitDate = new Date(visit.visit_date);
+        return visitDate >= period.start && visitDate <= period.end;
+      }) || [];
+      
+      // Calculate branch coverage
+      const visitedBranches = new Set(periodVisits.map(v => v.branch_id));
+      const branchCoverage = totalBranches ? Math.round((visitedBranches.size / totalBranches) * 100) : 0;
+      
+      // Calculate participation rate
+      let totalParticipation = 0;
+      let validVisits = 0;
+      
+      periodVisits.forEach(visit => {
+        if (visit.total_participants && visit.total_employees_invited) {
+          totalParticipation += (visit.total_participants / visit.total_employees_invited) * 100;
+          validVisits++;
+        }
+      });
+      
+      const participationRate = validVisits ? Math.round(totalParticipation / validVisits) : 0;
+      
+      return {
+        month: period.label,
+        branchCoverage,
+        participationRate
+      };
+    });
+    
+    return trends;
+  } catch (error: any) {
+    console.error("Error getting coverage and participation trends:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading trends",
+      description: error.message || "Unable to load coverage and participation trends"
+    });
+    return [];
   }
 };
 
 // Get visit metrics across branches for analytics
-export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | undefined) => {
+export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | undefined): Promise<{
+  name: string;
+  manning: number;
+  attrition: number;
+  er: number;
+  nonVendor: number;
+  cwt: number;
+}[]> => {
   try {
     let query = supabase.from('branch_visits')
       .select(`
-        branch_category,
+        id,
+        branch_id,
         manning_percentage,
         attrition_percentage,
         er_percentage,
-        cwt_cases
+        non_vendor_percentage,
+        cwt_cases,
+        branches:branch_id (
+          category
+        )
       `);
     
     // Apply date filter if provided
@@ -368,7 +701,8 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | und
     // Only include submitted or approved visits
     query = query.in('status', ['submitted', 'approved']);
     
-    const { data, error } = await query;
+    const { data, error } = await query as { data: BranchVisit[] | null, error: any };
+    console.log('Raw visit metrics data:', data);
     
     if (error) {
       throw error;
@@ -384,11 +718,12 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | und
       manningSum: number;
       attritionSum: number;
       erSum: number;
+      nonVendorSum: number;
       cwtSum: number;
     }> = {};
     
     data.forEach(visit => {
-      const category = visit.branch_category || 'unknown';
+      const category = visit.branches?.category || 'unknown';
       
       if (!categoryData[category]) {
         categoryData[category] = {
@@ -396,25 +731,30 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | und
           manningSum: 0,
           attritionSum: 0,
           erSum: 0,
+          nonVendorSum: 0,
           cwtSum: 0
         };
       }
       
       categoryData[category].count++;
       
-      if (typeof visit.manning_percentage === 'number') {
+      if (visit.manning_percentage !== null) {
         categoryData[category].manningSum += visit.manning_percentage;
       }
       
-      if (typeof visit.attrition_percentage === 'number') {
+      if (visit.attrition_percentage !== null) {
         categoryData[category].attritionSum += visit.attrition_percentage;
       }
       
-      if (typeof visit.er_percentage === 'number') {
+      if (visit.er_percentage !== null) {
         categoryData[category].erSum += visit.er_percentage;
       }
       
-      if (typeof visit.cwt_cases === 'number') {
+      if (visit.non_vendor_percentage !== null) {
+        categoryData[category].nonVendorSum += visit.non_vendor_percentage;
+      }
+      
+      if (visit.cwt_cases !== null) {
         categoryData[category].cwtSum += visit.cwt_cases;
       }
     });
@@ -426,7 +766,8 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | und
         manning: Math.round(data.manningSum / data.count),
         attrition: Math.round(data.attritionSum / data.count),
         er: Math.round(data.erSum / data.count),
-        cwt: data.cwtSum
+        nonVendor: Math.round(data.nonVendorSum / data.count),
+        cwt: Math.round(data.cwtSum / data.count)
       };
     });
     
@@ -438,322 +779,161 @@ export const getVisitMetrics = async (dateRange?: { from: Date; to: Date } | und
   }
 };
 
-// Get visit metrics for a specific BH user
-export const getBHVisitMetrics = async (userId: string) => {
-  try {
-    if (!userId) {
-      throw new Error("User ID is required");
-    }
-    
-    // For BH Dashboard we need specific metrics
-    const { data: visits, error } = await supabase
-      .from('branch_visits')
-      .select(`
-        hr_connect_session,
-        total_employees_invited,
-        total_participants,
-        new_employees_total,
-        new_employees_covered
-      `)
-      .eq('user_id', userId)
-      .in('status', ['submitted', 'approved']);
-      
-    if (error) throw error;
-    
-    if (!visits || visits.length === 0) {
-      return {
-        hrConnectSessions: { completed: 0, total: 0 },
-        avgParticipation: 0,
-        employeeCoverage: 0,
-        newEmployeeCoverage: 0
-      };
-    }
-    
-    // Calculate HR Connect sessions
-    const hrSessions = visits.filter(v => v.hr_connect_session === true).length;
-    
-    // Calculate average participation
-    const totalInvited = visits.reduce((sum, v) => sum + (v.total_employees_invited || 0), 0);
-    const totalParticipated = visits.reduce((sum, v) => sum + (v.total_participants || 0), 0);
-    const avgParticipation = totalInvited > 0 ? Math.round((totalParticipated / totalInvited) * 100) : 0;
-    
-    // Calculate new employee coverage
-    const newTotal = visits.reduce((sum, v) => sum + (v.new_employees_total || 0), 0);
-    const newCovered = visits.reduce((sum, v) => sum + (v.new_employees_covered || 0), 0);
-    const newEmployeeCoverage = newTotal > 0 ? Math.round((newCovered / newTotal) * 100) : 0;
-    
-    return {
-      hrConnectSessions: { completed: hrSessions, total: visits.length },
-      avgParticipation,
-      employeeCoverage: avgParticipation, // Same as participation for now
-      newEmployeeCoverage
-    };
-  } catch (error) {
-    console.error("Error getting BH visit metrics:", error);
-    return {
-      hrConnectSessions: { completed: 0, total: 0 },
-      avgParticipation: 0,
-      employeeCoverage: 0,
-      newEmployeeCoverage: 0
-    };
-  }
-};
-
-// Get coverage and participation data for Coverage & Participation Trends chart
-export const getCoverageParticipationTrends = async (timeRange = 'lastSixMonths') => {
-  console.info("Fetching coverage and participation trends...");
-  
-  try {
-    // Determine date range based on timeRange
-    let startDate = new Date();
-    const endDate = new Date();
-    
-    switch(timeRange) {
-      case 'lastMonth':
-        startDate.setMonth(startDate.getMonth() - 1);
-        break;
-      case 'lastThreeMonths':
-        startDate.setMonth(startDate.getMonth() - 3);
-        break;
-      case 'lastSixMonths':
-        startDate.setMonth(startDate.getMonth() - 6);
-        break;
-      case 'lastYear':
-        startDate.setFullYear(startDate.getFullYear() - 1);
-        break;
-      default:
-        startDate.setMonth(startDate.getMonth() - 6);
-    }
-    
-    // Format dates for query
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
-    
-    // Get total branches count for coverage calculation
-    const { data: branches, error: branchError } = await supabase
-      .from('branches')
-      .select('id', { count: 'exact' });
-    
-    if (branchError) throw branchError;
-    const totalBranches = branches?.length || 0;
-    
-    // Get all visits within the date range grouped by month
-    const { data: visits, error: visitError } = await supabase
-      .from('branch_visits')
-      .select(`
-        visit_date,
-        branch_id,
-        total_employees_invited,
-        total_participants
-      `)
-      .gte('visit_date', startDateStr)
-      .lte('visit_date', endDateStr)
-      .in('status', ['submitted', 'approved']);
-    
-    if (visitError) throw visitError;
-    
-    if (!visits || visits.length === 0) {
-      return [];
-    }
-    
-    // Group visits by month
-    const visitsByMonth: Record<string, {
-      visits: typeof visits,
-      uniqueBranches: Set<string>,
-      totalInvited: number,
-      totalParticipated: number
-    }> = {};
-    
-    visits.forEach(visit => {
-      const visitDate = new Date(visit.visit_date);
-      const monthYear = `${visitDate.getFullYear()}-${String(visitDate.getMonth() + 1).padStart(2, '0')}`;
-      
-      if (!visitsByMonth[monthYear]) {
-        visitsByMonth[monthYear] = {
-          visits: [],
-          uniqueBranches: new Set(),
-          totalInvited: 0,
-          totalParticipated: 0
-        };
-      }
-      
-      visitsByMonth[monthYear].visits.push(visit);
-      visitsByMonth[monthYear].uniqueBranches.add(visit.branch_id);
-      visitsByMonth[monthYear].totalInvited += (visit.total_employees_invited || 0);
-      visitsByMonth[monthYear].totalParticipated += (visit.total_participants || 0);
-    });
-    
-    // Convert to array and format for chart
-    const trendsData = Object.entries(visitsByMonth).map(([monthYear, data]) => {
-      const [year, month] = monthYear.split('-').map(Number);
-      const date = new Date(year, month - 1);
-      const monthName = date.toLocaleString('default', { month: 'short' });
-      
-      const branchCoverage = totalBranches > 0 ? 
-        Math.round((data.uniqueBranches.size / totalBranches) * 100) : 0;
-        
-      const participationRate = data.totalInvited > 0 ?
-        Math.round((data.totalParticipated / data.totalInvited) * 100) : 0;
-      
-      return {
-        month: `${monthName} ${year}`,
-        branchCoverage,
-        participationRate
-      };
-    });
-    
-    // Sort by date
-    trendsData.sort((a, b) => {
-      const dateA = new Date(a.month);
-      const dateB = new Date(b.month);
-      return dateA.getTime() - dateB.getTime();
-    });
-    
-    console.info("Trends data:", trendsData);
-    return trendsData;
-  } catch (error) {
-    console.error("Error fetching coverage and participation trends:", error);
-    toast({
-      variant: "destructive",
-      title: "Error fetching trends",
-      description: "Could not load coverage and participation data"
-    });
-    return [];
-  }
-};
-
 // Get performance trend data for Performance Trend chart
-export const getPerformanceTrends = async (timeRange = 'lastSixMonths') => {
+export const getPerformanceTrends = async (timeRange = 'lastSixMonths'): Promise<{
+  month: string;
+  manning: number;
+  attrition: number;
+  er: number;
+  nonVendor: number;
+}[]> => {
   console.log("Fetching performance trends for", timeRange);
   try {
-    // Determine date range based on timeRange
-    let startDate = new Date();
+    // Get date range based on timeRange
     const endDate = new Date();
+    let startDate: Date;
     
-    // Reset the startDate based on the selected time range
-    switch(timeRange) {
-      case 'lastWeek':
-        startDate.setDate(startDate.getDate() - 7);
-        break;
+    switch (timeRange) {
       case 'lastMonth':
+        startDate = new Date(endDate);
         startDate.setMonth(startDate.getMonth() - 1);
         break;
       case 'lastQuarter':
+        startDate = new Date(endDate);
         startDate.setMonth(startDate.getMonth() - 3);
         break;
       case 'lastSixMonths':
-        startDate.setMonth(startDate.getMonth() - 6);
-        break;
-      case 'lastYear':
-        startDate.setFullYear(startDate.getFullYear() - 1);
-        break;
       default:
+        startDate = new Date(endDate);
         startDate.setMonth(startDate.getMonth() - 6);
     }
     
-    // Format for console debugging
-    console.log(`Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    // Get time periods for the chart
+    const periods = getTimePeriods(timeRange, startDate, endDate);
     
-    // Get appropriate periods based on timeRange
-    const timePeriods = getTimePeriods(timeRange, startDate, endDate);
-    console.log("Time periods:", timePeriods);
-    
-    // Get visits from the database within the date range
-    const { data: visits, error } = await supabase
+    // Get all visits within the date range
+    const { data: visits, error: visitsError } = await supabase
       .from('branch_visits')
-      .select('visit_date, manning_percentage, attrition_percentage, er_percentage, non_vendor_percentage')
+      .select(`
+        visit_date,
+        manning_percentage,
+        attrition_percentage,
+        er_percentage,
+        non_vendor_percentage,
+        cwt_cases
+      `)
+      .in('status', ['submitted', 'approved'])
       .gte('visit_date', startDate.toISOString())
-      .lte('visit_date', endDate.toISOString())
-      .order('visit_date', { ascending: true });
+      .lte('visit_date', endDate.toISOString()) as { data: BranchVisit[] | null, error: any };
+      
+    if (visitsError) {
+      console.error('Error fetching performance trend visits:', visitsError);
+      throw visitsError;
+    }
     
-    if (error) throw error;
-    console.log(`Found ${visits?.length || 0} visits within date range`);
+    console.info('Raw performance trend visits:', JSON.stringify(visits, null, 2));
     
-    // Process data for each time period
-    const trendsData = timePeriods.map(period => {
-      // Filter visits for this period
+    if (!visits || visits.length === 0) {
+      console.warn('No visits found for performance trends');
+      return periods.map(period => ({
+        month: period.label,
+        manning: 0,
+        attrition: 0,
+        er: 0,
+        nonVendor: 0
+      }));
+    }
+    
+    // Calculate metrics for each period
+    const trends = periods.map(period => {
       const periodVisits = visits.filter(visit => {
         const visitDate = new Date(visit.visit_date);
         return visitDate >= period.start && visitDate <= period.end;
       });
       
-      // Calculate averages for this period
       let manningSum = 0;
+      let manningCount = 0;
       let attritionSum = 0;
+      let attritionCount = 0;
       let erSum = 0;
+      let erCount = 0;
       let nonVendorSum = 0;
-      let count = 0;
+      let nonVendorCount = 0;
+      let cwtSum = 0;
+      let cwtCount = 0;
       
       periodVisits.forEach(visit => {
         if (visit.manning_percentage !== null) {
           manningSum += visit.manning_percentage;
-          count++;
+          manningCount++;
         }
-        if (visit.attrition_percentage !== null) attritionSum += visit.attrition_percentage;
-        if (visit.er_percentage !== null) erSum += visit.er_percentage;
-        if (visit.non_vendor_percentage !== null) nonVendorSum += visit.non_vendor_percentage;
+        
+        if (visit.attrition_percentage !== null) {
+          attritionSum += visit.attrition_percentage;
+          attritionCount++;
+        }
+        
+        if (visit.er_percentage !== null) {
+          erSum += visit.er_percentage;
+          erCount++;
+        }
+
+        if (visit.non_vendor_percentage !== null) {
+          nonVendorSum += visit.non_vendor_percentage;
+          nonVendorCount++;
+        }
+
+        if (visit.cwt_cases !== null) {
+          cwtSum += visit.cwt_cases;
+          cwtCount++;
+        }
       });
-      
-      // Avoid division by zero
-      count = Math.max(count, 1);
       
       return {
         month: period.label,
-        manning: Math.round(manningSum / count),
-        attrition: Math.round(attritionSum / count),
-        er: Math.round(erSum / count),
-        nonVendor: Math.round(nonVendorSum / count)
+        manning: manningCount ? Math.round(manningSum / manningCount) : 0,
+        attrition: attritionCount ? Math.round(attritionSum / attritionCount) : 0,
+        er: erCount ? Math.round(erSum / erCount) : 0,
+        nonVendor: nonVendorCount ? Math.round(nonVendorSum / nonVendorCount) : 0
       };
     });
     
-    return trendsData;
-  } catch (error) {
-    console.error("Error fetching performance trends:", error);
-    // Return empty array or sample data as fallback
+    return trends;
+  } catch (error: any) {
+    console.error("Error getting performance trends:", error);
+    toast({
+      variant: "destructive",
+      title: "Error loading trends",
+      description: error.message || "Unable to load performance trends"
+    });
     return [];
   }
 };
 
 // Helper function to generate time periods based on selected range
-function getTimePeriods(timeRange, startDate, endDate) {
-  const periods = [];
-  let currentDate;
+const getTimePeriods = (timeRange: string, startDate: Date, endDate: Date): { start: Date; end: Date; label: string }[] => {
+  const periods: { start: Date; end: Date; label: string }[] = [];
+  let currentDate: Date;
   
-  switch(timeRange) {
-    case 'lastWeek':
-      // Daily periods for the last 7 days
-      for (let i = 6; i >= 0; i--) {
-        currentDate = new Date(endDate);
-        currentDate.setDate(currentDate.getDate() - i);
-        const dayStart = new Date(currentDate);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(currentDate);
-        dayEnd.setHours(23, 59, 59, 999);
-        
-        const dayStr = `${currentDate.getDate()}/${currentDate.getMonth() + 1}`;
-        periods.push({
-          start: dayStart,
-          end: dayEnd,
-          label: dayStr
-        });
-      }
-      break;
-      
+  switch (timeRange) {
     case 'lastMonth':
       // Weekly periods for the last month
       currentDate = new Date(startDate);
       let weekNum = 1;
+      
       while (currentDate < endDate) {
         const weekStart = new Date(currentDate);
         const weekEnd = new Date(currentDate);
         weekEnd.setDate(weekEnd.getDate() + 6);
-        if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
         
-        const weekStr = `W${weekNum}`;
+        if (weekEnd > endDate) {
+          weekEnd.setTime(endDate.getTime());
+        }
+        
         periods.push({
           start: weekStart,
           end: weekEnd,
-          label: weekStr
+          label: `Week ${weekNum}`
         });
         
         currentDate.setDate(currentDate.getDate() + 7);
@@ -762,28 +942,7 @@ function getTimePeriods(timeRange, startDate, endDate) {
       break;
       
     case 'lastQuarter':
-      // Monthly periods for the last quarter (3 months)
-      currentDate = new Date(startDate);
-      currentDate.setDate(1); // Start from the 1st of the month
-      
-      while (currentDate < endDate) {
-        const monthStart = new Date(currentDate);
-        const monthEnd = new Date(currentDate);
-        monthEnd.setMonth(monthEnd.getMonth() + 1, 0); // Last day of current month
-        
-        const monthStr = monthStart.toLocaleDateString('en-US', { month: 'short' });
-        periods.push({
-          start: monthStart,
-          end: monthEnd,
-          label: monthStr
-        });
-        
-        currentDate.setMonth(currentDate.getMonth() + 1);
-      }
-      break;
-      
     case 'lastSixMonths':
-    case 'lastYear':
     default:
       // Monthly periods
       currentDate = new Date(startDate);
@@ -806,4 +965,15 @@ function getTimePeriods(timeRange, startDate, endDate) {
   }
   
   return periods;
-}
+};
+
+// Helper function to get category colors
+const getCategoryColor = (category: string) => {
+  const colors = {
+    urban: "bg-blue-500",
+    'semi-urban': "bg-emerald-500",
+    rural: "bg-purple-500",
+    metro: "bg-orange-500"
+  };
+  return colors[category.toLowerCase()] || "bg-slate-500";
+};
