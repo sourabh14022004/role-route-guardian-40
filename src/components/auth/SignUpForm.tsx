@@ -203,9 +203,9 @@ const SignUpForm = () => {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="BH">BH</SelectItem>
-                    <SelectItem value="ZH">ZH</SelectItem>
-                    <SelectItem value="CH">CH</SelectItem>
+                    <SelectItem value="BH">BHR</SelectItem>
+                    <SelectItem value="ZH">ZHR</SelectItem>
+                    <SelectItem value="CH">CHR</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
