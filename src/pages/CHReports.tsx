@@ -228,7 +228,7 @@ const CHReports = () => {
       if (data.length === 0) {
         toast({
           title: "No data to export",
-          description: "There are no BHR performance data to export."
+          description: "There are no BH performance data to export."
         });
         return;
       }
@@ -252,14 +252,14 @@ const CHReports = () => {
       
       toast({
         title: "Download complete",
-        description: "BHR performance summary has been exported successfully."
+        description: "BH performance summary has been exported successfully."
       });
     } catch (error) {
-      console.error("Error exporting BHR data:", error);
+      console.error("Error exporting BH data:", error);
       toast({
         variant: "destructive",
         title: "Export failed",
-        description: "There was an error exporting the BHR performance data."
+        description: "There was an error exporting the BH performance data."
       });
     } finally {
       setIsDownloadingBHR(false);
@@ -422,13 +422,13 @@ const CHReports = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="bhr">BHR</Label>
+                  <Label htmlFor="bhr">BH</Label>
                   <Select value={selectedBHR} onValueChange={setSelectedBHR}>
                     <SelectTrigger id="bhr">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All BHRs</SelectItem>
+                      <SelectItem value="all">All BHs</SelectItem>
                       <SelectItem value="bhr1">Sanjay Singh</SelectItem>
                       <SelectItem value="bhr2">Priya Sharma</SelectItem>
                       <SelectItem value="bhr3">Vikram Malhotra</SelectItem>
@@ -526,7 +526,7 @@ const CHReports = () => {
             isLoading={isDownloadingVisits}
           />
           <DownloadButton 
-            label="BHR Performance Summary"
+            label="BH Performance Summary"
             icon={<Download className="h-5 w-5" />}
             onClick={handleDownloadBHRPerformance}
             isLoading={isDownloadingBHR}

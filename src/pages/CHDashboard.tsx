@@ -401,9 +401,9 @@ const CHDashboard = () => {
         {/* Top performers */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Performing BHRs</CardTitle>
+            <CardTitle>Top Performing BHs</CardTitle>
             <CardDescription>
-              BHRs with the highest coverage rates and report submissions
+              BHs with the highest coverage rates and report submissions
             </CardDescription>
           </CardHeader>
           <CardContent>

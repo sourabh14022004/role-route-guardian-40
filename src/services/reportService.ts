@@ -210,11 +210,11 @@ export async function fetchBHRReportStats(bhrId: string): Promise<BHRReportStats
     
     return stats;
   } catch (error: any) {
-    console.error("Error fetching BHR report stats:", error);
+    console.error("Error fetching BH report stats:", error);
     toast({
       variant: "destructive",
       title: "Error loading stats",
-      description: error.message || "Unable to load BHR statistics"
+      description: error.message || "Unable to load BH statistics"
     });
     return {
       total: 0,
@@ -603,8 +603,8 @@ export async function exportBranchVisitData(
       'Branch Code': visit.branches?.branch_code || 'Unknown',
       'Branch Location': visit.branches?.location || 'Unknown',
       'Branch Category': visit.branch_category || 'Unknown',
-      'BHR Name': visit.profiles?.full_name || 'Unknown',
-      'BHR Code': visit.profiles?.e_code || 'Unknown',
+      'BH Name': visit.profiles?.full_name || 'Unknown',
+      'BH Code': visit.profiles?.e_code || 'Unknown',
       'Status': visit.status || 'Unknown',
       'HR Connect Session': visit.hr_connect_session ? 'Yes' : 'No',
       'Total Employees Invited': visit.total_employees_invited || 0,
@@ -664,10 +664,10 @@ export async function exportBHRPerformanceSummary(
       }
     }
     
-    // Get performance data for each BHR
+    // Get performance data for each BH
     const bhrPerformance = await Promise.all(
       bhrs.map(async (bhr) => {
-        // Get all visits by this BHR
+        // Get all visits by this BH
         let query = supabase
           .from('branch_visits')
           .select('*, branches:branch_id (category)')
@@ -729,8 +729,8 @@ export async function exportBHRPerformanceSummary(
         });
         
         return {
-          'BHR Name': bhr.full_name,
-          'BHR Code': bhr.e_code,
+          'BH Name': bhr.full_name,
+          'BH Code': bhr.e_code,
           'Total Visits': totalVisits,
           'Unique Branches Visited': uniqueBranches.size,
           'Platinum Visits': visitsByCategory.platinum,
@@ -748,11 +748,11 @@ export async function exportBHRPerformanceSummary(
     
     return bhrPerformance;
   } catch (error: any) {
-    console.error("Error exporting BHR performance data:", error);
+    console.error("Error exporting BH performance data:", error);
     toast({
       variant: "destructive",
       title: "Export failed",
-      description: error.message || "Unable to export BHR performance data"
+      description: error.message || "Unable to export BH performance data"
     });
     return [];
   }
@@ -763,7 +763,7 @@ export async function exportBHRPerformanceSummary(
  */
 export async function exportBranchAssignments() {
   try {
-    // Get BHRs with their assigned branches
+    // Get BHs with their assigned branches
     const { data: mappings, error } = await supabase
       .from('bhr_branch_mappings')
       .select(`
@@ -783,8 +783,8 @@ export async function exportBranchAssignments() {
     
     // Format data for export
     return mappings?.map(mapping => ({
-      'BHR Name': mapping.profiles?.full_name || 'Unknown',
-      'BHR Code': mapping.profiles?.e_code || 'Unknown',
+      'BH Name': mapping.profiles?.full_name || 'Unknown',
+      'BH Code': mapping.profiles?.e_code || 'Unknown',
       'Branch Name': mapping.branches?.name || 'Unknown',
       'Branch Code': mapping.branches?.branch_code || 'Unknown',
       'Branch Location': mapping.branches?.location || 'Unknown',

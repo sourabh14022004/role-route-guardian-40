@@ -63,7 +63,7 @@ const ZHBHRManagement = () => {
     try {
       return await fetchBHRReportStats(bhId);
     } catch (error) {
-      console.error("Error fetching BHR stats:", error);
+      console.error("Error fetching BH stats:", error);
       return { total: 0, approved: 0, submitted: 0, rejected: 0 };
     }
   };
@@ -71,7 +71,7 @@ const ZHBHRManagement = () => {
   return (
     <div className="px-6 py-8 md:px-8 lg:px-10 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-blue-500 bg-clip-text text-transparent">BHR Management</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-blue-500 bg-clip-text text-transparent">BH Management</h1>
         <p className="text-slate-500 mt-2 text-lg">
           View and manage Branch Head Representatives in your zone
         </p>
@@ -119,7 +119,7 @@ const ZHBHRManagement = () => {
           <div className="flex justify-center mb-4">
             <User className="h-16 w-16 text-slate-300" />
           </div>
-          <h3 className="text-xl font-medium mb-2 text-slate-700">No BHRs found</h3>
+          <h3 className="text-xl font-medium mb-2 text-slate-700">No BHs found</h3>
           <p className="text-slate-500 max-w-md mx-auto">No Branch Head Representatives match your current filters.</p>
         </div>
       ) : (

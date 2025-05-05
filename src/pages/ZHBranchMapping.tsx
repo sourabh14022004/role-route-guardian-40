@@ -136,7 +136,7 @@ const ZHBranchMapping = () => {
         toast({
           variant: "destructive",
           title: "Error loading data",
-          description: "Failed to load branch and BHR data. Please try again."
+          description: "Failed to load branch and BH data. Please try again."
         });
       } finally {
         setIsLoading(false);
@@ -354,7 +354,7 @@ const ZHBranchMapping = () => {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-1">Branch Mapping</h1>
-        <p className="text-slate-600">Assign branches to Branch Head Representatives (BHRs)</p>
+        <p className="text-slate-600">Assign branches to Branch Head Representatives (BHs)</p>
       </div>
       
       <Card className="mb-6 hover:shadow-md transition-shadow">
@@ -397,7 +397,7 @@ const ZHBranchMapping = () => {
                   <TableHead className="w-[200px]">Branch Name</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Assigned BHRs</TableHead>
+                  <TableHead>Assigned BHs</TableHead>
                   <TableHead className="text-right w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -438,7 +438,7 @@ const ZHBranchMapping = () => {
                               </Badge>
                             ))
                           ) : (
-                            <span className="text-slate-500 text-sm">No BHRs assigned</span>
+                            <span className="text-slate-500 text-sm">No BHs assigned</span>
                           )}
                         </div>
                       </TableCell>
@@ -477,15 +477,15 @@ const ZHBranchMapping = () => {
           {dialogType === "assign" ? (
             <>
               <AlertDialogHeader>
-                <AlertDialogTitle>Assign Branch to BHR</AlertDialogTitle>
+                <AlertDialogTitle>Assign Branch to BH</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Select a BHR to assign to {selectedBranch?.name}
+                  Select a BH to assign to {selectedBranch?.name}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="py-4">
                 <Select value={selectedBHUser || ""} onValueChange={setSelectedBHUser}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a BHR" />
+                    <SelectValue placeholder="Select a BH" />
                   </SelectTrigger>
                   <SelectContent>
                     {bhUsers.map((bhUser) => (

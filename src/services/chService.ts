@@ -172,7 +172,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
       .eq('role', 'BH');
 
     if (activeBhrsError) {
-      console.error("Error fetching active BHRs:", activeBhrsError);
+      console.error("Error fetching active BHs:", activeBhrsError);
       throw activeBhrsError;
     }
 

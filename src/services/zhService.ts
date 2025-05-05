@@ -154,11 +154,11 @@ export async function fetchBHRs(userId: string): Promise<BHRUser[]> {
 
     return processedBHRs;
   } catch (error: any) {
-    console.error("Error fetching BHRs:", error);
+    console.error("Error fetching BHs:", error);
     toast({
       variant: "destructive",
-      title: "Error loading BHRs",
-      description: error.message || "Unable to load BHRs"
+      title: "Error loading BHs",
+      description: error.message || "Unable to load BHs"
     });
     return [];
   }
@@ -272,7 +272,7 @@ export async function assignBranchToBHR(bhUserId: string, branchId: string) {
       toast({
         variant: "destructive",
         title: "Assignment already exists",
-        description: "This branch is already assigned to this BHR."
+        description: "This branch is already assigned to this BH."
       });
       return null;
     }
@@ -303,7 +303,7 @@ export async function assignBranchToBHR(bhUserId: string, branchId: string) {
 
     toast({
       title: "Branch assigned successfully",
-      description: "The branch has been assigned to the BHR."
+      description: "The branch has been assigned to the BH."
     });
 
     return {
@@ -312,11 +312,11 @@ export async function assignBranchToBHR(bhUserId: string, branchId: string) {
       user_id: bhUserId
     };
   } catch (error: any) {
-    console.error("Error assigning branch to BHR:", error);
+    console.error("Error assigning branch to BH:", error);
     
     let errorMessage = "An unexpected error occurred.";
     if (error.code === '23505') {
-      errorMessage = "This branch is already assigned to this BHR.";
+      errorMessage = "This branch is already assigned to this BH.";
     } else if (error.message) {
       errorMessage = error.message;
     }

@@ -241,7 +241,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">BHR Details</DialogTitle>
+          <DialogTitle className="text-xl">BH Details</DialogTitle>
         </DialogHeader>
 
         {profileLoading ? (
@@ -249,7 +249,7 @@ const BHRDetailsModal = ({ bhId, open, onClose }: BHRDetailsModalProps) => {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
         ) : !bhrProfile ? (
-          <div className="py-4 text-center text-slate-500">BHR profile not found</div>
+          <div className="py-4 text-center text-slate-500">BH profile not found</div>
         ) : (
           <>
             <div className="flex flex-col md:flex-row gap-4 md:items-start mb-6">
